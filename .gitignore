@@ -141,3 +141,4 @@ vite.config.ts.timestamp-*
 # Workspace files
 .idea/
 .vscode/
+TASKS.md

@@ -15,6 +15,7 @@ const createBuildOptions = () => {
         entryPoints: [path.join(__dirname, 'src', 'main.ts')],
         outfile: path.join(__dirname, 'dist', 'bundled.js'),
         bundle: true,
+        external: ['vue', '@wikimedia/codex'],
         format: 'iife',
         charset: 'utf8',
         target: ['es2017'],
@@ -32,7 +33,7 @@ const createBuildOptions = () => {
 // Timestamp: ${timestamp}
 // <nowiki>`
         },
-        footer: {js: '// </nowiki>'},
+        footer: { js: '// </nowiki>' },
         logLevel: 'info',
     };
 };
@@ -43,13 +44,13 @@ const createBuildOptions = () => {
         if (watch) {
             const ctx = await esbuild.context(buildOptions);
             await ctx.watch();
-            console.log('[CiteHub build] Watching for changes...');
+            console.log('[Cite Hub build] Watching for changes...');
         } else {
             await esbuild.build(buildOptions);
-            console.log('[CiteHub build] Build complete');
+            console.log('[Cite Hub build] Build complete');
         }
     } catch (e) {
-        console.error('[CiteHub build] Build failed:', e);
+        console.error('[Cite Hub build] Build failed:', e);
         process.exit(1);
     }
 })();

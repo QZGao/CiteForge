@@ -1,35 +1,54 @@
 import styles from './styles.css';
+import { parseReferences, attachDomUses } from './core/references';
+import { getWikitext } from './data/wikitext';
+import { injectStyles } from './utils/styles';
+import { openInspectorDialog, getPortletLinkId, isHubVisible, setHubVisible } from './ui/panel';
+import { addPortletTrigger } from './ui/portlet';
 
-/**
- * Injects CSS styles into the document head.
- * @param css {string} - The CSS styles to inject.
- */
-function injectStyles(css: string): void {
-	if (!css) return;
-	try {
-		const styleEl = document.createElement('style');
-		styleEl.appendChild(document.createTextNode(css));
-		document.head.appendChild(styleEl);
-	} catch (e) {
-		// Fallback for older environments
-		const div = document.createElement('div');
-		div.innerHTML = `<style>${css}</style>`;
-		document.head.appendChild(div.firstChild as any);
-	}
+async function fetchRefs(): Promise<import('./types').Reference[]> {
+	const wikitext = await getWikitext();
+	const refs = parseReferences(wikitext);
+	attachDomUses(refs);
+	return refs;
 }
 
-/**
- * Entry point of the script.
- */
-function init(): void {
-	// Inject bundled CSS into the page.
-	if (typeof document !== 'undefined') {
-		injectStyles(styles);
+async function loadCiteHubData(): Promise<void> {
+	const refs = await fetchRefs();
+	const refreshOnce = async () => {
+		const next = await fetchRefs();
+		await openInspectorDialog(next, refreshOnce);
+	};
+	await openInspectorDialog(refs, refreshOnce);
+}
+
+async function init(): Promise<void> {
+	injectStyles(styles);
+	await mw.loader.using(['mediawiki.util', 'mediawiki.api', '@wikimedia/codex']);
+
+	const toggle = async () => {
+		if (isHubVisible()) {
+			setHubVisible(false);
+		} else {
+			await loadCiteHubData();
+			setHubVisible(true);
+		}
+		refreshPortletLabel();
+	};
+
+	const refreshPortletLabel = () => {
+		const label = isHubVisible() ? 'Hide Cite Hub' : 'Show Cite Hub';
+		addPortletTrigger(getPortletLinkId(), label, () => {
+			void toggle();
+		});
+	};
+
+	refreshPortletLabel();
+	if (isHubVisible()) {
+		await loadCiteHubData();
 	}
-
-	mw.hook('wikipage.content').add(function () {
-
+	mw.hook('wikipage.content').add(() => {
+		refreshPortletLabel();
 	});
 }
 
-init();
+void init();
