@@ -1,0 +1,16 @@
+{
+  "name": "citehub",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Unified reference workbench that lets you inspect, rename, reorganize, and check all citations on a page. ",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "esbuild": "^0.21.5",
+    "types-mediawiki": "^1.9.1"
+  }
+}
