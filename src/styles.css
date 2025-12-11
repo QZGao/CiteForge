@@ -4,8 +4,9 @@
 	position: fixed;
 	left: 16px;
 	bottom: 16px;
-	width: 540px;
-	max-height: 76vh;
+	width: 400px;
+	height: 66vh;
+	max-height: 80vh;
 	display: none;
 	flex-direction: column;
 	z-index: 10000;
@@ -206,6 +207,15 @@
 	transform: translateY(-1px);
 }
 
+.citehub-tool-btn--primary {
+	background: linear-gradient(135deg, #2a4b8d, #1d3a6c);
+	color: #fff;
+}
+
+.citehub-tool-btn--primary:hover {
+	background: linear-gradient(135deg, #3a5b9d, #2d4a7c);
+}
+
 .citehub-tool-icon {
 	display: inline-flex;
 	align-items: center;
@@ -265,11 +275,13 @@
 	border: 1px solid #d7dce3;
 	background: #f5f7fb;
 	border-radius: 4px;
-	padding: 4px 6px;
+	padding: 4px 8px;
 	cursor: pointer;
 	display: inline-flex;
 	align-items: center;
-	justify-content: center;
+	gap: 4px;
+	font-size: 12px;
+	color: #3c4554;
 }
 
 .citehub-copy-btn:hover {
@@ -315,10 +327,10 @@
 
 .citehub-row__title {
 	display: flex;
-	justify-content: space-between;
 	align-items: baseline;
-	gap: 8px;
+	gap: 4px;
 	margin-bottom: 4px;
+	flex-wrap: wrap;
 }
 
 .citehub-row__name {
@@ -326,9 +338,36 @@
 	color: #24334f;
 }
 
+.citehub-row__name-actions {
+	display: inline-flex;
+	gap: 2px;
+	align-items: center;
+	margin-left: 2px;
+}
+
+.citehub-icon-btn {
+	border: none;
+	background: transparent;
+	padding: 2px;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 3px;
+	color: #5a6475;
+	opacity: 0.6;
+	transition: opacity 0.15s, background 0.15s;
+}
+
+.citehub-icon-btn:hover {
+	opacity: 1;
+	background: #e2eaf7;
+}
+
 .citehub-row__meta {
 	font-size: 12px;
 	color: #5a6475;
+	margin-left: auto;
 }
 
 .citehub-row__snippet {
@@ -391,6 +430,28 @@
 .citehub-ref-highlight {
 	background: #fff2a8;
 	outline: 2px solid #f0c400;
+	border-radius: 2px;
+	display: inline-block;
+}
+
+@keyframes citehub-blink {
+
+	0%,
+	100% {
+		background: #fff2a8;
+		outline: 2px solid #f0c400;
+		transform: scale(1);
+	}
+
+	50% {
+		background: #ffe066;
+		outline: 2px solid #e6a700;
+		transform: scale(1.1);
+	}
+}
+
+.citehub-ref-highlight.citehub-ref-blink {
+	animation: citehub-blink 0.4s ease-in-out 3;
 }
 
 .citehub-shell {

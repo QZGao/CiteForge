@@ -7,6 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const watch = process.argv.includes('--watch');
+const debug = process.argv.includes('--debug');
 const pkgJson = JSON.parse(fs.readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 
 const createBuildOptions = () => {
@@ -20,7 +21,7 @@ const createBuildOptions = () => {
         charset: 'utf8',
         target: ['es2017'],
         minify: false,
-        sourcemap: false,
+        sourcemap: debug ? 'inline' : false,
         // Tell esbuild to load CSS files as text so they're bundled into the JS
         loader: {
             '.css': 'text'

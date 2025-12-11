@@ -13,7 +13,7 @@ export function parseReferences(wikitext: string): Reference[] {
 	let namelessCounter = 0;
 
 	const getOrCreateRef = (name: string | null, group: string | null, content: string): Reference => {
-		const key = name ?? `__nameless_${namelessCounter}`;
+		const key = name ?? `__nameless_${namelessCounter++}`;
 		const existing = refs.get(key);
 
 		if (existing) {
@@ -34,51 +34,36 @@ export function parseReferences(wikitext: string): Reference[] {
 		return ref;
 	};
 
+	// Sanitize wikitext to remove comments, nowiki, pre, syntaxhighlight blocks
 	const sanitized = sanitizeWikitext(wikitext);
-	const withoutSelfClosing = stripSelfClosingRefs(sanitized);
 
-	// Capture named <ref>...</ref> content from sanitized text
-	const refTagRegex = /<ref\b[^>]*\bname\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s/>]+))[^>]*>([\s\S]*?)<\/ref>/gi;
+	// Parse self-closing refs: <ref name="foo" />
+	// Attribute pattern allows quoted values with any chars including /
+	const refSelfClosing = /<ref\b((?:\s+\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s/>]+))*)\s*\/>/gi;
 	let match: RegExpExecArray | null;
-	while ((match = refTagRegex.exec(withoutSelfClosing)) !== null) {
-		const name = match[1] ?? match[2] ?? match[3] ?? '';
-		const content = match[4] ?? '';
-		const group = extractAttr(match[0], 'group');
-		if (!name) {
-			namelessCounter++;
-		}
-		const ref = getOrCreateRef(name || null, group, content.trim());
-		ref.uses.push({ index: ref.uses.length, anchor: null });
-	}
-
-	const refSelfClosing = /<ref\b([^>]*)\/>/gi;
-	while ((match = refSelfClosing.exec(wikitext)) !== null) {
+	while ((match = refSelfClosing.exec(sanitized)) !== null) {
 		const attrs = match[1] ?? '';
 		const name = extractAttr(attrs, 'name');
 		const group = extractAttr(attrs, 'group');
-		if (!name) {
-			namelessCounter++;
-		}
 		const ref = getOrCreateRef(name, group, '');
 		ref.uses.push({ index: ref.uses.length, anchor: null });
 	}
 
-	// Count full refs as uses on original text
-	const refTagUses = /<ref\b([^>]*)>([\s\S]*?)<\/ref>/gi;
-	while ((match = refTagUses.exec(wikitext)) !== null) {
+	// Parse full refs: <ref>content</ref> and <ref name="foo">content</ref>
+	// Match opening tag that is NOT self-closing (no / before >)
+	const refTagFull = /<ref\b((?:\s+\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s/>]+))*)(?<!\s*\/)\s*>([\s\S]*?)<\/ref>/gi;
+	while ((match = refTagFull.exec(sanitized)) !== null) {
 		const attrs = match[1] ?? '';
 		const content = match[2] ?? '';
 		const name = extractAttr(attrs, 'name');
 		const group = extractAttr(attrs, 'group');
-		if (!name) {
-			namelessCounter++;
-		}
 		const ref = getOrCreateRef(name, group, content.trim());
 		ref.uses.push({ index: ref.uses.length, anchor: null });
 	}
 
+	// Parse {{r|name}} templates
 	const refTemplate = /\{\{\s*r\s*\|\s*(?:name\s*=\s*)?([^|}]+)[^}]*\}\}/gi;
-	while ((match = refTemplate.exec(wikitext)) !== null) {
+	while ((match = refTemplate.exec(sanitized)) !== null) {
 		const name = match[1]?.trim();
 		if (!name) continue;
 		const ref = getOrCreateRef(name, null, '');
@@ -162,14 +147,4 @@ function sanitizeWikitext(text: string): string {
 	t = t.replace(/<syntaxhighlight\b[^>]*>[\s\S]*?<\/syntaxhighlight>/gi, '');
 	t = t.replace(/<nowiki\b[^>]*\/\s*>/gi, '');
 	return t;
-}
-
-/**
- * Remove self-closing named ref tags from wikitext.
- * Used to avoid double-counting when parsing full ref tags separately.
- * @param text - Wikitext to process.
- * @returns Wikitext with self-closing named refs removed.
- */
-function stripSelfClosingRefs(text: string): string {
-	return text.replace(/<ref\b[^>]*\bname\s*=\s*(?:"[^"]+"|'[^']+'|[^\s\/>]+)[^>]*\/\s*>/gi, '');
 }

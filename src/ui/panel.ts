@@ -14,6 +14,13 @@ const HIGHLIGHT_CLASS = 'citehub-ref-highlight';
 const PORTLET_LINK_ID = 'citehub-portlet-link';
 const PANEL_SIZE_KEY = 'citehub-panel-size';
 
+/** Represents a queued change to a reference name. */
+type PendingChange = {
+	refId: string;
+	oldName: string;
+	newName: string;
+};
+
 /** Internal state for the inspector panel Vue component. */
 type InspectorState = {
 	open: boolean;
@@ -24,6 +31,7 @@ type InspectorState = {
 	settings: ReturnType<typeof getSettings>;
 	showSettings: boolean;
 	minHeight: number;
+	pendingChanges: PendingChange[];
 };
 
 /** Extended context including computed properties for the inspector. */
@@ -31,21 +39,30 @@ type InspectorCtx = InspectorState & {
 	sortedRefs: Reference[];
 	filteredRefs: Reference[];
 	firstByBucket: Record<string, string>;
+	hasPendingChanges: boolean;
 };
 
 /**
  * Highlight all DOM anchors associated with a reference.
  * Clears any existing highlights before applying new ones.
+ * Scrolls to the first anchor and triggers a blink animation.
  * @param ref - The reference to highlight, or null to clear all.
  */
 function highlightRef(ref: Reference | null): void {
 	clearHighlights();
 	if (!ref) return;
+	const anchors: Element[] = [];
 	ref.uses.forEach((use) => {
 		if (use.anchor) {
 			use.anchor.classList.add(HIGHLIGHT_CLASS);
+			use.anchor.classList.add('citehub-ref-blink');
+			anchors.push(use.anchor);
 		}
 	});
+	// Scroll to the first highlighted anchor
+	if (anchors.length > 0) {
+		anchors[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+	}
 }
 
 /**
@@ -54,6 +71,27 @@ function highlightRef(ref: Reference | null): void {
 export function clearHighlights(): void {
 	document.querySelectorAll(`.${HIGHLIGHT_CLASS}`).forEach((node) => {
 		node.classList.remove(HIGHLIGHT_CLASS);
+		node.classList.remove('citehub-ref-blink');
+	});
+}
+
+/**
+ * Show a "Copied!" badge next to the reference row.
+ * @param ref - The reference that was copied.
+ */
+function showCopiedBadge(ref: Reference): void {
+	const name = ref.name || ref.id || '';
+	const badge = document.createElement('span');
+	badge.className = 'citehub-badge';
+	badge.textContent = 'Copied!';
+	const rows = document.querySelectorAll('.citehub-row');
+	rows.forEach((row) => {
+		if (row.textContent?.includes(name)) {
+			const existing = row.querySelector('.citehub-badge');
+			existing?.remove();
+			row.appendChild(badge);
+			setTimeout(() => badge.remove(), 900);
+		}
 	});
 }
 
@@ -144,12 +182,16 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				query: '',
 				settings: getSettings(),
 				showSettings: false,
-				minHeight: 260
+				minHeight: 300,
+				pendingChanges: []
 			};
 		},
 		computed: {
 			hasRefs(this: InspectorCtx): boolean {
 				return Array.isArray(this.filteredRefs) && this.filteredRefs.length > 0;
+			},
+			hasPendingChanges(this: InspectorCtx): boolean {
+				return this.pendingChanges.length > 0;
 			},
 			sortedRefs(this: InspectorCtx): Reference[] {
 				const arr = Array.isArray(this.refs) ? this.refs.slice() : [];
@@ -249,21 +291,41 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				void navigator.clipboard?.writeText(formatted).catch(() => {
 					/* ignore */
 				});
-				const badge = document.createElement('span');
-				badge.className = 'citehub-badge';
-				badge.textContent = 'Copied!';
-				const rows = document.querySelectorAll('.citehub-row');
-				rows.forEach((row) => {
-					if (row.textContent?.includes(name)) {
-						const existing = row.querySelector('.citehub-badge');
-						existing?.remove();
-						row.appendChild(badge);
-						setTimeout(() => badge.remove(), 900);
-					}
+				showCopiedBadge(ref);
+			},
+			copyRefContent(_this: InspectorCtx, ref: Reference): void {
+				const content = ref.contentWikitext || '';
+				void navigator.clipboard?.writeText(content).catch(() => {
+					/* ignore */
 				});
+				showCopiedBadge(ref);
+			},
+			editRefName(this: InspectorCtx, ref: Reference): void {
+				const currentName = ref.name || '';
+				const newName = prompt('Edit reference name:', currentName);
+				if (newName === null || newName === currentName) return;
+				const oldName = ref.name || '';
+				ref.name = newName;
+				// Queue the change
+				const existingIdx = this.pendingChanges.findIndex((c) => c.refId === ref.id);
+				if (existingIdx >= 0) {
+					// Update existing change
+					if (this.pendingChanges[existingIdx].oldName === newName) {
+						// Reverted to original - remove from queue
+						this.pendingChanges.splice(existingIdx, 1);
+					} else {
+						this.pendingChanges[existingIdx].newName = newName;
+					}
+				} else {
+					this.pendingChanges.push({ refId: ref.id, oldName, newName });
+				}
 			},
 			toggleSettings(this: InspectorCtx): void {
 				this.showSettings = !this.showSettings;
+			},
+			saveChanges(this: InspectorCtx): void {
+				// TODO: Implement actual wikitext editing
+				mw.notify?.(`${this.pendingChanges.length} change(s) to save (not yet implemented)`, { type: 'info' });
 			},
 			saveSettings(this: InspectorCtx): void {
 				saveSettings(this.settings);
@@ -277,8 +339,8 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				const startX = event.clientX;
 				const startY = event.clientY;
 				const onMove = (e: MouseEvent) => {
-					const newW = Math.max(360, startW + (e.clientX - startX));
-					const newH = Math.max(260, startH - (e.clientY - startY));
+					const newW = Math.max(320, startW + (e.clientX - startX));
+					const newH = Math.max(300, startH - (e.clientY - startY));
 					panelEl.style.width = `${newW}px`;
 					panelEl.style.height = `${newH}px`;
 				};
@@ -286,8 +348,8 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					document.removeEventListener('mousemove', onMove);
 					document.removeEventListener('mouseup', onUp);
 					document.body.style.cursor = '';
-					const newW = Math.max(360, startW + (e.clientX - startX));
-					const newH = Math.max(260, startH - (e.clientY - startY));
+					const newW = Math.max(320, startW + (e.clientX - startX));
+					const newH = Math.max(300, startH - (e.clientY - startY));
 					savePanelSize({ width: newW, height: newH });
 				};
 				document.addEventListener('mousemove', onMove);
@@ -378,15 +440,29 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 								>
 									<div class="citehub-row__title">
 										<span class="citehub-row__name">{{ refName(ref) }}</span>
+										<span class="citehub-row__name-actions" v-if="ref.name">
+											<button class="citehub-icon-btn" type="button" @click.stop.prevent="editRefName(ref)" title="Edit ref name">
+												<svg viewBox="0 0 20 20" width="12" height="12" aria-hidden="true">
+													<path fill="currentColor" d="m16.77 8 1.94-2a1 1 0 0 0 0-1.41l-3.34-3.3a1 1 0 0 0-1.41 0L12 3.23zM1 14.25V19h4.75l9.96-9.96-4.75-4.75z"/>
+												</svg>
+											</button>
+											<button class="citehub-icon-btn" type="button" @click.stop.prevent="copyRefName(ref)" title="Copy ref name">
+												<svg viewBox="0 0 20 20" width="12" height="12" aria-hidden="true">
+													<path fill="currentColor" d="M3 3h8v2h2V3c0-1.1-.895-2-2-2H3c-1.1 0-2 .895-2 2v8c0 1.1.895 2 2 2h2v-2H3z"/>
+													<path fill="currentColor" d="M9 9h8v8H9zm0-2c-1.1 0-2 .895-2 2v8c0 1.1.895 2 2 2h8c1.1 0 2-.895 2-2V9c0-1.1-.895-2-2-2z"/>
+												</svg>
+											</button>
+										</span>
 										<span class="citehub-row__meta">Uses: {{ refUses(ref) }} <span v-if="ref.group">· {{ ref.group }}</span></span>
 									</div>
 									<div class="citehub-row__snippet">{{ (ref.contentWikitext || '').slice(0, 200) || '(No inline content captured)' }}</div>
 									<div class="citehub-row__actions">
-										<button class="citehub-copy-btn" type="button" @click.stop.prevent="copyRefName(ref)" :title="'Copy ref name'">
-											<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-												<path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
-											</path>
+										<button class="citehub-copy-btn" type="button" @click.stop.prevent="copyRefContent(ref)" title="Copy raw content">
+											<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+												<path fill="currentColor" d="M3 3h8v2h2V3c0-1.1-.895-2-2-2H3c-1.1 0-2 .895-2 2v8c0 1.1.895 2 2 2h2v-2H3z"/>
+												<path fill="currentColor" d="M9 9h8v8H9zm0-2c-1.1 0-2 .895-2 2v8c0 1.1.895 2 2 2h8c1.1 0 2-.895 2-2V9c0-1.1-.895-2-2-2z"/>
 											</svg>
+											<span>Copy raw</span>
 										</button>
 									</div>
 								</div>
@@ -394,6 +470,14 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 							<div v-else class="citehub-empty">No references found on this page.</div>
 						</div>
 						<div class="citehub-panel__toolbar">
+							<button v-if="hasPendingChanges" class="citehub-tool-btn citehub-tool-btn--primary" type="button" title="Save pending changes" @click.prevent="saveChanges">
+								<span class="citehub-tool-icon" aria-hidden="true">
+									<svg viewBox="0 0 20 20" width="16" height="16">
+										<path fill="currentColor" d="M17 2h-3.5V1H15V0H5v1h1.5v1H3L2 4v15h16V4zm-2.5 0h-9V1h9zM7 15H5v-4h2zm4 0H9v-4h2zm4 0h-2v-4h2zm2-6H3V4.5l.5-.5h13l.5.5z"/>
+									</svg>
+								</span>
+								<span class="citehub-tool-label">Save ({{ pendingChanges.length }})</span>
+							</button>
 							<button class="citehub-tool-btn" type="button" title="Settings" @click.prevent="toggleSettings">
 								<span class="citehub-tool-icon" aria-hidden="true">
 									<svg viewBox="0 0 20 20" width="16" height="16" xmlns:xlink="http://www.w3.org/1999/xlink">
@@ -561,7 +645,7 @@ function applyMinHeight(state: InspectorCtx): void {
 	const topbarH = topbarEl?.offsetHeight || 0;
 	const indexH = indexCol?.scrollHeight || 0;
 	const needed = headerH + pad + topbarH + indexH + 16;
-	state.minHeight = Math.max(260, needed);
+	state.minHeight = Math.max(300, needed);
 	const currentH = panelEl.offsetHeight;
 	if (currentH < state.minHeight) {
 		panelEl.style.height = `${state.minHeight}px`;
