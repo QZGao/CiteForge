@@ -10,6 +10,30 @@ const watch = process.argv.includes('--watch');
 const debug = process.argv.includes('--debug');
 const pkgJson = JSON.parse(fs.readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 
+/**
+ * esbuild plugin to extract <template> content from .vue files.
+ * Exports the template as a default string for runtime compilation.
+ */
+const vueTemplatePlugin = {
+    name: 'vue-template',
+    setup(build) {
+        build.onLoad({ filter: /\.vue$/ }, async (args) => {
+            const text = await fs.promises.readFile(args.path, 'utf8');
+            const match = text.match(/<template>([\s\S]*)<\/template>/);
+            if (!match) {
+                return { errors: [{ text: `No <template> block found in ${args.path}` }] };
+            }
+            const template = match[1];
+            // Escape backticks and backslashes for template literal
+            const escaped = template.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
+            return {
+                contents: `export default \`${escaped}\`;`,
+                loader: 'js'
+            };
+        });
+    }
+};
+
 const createBuildOptions = () => {
     const timestamp = new Date().toISOString();
     return {
@@ -22,6 +46,7 @@ const createBuildOptions = () => {
         target: ['es2017'],
         minify: false,
         sourcemap: debug ? 'inline' : false,
+        plugins: [vueTemplatePlugin],
         // Tell esbuild to load CSS files as text so they're bundled into the JS
         loader: {
             '.css': 'text'

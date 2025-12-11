@@ -23,3 +23,41 @@ export interface Reference {
 	/** All uses (invocations) of this reference in the document. */
 	uses: ReferenceUse[];
 }
+
+/**
+ * Represents a queued change to a reference name.
+ */
+export interface PendingChange {
+	/** ID of the reference being changed. */
+	refId: string;
+	/** Original name before the change. */
+	oldName: string;
+	/** New name after the change. */
+	newName: string;
+}
+
+/**
+ * Internal state for the inspector panel Vue component.
+ */
+export interface InspectorState {
+	open: boolean;
+	visible: boolean;
+	refs: Reference[];
+	selectedRef: Reference | null;
+	query: string;
+	settings: { copyFormat: 'raw' | 'r' | 'ref'; showCiteRefCopyBtn: boolean; showInUserNs: boolean };
+	showSettings: boolean;
+	minHeight: number;
+	pendingChanges: PendingChange[];
+}
+
+/**
+ * Extended context including computed properties for the inspector.
+ */
+export type InspectorCtx = InspectorState & {
+	sortedRefs: Reference[];
+	filteredRefs: Reference[];
+	firstByBucket: Record<string, string>;
+	hasPendingChanges: boolean;
+	hasRefs: boolean;
+};
