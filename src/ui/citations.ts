@@ -3,6 +3,12 @@ import { getSettings, loadSettings } from './settings';
 const POPUP_ID = 'citehub-ref-popup';
 const DATA_ATTACHED = 'citehubAttached';
 
+/**
+ * Initialize the citation hover popup feature.
+ * Creates a popup element that appears when hovering over citation superscripts,
+ * allowing users to copy a permalink to the specific citation.
+ * Uses MutationObserver to attach to dynamically added citations.
+ */
 export function initCitationPopup(): void {
 	loadSettings();
 	if (document.getElementById(POPUP_ID)) return;
@@ -141,7 +147,7 @@ export function initCitationPopup(): void {
 	};
 
 	const supElements = document.querySelectorAll('sup[id^="cite_ref-"]');
-	supElements.forEach(attachToSup);
+	supElements.forEach((el) => attachToSup(el as HTMLElement));
 
 	const mo = new MutationObserver((muts) => {
 		for (const m of muts) {
@@ -161,6 +167,13 @@ export function initCitationPopup(): void {
 	mo.observe(document.body, { childList: true, subtree: true });
 }
 
+/**
+ * Find the common prefix of two strings.
+ * Used to extract the shared portion of cite note and cite ref IDs.
+ * @param a - First string to compare.
+ * @param b - Second string to compare.
+ * @returns The longest common prefix of both strings.
+ */
 function commonPrefix(a: string, b: string): string {
 	const len = Math.min(a.length, b.length);
 	let i = 0;

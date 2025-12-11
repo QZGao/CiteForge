@@ -6,7 +6,7 @@ import {
 	loadCodexAndVue,
 	mountApp,
 	registerCodexComponents
-} from './dialog';
+} from './codex';
 import { getSettings, namespaceAllowed, saveSettings } from './settings';
 import { initCitationPopup } from './citations';
 
@@ -14,6 +14,7 @@ const HIGHLIGHT_CLASS = 'citehub-ref-highlight';
 const PORTLET_LINK_ID = 'citehub-portlet-link';
 const PANEL_SIZE_KEY = 'citehub-panel-size';
 
+/** Internal state for the inspector panel Vue component. */
 type InspectorState = {
 	open: boolean;
 	visible: boolean;
@@ -24,12 +25,19 @@ type InspectorState = {
 	showSettings: boolean;
 	minHeight: number;
 };
+
+/** Extended context including computed properties for the inspector. */
 type InspectorCtx = InspectorState & {
 	sortedRefs: Reference[];
 	filteredRefs: Reference[];
 	firstByBucket: Record<string, string>;
 };
 
+/**
+ * Highlight all DOM anchors associated with a reference.
+ * Clears any existing highlights before applying new ones.
+ * @param ref - The reference to highlight, or null to clear all.
+ */
 function highlightRef(ref: Reference | null): void {
 	clearHighlights();
 	if (!ref) return;
@@ -40,12 +48,19 @@ function highlightRef(ref: Reference | null): void {
 	});
 }
 
+/**
+ * Remove all reference highlight styling from the document.
+ */
 export function clearHighlights(): void {
 	document.querySelectorAll(`.${HIGHLIGHT_CLASS}`).forEach((node) => {
 		node.classList.remove(HIGHLIGHT_CLASS);
 	});
 }
 
+/**
+ * Load saved panel dimensions from localStorage.
+ * @returns Object with optional width and height values.
+ */
 function loadPanelSize(): { width?: number; height?: number } {
 	try {
 		const raw = localStorage.getItem(PANEL_SIZE_KEY);
@@ -57,6 +72,10 @@ function loadPanelSize(): { width?: number; height?: number } {
 	}
 }
 
+/**
+ * Save panel dimensions to localStorage for persistence.
+ * @param size - Object containing width and height to save.
+ */
 function savePanelSize(size: { width: number; height: number }): void {
 	try {
 		localStorage.setItem(PANEL_SIZE_KEY, JSON.stringify(size));
@@ -65,13 +84,23 @@ function savePanelSize(size: { width: number; height: number }): void {
 	}
 }
 
+/**
+ * Close the inspector panel and clear highlights.
+ * @param state - The inspector state to update.
+ */
 function performClose(state: InspectorState): void {
 	state.open = false;
 	clearHighlights();
 }
 
+/** Interface for the inspector root component's public methods. */
 type InspectorRoot = { setRefs: (nextRefs: Reference[]) => void; setVisible: (flag: boolean) => void; getVisible: () => boolean };
 
+/**
+ * Type guard to check if a value is an InspectorRoot instance.
+ * @param val - The value to check.
+ * @returns True if val has the required InspectorRoot methods.
+ */
 function isInspectorRoot(val: unknown): val is InspectorRoot {
 	return Boolean(
 		val &&
@@ -81,6 +110,12 @@ function isInspectorRoot(val: unknown): val is InspectorRoot {
 	);
 }
 
+/**
+ * Open the Cite Hub inspector dialog with the given references.
+ * If the dialog is already open, updates its reference list instead.
+ * @param refs - Array of references to display in the inspector.
+ * @param refreshFn - Optional callback to refresh the reference list.
+ */
 export async function openInspectorDialog(refs: Reference[], refreshFn?: () => Promise<void>): Promise<void> {
 	if (!namespaceAllowed()) {
 		mw.notify?.('Cite Hub is disabled in this namespace or content model.', { type: 'warn' });
@@ -275,7 +310,7 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 		beforeUnmount() {
 			clearHighlights();
 		},
-			template: `
+		template: `
 			<div class="citehub-shell" v-if="visible">
 				<button
 					class="citehub-launcher"
@@ -441,10 +476,19 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 	mountApp(app);
 }
 
+/**
+ * Get the ID used for the Cite Hub portlet link element.
+ * @returns The portlet link element ID string.
+ */
 export function getPortletLinkId(): string {
 	return PORTLET_LINK_ID;
 }
 
+/**
+ * Set the visibility state of the Cite Hub panel.
+ * Updates both the Vue component state and localStorage.
+ * @param show - Whether the panel should be visible.
+ */
 export function setHubVisible(show: boolean): void {
 	const root = getMountedRoot();
 	if (isInspectorRoot(root)) {
@@ -457,6 +501,11 @@ export function setHubVisible(show: boolean): void {
 	}
 }
 
+/**
+ * Check if the Cite Hub panel is currently visible.
+ * Checks the Vue component state first, then falls back to localStorage.
+ * @returns True if the panel is visible.
+ */
 export function isHubVisible(): boolean {
 	const root = getMountedRoot();
 	if (isInspectorRoot(root)) {
@@ -469,6 +518,12 @@ export function isHubVisible(): boolean {
 	}
 }
 
+/**
+ * Get the alphabetical grouping key for a reference name.
+ * Returns '#' for numeric, '*' for unnamed/special, or uppercase letter.
+ * @param name - The reference name to categorize.
+ * @returns Single character representing the group.
+ */
 function groupKey(name: string | null | undefined): string {
 	if (!name) return '*';
 	const first = name.trim().charAt(0);
@@ -478,12 +533,23 @@ function groupKey(name: string | null | undefined): string {
 	return '*';
 }
 
+/**
+ * Get the sort index for an alphabetical group character.
+ * Used to sort references by their group key.
+ * @param char - The group character to get the index for.
+ * @returns Numeric index for sorting (0-27, with 28 for unknown).
+ */
 function alphaIndex(char: string): number {
 	const alphabet = ['#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''), '*'];
 	const idx = alphabet.indexOf(char);
 	return idx === -1 ? alphabet.length : idx;
 }
 
+/**
+ * Calculate and apply minimum height to the panel based on content.
+ * Ensures the panel is tall enough to show the index and topbar.
+ * @param state - The inspector state to update with minHeight.
+ */
 function applyMinHeight(state: InspectorCtx): void {
 	const panelEl = document.querySelector<HTMLElement>('.citehub-panel');
 	const indexCol = document.querySelector<HTMLElement>('.citehub-panel__index');
@@ -502,12 +568,23 @@ function applyMinHeight(state: InspectorCtx): void {
 	}
 }
 
+/**
+ * Format a reference name for copying based on user preference.
+ * @param name - The reference name to format.
+ * @param fmt - The format style: 'raw', 'r' (template), or 'ref' (tag).
+ * @returns Formatted string ready for clipboard.
+ */
 function formatCopy(name: string, fmt: 'raw' | 'r' | 'ref'): string {
 	if (fmt === 'r') return `{{r|${name}}}`;
 	if (fmt === 'ref') return `<ref name="${escapeAttr(name)}" />`;
 	return name;
 }
 
+/**
+ * Escape double quotes in a string for use in HTML attributes.
+ * @param value - The string to escape.
+ * @returns String with double quotes replaced by &quot;.
+ */
 function escapeAttr(value: string): string {
 	return value.replace(/"/g, '&quot;');
 }

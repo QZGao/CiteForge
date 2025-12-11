@@ -1,18 +1,29 @@
+/** User-configurable settings for Cite Hub. */
 type Settings = {
+	/** Format used when copying reference names. */
 	copyFormat: 'raw' | 'r' | 'ref';
+	/** Whether to show the copy button on citation hover. */
 	showCiteRefCopyBtn: boolean;
+	/** Whether Cite Hub is enabled in User namespace. */
 	showInUserNs: boolean;
 };
 
 const SETTINGS_KEY = 'citehub-settings';
 let cachedSettings: Settings | null = null;
 
+/** Default settings applied when no user settings exist. */
 const DEFAULT_SETTINGS: Settings = {
 	copyFormat: 'raw',
 	showCiteRefCopyBtn: true,
 	showInUserNs: true
 };
 
+/**
+ * Load user settings from localStorage.
+ * Returns cached settings if already loaded, otherwise reads from storage.
+ * Falls back to defaults if storage is unavailable or corrupt.
+ * @returns The current settings object.
+ */
 export function loadSettings(): Settings {
 	if (cachedSettings) return cachedSettings;
 	try {
@@ -30,6 +41,11 @@ export function loadSettings(): Settings {
 	}
 }
 
+/**
+ * Save updated settings to localStorage.
+ * Merges the provided partial settings with current settings.
+ * @param next - Partial settings object with values to update.
+ */
 export function saveSettings(next: Partial<Settings>): void {
 	const current = loadSettings();
 	cachedSettings = { ...current, ...next };
@@ -40,10 +56,20 @@ export function saveSettings(next: Partial<Settings>): void {
 	}
 }
 
+/**
+ * Get the current settings (alias for loadSettings).
+ * @returns The current settings object.
+ */
 export function getSettings(): Settings {
 	return loadSettings();
 }
 
+/**
+ * Check if Cite Hub should be enabled in the current namespace.
+ * Allows mainspace (0), User (2 if enabled), and Draft namespaces.
+ * Also checks that the page content model is wikitext.
+ * @returns True if Cite Hub should be enabled.
+ */
 export function namespaceAllowed(): boolean {
 	const ns = mw.config?.get('wgNamespaceNumber');
 	const nsIds = mw.config?.get('wgNamespaceIds') || {};

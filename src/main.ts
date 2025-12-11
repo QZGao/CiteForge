@@ -5,6 +5,11 @@ import { injectStyles } from './utils/styles';
 import { openInspectorDialog, getPortletLinkId, isHubVisible, setHubVisible } from './ui/panel';
 import { addPortletTrigger } from './ui/portlet';
 
+/**
+ * Fetch and parse references from the current page's wikitext.
+ * Also attaches DOM anchor elements to each reference use.
+ * @returns Array of parsed references with DOM anchors attached.
+ */
 async function fetchRefs(): Promise<import('./types').Reference[]> {
 	const wikitext = await getWikitext();
 	const refs = parseReferences(wikitext);
@@ -12,6 +17,10 @@ async function fetchRefs(): Promise<import('./types').Reference[]> {
 	return refs;
 }
 
+/**
+ * Load references and open the Cite Hub inspector dialog.
+ * Sets up a refresh callback to reload data when requested.
+ */
 async function loadCiteHubData(): Promise<void> {
 	const refs = await fetchRefs();
 	const refreshOnce = async () => {
@@ -21,6 +30,10 @@ async function loadCiteHubData(): Promise<void> {
 	await openInspectorDialog(refs, refreshOnce);
 }
 
+/**
+ * Initialize the Cite Hub gadget.
+ * Injects styles, sets up the portlet link, and optionally opens the panel.
+ */
 async function init(): Promise<void> {
 	injectStyles(styles);
 	await mw.loader.using(['mediawiki.util', 'mediawiki.api', '@wikimedia/codex']);

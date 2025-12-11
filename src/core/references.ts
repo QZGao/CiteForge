@@ -2,6 +2,11 @@ import { Reference } from '../types';
 
 /**
  * Parse wikitext for basic ref usages.
+ * Extracts named and unnamed references from various wikitext formats including
+ * <ref> tags, self-closing refs, and {{r|...}} template syntax.
+ * 
+ * @param wikitext - The raw wikitext string to parse for references.
+ * @returns An array of parsed Reference objects with their metadata and usage information.
  */
 export function parseReferences(wikitext: string): Reference[] {
 	const refs = new Map<string, Reference>();
@@ -84,7 +89,16 @@ export function parseReferences(wikitext: string): Reference[] {
 }
 
 /**
- * Attach DOM anchor nodes to known references where possible.
+ * Attaches DOM elements to references based on their names.
+ *
+ * This function iterates through a list of references and associates
+ * them with corresponding anchor elements found in the document.
+ * It updates the `anchor` property of each reference's `uses` array
+ * with the appropriate anchor element, or adds a new entry if all
+ * existing uses have been assigned.
+ *
+ * @param refs - An array of Reference objects that contain the name
+ *               and uses to be attached to the corresponding DOM elements.
  */
 export function attachDomUses(refs: Reference[]): void {
 	const byName = new Map<string, Reference>();
@@ -120,6 +134,13 @@ export function attachDomUses(refs: Reference[]): void {
 	});
 }
 
+/**
+ * Extract an attribute value from an HTML/XML attribute string.
+ * Supports quoted (single/double) and unquoted attribute values.
+ * @param attrs - The attribute string to search (e.g., 'name="foo" group="bar"').
+ * @param attrName - The name of the attribute to extract.
+ * @returns The attribute value, or null if not found.
+ */
 function extractAttr(attrs: string, attrName: string): string | null {
 	const regex = new RegExp(`${attrName}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, 'i');
 	const match = attrs.match(regex);
@@ -127,6 +148,12 @@ function extractAttr(attrs: string, attrName: string): string | null {
 	return match[1] ?? match[2] ?? match[3] ?? null;
 }
 
+/**
+ * Remove comments and non-ref markup from wikitext to simplify parsing.
+ * Strips HTML comments, nowiki, pre, and syntaxhighlight blocks.
+ * @param text - Raw wikitext to sanitize.
+ * @returns Sanitized wikitext with problematic blocks removed.
+ */
 function sanitizeWikitext(text: string): string {
 	let t = String(text || '');
 	t = t.replace(/<!--[\s\S]*?-->/g, '');
@@ -137,6 +164,12 @@ function sanitizeWikitext(text: string): string {
 	return t;
 }
 
+/**
+ * Remove self-closing named ref tags from wikitext.
+ * Used to avoid double-counting when parsing full ref tags separately.
+ * @param text - Wikitext to process.
+ * @returns Wikitext with self-closing named refs removed.
+ */
 function stripSelfClosingRefs(text: string): string {
 	return text.replace(/<ref\b[^>]*\bname\s*=\s*(?:"[^"]+"|'[^']+'|[^\s\/>]+)[^>]*\/\s*>/gi, '');
 }

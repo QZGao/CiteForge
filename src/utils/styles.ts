@@ -1,5 +1,6 @@
 /**
  * Inject CSS text into the document head.
+ * @param css - The CSS string to inject.
  */
 export function injectStyles(css: string): void {
   if (!css) return;

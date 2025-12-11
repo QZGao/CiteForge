@@ -2,6 +2,8 @@ let wikitextCache: string | null = null;
 
 /**
  * Get current page wikitext from the edit textbox or API.
+ * Caches the result for future calls.
+ * @returns Promise resolving to the wikitext string.
  */
 export async function getWikitext(): Promise<string> {
 	if (wikitextCache !== null) {
