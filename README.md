@@ -1,28 +1,45 @@
 # (WIP) Cite Hub
 
-Unified reference workbench for Wikipedia wikitext pages. Inspect, search, copy, and prepare batch actions on citations in one floating panel.
+A citation management workbench for Wikipedia. Inspect, search, edit, and copy references from a floating panel.
 
-## What it does
+## Features
 
-- Floating launcher (bottom-left) plus portlet toggle (“Show/Hide Cite Hub”) that remembers visibility across page loads.
-- Alphabet index, sticky search bar, and inline refresh to browse all references; highlights uses in the article when selected.
-- Hover popup on reference superscripts to copy permalinks; optional via settings.
-- Copy ref names in multiple formats (raw, `{{r|name}}`, `<ref name="name" />`); toolbar buttons for upcoming mass rename/structure/check tools.
-- Resizable, themable panel (adapts to light/dark/follow-OS skins) with size persisted locally; disabled in non-wikitext or disallowed namespaces.
+- **Floating panel** – Collapsible panel (bottom-left) with portlet toggle; remembers visibility and size across sessions
+- **Reference browser** – Alphabetical index, search filter, and refresh button to navigate all citations
+- **Inline editing** – Click the edit icon to rename references in-place; changes are queued for batch saving
+- **Highlight & scroll** – Selecting a reference highlights and scrolls to its uses in the article (with blink animation)
+- **Copy options** – Copy ref names (raw, `{{r|name}}`, or `<ref name="..." />`) or raw citation content
+- **Hover popup** – Quick copy button on reference superscripts (optional, toggle in settings)
+- **Theme support** – Adapts to light/dark/system preference; namespace-aware (disabled on non-wikitext pages)
 
 ## Installation
 
-### Build manually
+### Build from source
 
-1) Install deps: `npm install`
-2) Build: `npm run build` → outputs `dist/bundled.js` for the user script.
-3) Upload `dist/bundled.js` to a wiki you control as a user script (e.g. [Special:MyPage/CiteHub.js](https://en.wikipedia.org/wiki/Special:MyPage/CiteHub.js) on English Wikipedia).
-4) Open [Special:MyPage/global.js](https://meta.wikimedia.org/wiki/Special:MyPage/global.js) on Meta-Wiki, and add:
+```bash
+npm install
+npm run build
+```
 
-   ```js
-   importScript('User:YourUsername/CiteHub.js'); // adjust path as needed
-   ```
+Upload `dist/bundled.js` to your wiki userspace (e.g., `User:YourName/CiteHub.js`), then load it via your `common.js`:
 
-## Inspiration and prior work
+```js
+mw.loader.load('//en.wikipedia.org/w/index.php?title=User:YourName/CiteHub.js&action=raw&ctype=text/javascript');
+```
 
-- [QuickEditExt-Citations](https://www.github.com/QZGao/QuickEditExt-Citations)
+## Development
+
+```bash
+npm run build:debug   # Build with sourcemaps
+npm run lint          # ESLint check
+npm test              # Run Vitest tests
+```
+
+## Credits
+
+- Icons:
+  - [Codex](https://doc.wikimedia.org/codex/latest/) (MIT & CC BY 4.0)
+  - [Codicons](https://github.com/microsoft/vscode-codicons) (MIT & CC BY 4.0)
+- Prior work:
+  - [QuickEditExt-Citations](https://github.com/QZGao/QuickEditExt-Citations) (MIT)
+  - [refOrganizer](https://github.com/QZGao/refOrganizer) and its upstream [refCon](https://github.com/Cumbril/refcon) (GNU FDL 1.3, CC BY-SA 3.0, & GNU GPL 2.0)

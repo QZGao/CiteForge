@@ -68,8 +68,18 @@
 							@click.prevent="selectRef(ref)"
 						>
 							<div class="citehub-row__title">
-								<span class="citehub-row__name">{{ refName(ref) }}</span>
-								<span class="citehub-row__name-actions" v-if="ref.name">
+								<input
+									v-if="editingRefId === ref.id"
+									class="citehub-row__name-input"
+									type="text"
+									:value="ref.name || ''"
+									@blur="commitRefName(ref, $event.target.value)"
+									@keydown.enter.prevent="commitRefName(ref, $event.target.value)"
+									@keydown.escape.prevent="cancelEditRefName(ref)"
+									@click.stop
+								/>
+								<span v-else class="citehub-row__name">{{ refName(ref) }}</span>
+								<span class="citehub-row__name-actions" v-if="ref.name && editingRefId !== ref.id">
 									<button class="citehub-icon-btn" type="button" @click.stop.prevent="editRefName(ref)" title="Edit ref name">
 										<svg viewBox="0 0 20 20" width="12" height="12" aria-hidden="true">
 											<path fill="currentColor" d="m16.77 8 1.94-2a1 1 0 0 0 0-1.41l-3.34-3.3a1 1 0 0 0-1.41 0L12 3.23zM1 14.25V19h4.75l9.96-9.96-4.75-4.75z"/>
@@ -101,8 +111,8 @@
 				<div class="citehub-panel__toolbar">
 					<button v-if="hasPendingChanges" class="citehub-tool-btn citehub-tool-btn--primary" type="button" title="Save pending changes" @click.prevent="saveChanges">
 						<span class="citehub-tool-icon" aria-hidden="true">
-							<svg viewBox="0 0 20 20" width="16" height="16">
-								<path fill="currentColor" d="M17 2h-3.5V1H15V0H5v1h1.5v1H3L2 4v15h16V4zm-2.5 0h-9V1h9zM7 15H5v-4h2zm4 0H9v-4h2zm4 0h-2v-4h2zm2-6H3V4.5l.5-.5h13l.5.5z"/>
+							<svg viewBox="0 0 16 16" width="16" height="16">
+								<path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M15 6.12V11C15 12.06 14.58 13.08 13.83 13.83C13.08 14.58 12.06 15 11 15H5C4.91 15 4.82 14.99 4.74 14.98C4.66 14.97 4.58 14.96 4.5 14.93C4.32 14.89 4.15 14.82 4 14.73C3.92 14.68 3.85 14.64 3.78 14.58C3.64 14.48 3.52 14.36 3.42 14.22C3.36 14.15 3.32 14.08 3.27 14H11C11.35 14 11.69 13.94 12 13.82C12.42 13.68 12.8 13.44 13.12 13.12C13.68 12.56 14 11.8 14 11V4.3L14.41 4.71C14.79 5.08 15 5.6 15 6.12ZM11 13H3C1.897 13 1 12.103 1 11V3C1 1.897 1.897 1 3 1H9.879C10.405 1 10.921 1.213 11.293 1.586L12.414 2.707C12.787 3.079 13 3.595 13 4.121V11C13 12.103 12.103 13 11 13ZM5.999 3H8V2H5.999V3ZM9 8H5V12H9V8ZM10 8V12H11C11.551 12 12 11.551 12 11V4.121C12 3.858 11.893 3.6 11.707 3.414L10.586 2.293C10.4 2.107 10.142 2 9.879 2H9V3C9 3.551 8.551 4 8 4H6C5.449 4 5 3.551 5 3V2H3C2.449 2 2 2.449 2 3V11C2 11.551 2.449 12 3 12H4V8C4 7.449 4.449 7 5 7H9C9.551 7 10 7.449 10 8Z"/>
 							</svg>
 						</span>
 						<span class="citehub-tool-label">Save ({{ pendingChanges.length }})</span>

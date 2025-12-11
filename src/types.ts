@@ -49,6 +49,8 @@ export interface InspectorState {
 	showSettings: boolean;
 	minHeight: number;
 	pendingChanges: PendingChange[];
+	/** ID of the reference currently being edited inline, or null if none. */
+	editingRefId: string | null;
 }
 
 /**

@@ -156,7 +156,8 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				settings: getSettings(),
 				showSettings: false,
 				minHeight: 300,
-				pendingChanges: []
+				pendingChanges: [],
+				editingRefId: null
 			};
 		},
 		computed: {
@@ -274,24 +275,46 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				showCopiedBadge(ref);
 			},
 			editRefName(this: InspectorCtx, ref: Reference): void {
-				const currentName = ref.name || '';
-				const newName = prompt('Edit reference name:', currentName);
-				if (newName === null || newName === currentName) return;
-				const oldName = ref.name || '';
+				this.editingRefId = ref.id;
+				// Focus the input after Vue updates the DOM
+				setTimeout(() => {
+					const input = document.querySelector<HTMLInputElement>('.citehub-row__name-input');
+					if (input) {
+						input.focus();
+						input.select();
+					}
+				}, 0);
+			},
+			commitRefName(this: InspectorCtx, ref: Reference, newName: string): void {
+				const oldName = this.pendingChanges.find((c) => c.refId === ref.id)?.oldName ?? ref.name ?? '';
+				this.editingRefId = null;
+				if (newName === oldName) {
+					// Reverted to original - remove from queue if exists
+					const idx = this.pendingChanges.findIndex((c) => c.refId === ref.id);
+					if (idx >= 0) {
+						this.pendingChanges.splice(idx, 1);
+						ref.name = oldName;
+					}
+					return;
+				}
 				ref.name = newName;
 				// Queue the change
 				const existingIdx = this.pendingChanges.findIndex((c) => c.refId === ref.id);
 				if (existingIdx >= 0) {
-					// Update existing change
-					if (this.pendingChanges[existingIdx].oldName === newName) {
-						// Reverted to original - remove from queue
-						this.pendingChanges.splice(existingIdx, 1);
-					} else {
-						this.pendingChanges[existingIdx].newName = newName;
-					}
+					this.pendingChanges[existingIdx].newName = newName;
 				} else {
 					this.pendingChanges.push({ refId: ref.id, oldName, newName });
 				}
+			},
+			cancelEditRefName(this: InspectorCtx, ref: Reference): void {
+				// Restore original name if there was a pending change
+				const pending = this.pendingChanges.find((c) => c.refId === ref.id);
+				if (pending) {
+					ref.name = pending.oldName;
+					const idx = this.pendingChanges.indexOf(pending);
+					this.pendingChanges.splice(idx, 1);
+				}
+				this.editingRefId = null;
 			},
 			toggleSettings(this: InspectorCtx): void {
 				this.showSettings = !this.showSettings;

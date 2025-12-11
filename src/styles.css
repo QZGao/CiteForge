@@ -216,6 +216,10 @@
 	background: linear-gradient(135deg, #3a5b9d, #2d4a7c);
 }
 
+.citehub-tool-btn--primary .citehub-tool-label {
+	color: #fff;
+}
+
 .citehub-tool-icon {
 	display: inline-flex;
 	align-items: center;
@@ -336,6 +340,25 @@
 .citehub-row__name {
 	font-weight: 700;
 	color: #24334f;
+}
+
+.citehub-row__name-input {
+	font-weight: 700;
+	color: #24334f;
+	font-size: inherit;
+	font-family: inherit;
+	border: 1px solid #3366cc;
+	border-radius: 3px;
+	padding: 1px 4px;
+	margin: -2px 0;
+	background: #fff;
+	outline: none;
+	min-width: 100px;
+	max-width: 200px;
+}
+
+.citehub-row__name-input:focus {
+	box-shadow: 0 0 0 2px rgba(51, 102, 204, 0.25);
 }
 
 .citehub-row__name-actions {
