@@ -9,11 +9,42 @@ import {
 } from './codex';
 import { getSettings, namespaceAllowed, saveSettings } from './settings';
 import { initCitationPopup } from './citations';
+import panelStyles from './panel.css';
 import PANEL_TEMPLATE from './panel.template.vue';
 
+const PANEL_STYLE_ELEMENT_ID = 'citehub-panel-styles';
 const HIGHLIGHT_CLASS = 'citehub-ref-highlight';
 const PORTLET_LINK_ID = 'citehub-portlet-link';
 const PANEL_SIZE_KEY = 'citehub-panel-size';
+
+let panelStylesInjected = false;
+
+/**
+ * Inject panel styles into the document once.
+ */
+function injectPanelStyles(): void {
+	if (panelStylesInjected) return;
+	const existing = document.getElementById(PANEL_STYLE_ELEMENT_ID);
+	if (existing) {
+		panelStylesInjected = true;
+		return;
+	}
+	try {
+		const styleEl = document.createElement('style');
+		styleEl.id = PANEL_STYLE_ELEMENT_ID;
+		styleEl.appendChild(document.createTextNode(panelStyles));
+		document.head.appendChild(styleEl);
+		panelStylesInjected = true;
+	} catch {
+		const div = document.createElement('div');
+		div.innerHTML = `<style id="${PANEL_STYLE_ELEMENT_ID}">${panelStyles}</style>`;
+		const styleEl = div.firstChild as HTMLElement | null;
+		if (styleEl) {
+			document.head.appendChild(styleEl);
+			panelStylesInjected = true;
+		}
+	}
+}
 
 /**
  * Highlight all DOM anchors associated with a reference.
@@ -132,6 +163,8 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 		mw.notify?.('Cite Hub is disabled in this namespace or content model.', { type: 'warn' });
 		return;
 	}
+
+	injectPanelStyles();
 
 	const existingApp = getMountedApp();
 	const existingRoot = getMountedRoot();
