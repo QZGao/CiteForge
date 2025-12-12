@@ -1,0 +1,390 @@
+.citeforge-mass-rename-shell {
+	position: fixed;
+	inset: 0;
+	z-index: 12000;
+	pointer-events: none;
+}
+
+.citeforge-mass-rename-backdrop {
+	position: absolute;
+	inset: 0;
+	background: rgba(6, 20, 40, 0.55);
+	backdrop-filter: blur(2px);
+}
+
+.citeforge-mass-rename-window {
+	position: absolute;
+	inset: 5vh 8vw;
+	background: #fdfdfd;
+	border: 1px solid #d6d9e0;
+	border-radius: 10px;
+	box-shadow: 0 16px 46px rgba(13, 30, 58, 0.32);
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	pointer-events: auto;
+}
+
+.citeforge-mass-rename-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 14px 16px;
+	background: linear-gradient(135deg, #2a4b8d, #1d3a6c);
+	color: #f8fbff;
+}
+
+.citeforge-mass-rename-title {
+	font-weight: 700;
+	font-size: 16px;
+}
+
+.citeforge-mass-rename-subtitle {
+	font-size: 12px;
+	opacity: 0.85;
+}
+
+.citeforge-mass-rename-header-actions {
+	display: flex;
+	gap: 6px;
+}
+
+.citeforge-mass-rename-header-actions .cdx-button {
+	color: #f7fbff;
+}
+
+.citeforge-mass-rename-header-actions .cdx-button:enabled.cdx-button--weight-quiet:hover,
+.citeforge-mass-rename-header-actions .cdx-button.cdx-button--fake-button--enabled.cdx-button--weight-quiet:hover {
+	color: #e2eaf7 !important;
+	background-color: transparent !important;
+	mix-blend-mode: normal !important;
+}
+
+.citeforge-mass-rename-body {
+	display: grid;
+	grid-template-columns: 280px 1fr;
+	gap: 14px;
+	padding: 14px 16px 10px 16px;
+	overflow: hidden;
+}
+
+.citeforge-mass-rename-controls {
+	background: #f6f8fb;
+	border: 1px solid #e1e4ea;
+	border-radius: 8px;
+	padding: 10px 10px 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	overflow-y: auto;
+}
+
+.citeforge-mass-rename-label {
+	font-size: 12px;
+	font-weight: 600;
+	color: #13233f;
+}
+
+.citeforge-mass-rename-select,
+.citeforge-mass-rename-input {
+	width: 100%;
+}
+
+.citeforge-mass-rename-rowstack {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.citeforge-mass-rename-rowstack--wrap {
+	flex-wrap: wrap;
+}
+
+.citeforge-mass-rename-actions {
+	display: flex;
+	gap: 6px;
+	margin-top: 2px;
+}
+
+.citeforge-mass-rename-actions .cdx-button {
+	font-size: 12px;
+	padding: 4px 8px;
+}
+
+.citeforge-mass-rename-field {
+	width: 100%;
+	max-width: 520px;
+}
+
+.citeforge-mass-rename-field .cdx-label__description {
+	font-size: 11px;
+	line-height: 1.5em;
+}
+
+.citeforge-mass-rename-controls .cdx-input-chip__text,
+.citeforge-mass-rename-controls .cdx-chip-input__input {
+	font-size: 13px !important;
+}
+
+/* Codex form controls sizing inside mass-rename controls */
+.citeforge-mass-rename-controls .cdx-select,
+.citeforge-mass-rename-controls .cdx-select-vue,
+.citeforge-mass-rename-controls .cdx-multiselect-lookup,
+.citeforge-mass-rename-controls .cdx-multiselect-lookup-vue,
+.citeforge-mass-rename-controls .cdx-text-input,
+.citeforge-mass-rename-controls .cdx-text-input-vue,
+.citeforge-mass-rename-controls .cdx-checkbox,
+.citeforge-mass-rename-controls .cdx-checkbox-vue {
+	font-size: 13px;
+	width: 100% !important;
+	max-width: 520px;
+	display: block;
+	min-width: 0 !important;
+}
+
+.citeforge-mass-rename-controls .cdx-select-vue .cdx-select,
+.citeforge-mass-rename-controls .cdx-multiselect-lookup-vue .cdx-multiselect-lookup,
+.citeforge-mass-rename-controls .cdx-text-input-vue .cdx-text-input {
+	width: 100% !important;
+	max-width: 520px;
+	min-width: 0 !important;
+}
+
+.citeforge-mass-rename-controls .cdx-select-vue__handle {
+	width: 100% !important;
+	max-width: 520px;
+	min-width: 0 !important;
+}
+
+.citeforge-mass-rename-controls .cdx-select__handle,
+.citeforge-mass-rename-controls .cdx-multiselect-lookup__input,
+.citeforge-mass-rename-controls .cdx-multiselect-lookup .cdx-text-input__input,
+.citeforge-mass-rename-controls .cdx-select-vue__handle,
+.citeforge-mass-rename-controls .cdx-text-input__input,
+.citeforge-mass-rename-controls .cdx-menu-item {
+	font-size: 13px;
+	line-height: 1.4;
+}
+
+.citeforge-mass-rename-controls .cdx-select__handle,
+.citeforge-mass-rename-controls .cdx-select-vue__handle,
+.citeforge-mass-rename-controls .cdx-text-input__input,
+.citeforge-mass-rename-controls .cdx-multiselect-lookup__input,
+.citeforge-mass-rename-controls .cdx-multiselect-lookup .cdx-text-input__input {
+	min-height: 28px;
+}
+
+.citeforge-mass-rename-controls .cdx-checkbox__label,
+.citeforge-mass-rename-controls .cdx-checkbox__input {
+	font-size: 13px;
+}
+
+.citeforge-mass-rename-list {
+	display: flex;
+	flex-direction: column;
+	border: 1px solid #e2e6ed;
+	border-radius: 8px;
+	overflow: hidden;
+	background: #fff;
+}
+
+.citeforge-mass-rename-toolbar {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 8px;
+	padding: 10px;
+	background: #f8f9fb;
+	border-bottom: 1px solid #e1e4ea;
+}
+
+.citeforge-mass-rename-search {
+	width: 100%;
+	padding: 7px 8px;
+	border: 1px solid #cfd5df;
+	border-radius: 6px;
+	font-size: 13px;
+}
+
+.citeforge-mass-rename-toolbar .cdx-checkbox__label,
+.citeforge-mass-rename-toolbar .cdx-checkbox__input {
+	font-size: 12px;
+}
+
+.citeforge-mass-rename-table {
+	overflow: auto;
+	max-height: 60vh;
+}
+
+.citeforge-mass-rename-row {
+	display: grid;
+	grid-template-columns: 52px 2fr 70px 1fr 80px;
+	gap: 8px;
+	padding: 10px;
+	border-bottom: 1px solid #eef1f6;
+	align-items: flex-start;
+}
+
+.citeforge-mass-rename-row:last-child {
+	border-bottom: none;
+}
+
+.citeforge-mass-rename-row.is-inactive {
+	opacity: 0.6;
+}
+
+.citeforge-mass-rename-row.has-error {
+	background: #fff6f6;
+}
+
+.citeforge-mass-rename-head {
+	background: #f1f3f8;
+	font-weight: 600;
+	position: sticky;
+	top: 0;
+	z-index: 1;
+}
+
+.citeforge-mass-rename-col {
+	font-size: 12px;
+	color: #1b2a45;
+}
+
+.citeforge-mass-rename-col--check {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.citeforge-mass-rename-col--name {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.citeforge-mass-rename-col--suggest {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.citeforge-mass-rename-col--actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 6px;
+}
+
+.citeforge-mass-rename-name {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-weight: 600;
+	color: #14233f;
+}
+
+.citeforge-mass-rename-name__label {
+	max-width: 260px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.citeforge-mass-rename-name__bucket {
+	background: #e4e9f3;
+	color: #1d2f52;
+	padding: 2px 6px;
+	border-radius: 6px;
+	font-size: 11px;
+}
+
+.citeforge-mass-rename-snippet {
+	font-size: 12px;
+	color: #47546b;
+	max-height: 42px;
+	overflow-y: auto;
+}
+
+.citeforge-mass-rename-meta {
+	display: flex;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+.citeforge-mass-rename-chip {
+	background: #eef2f9;
+	color: #0f254d;
+	padding: 3px 6px;
+	border-radius: 6px;
+	font-size: 11px;
+}
+
+.citeforge-mass-rename-hint {
+	font-size: 11px;
+	color: #2a4b8d;
+}
+
+.citeforge-mass-rename-error {
+	font-size: 11px;
+	color: #b30015;
+}
+
+.citeforge-mass-rename-col--suggest .cdx-text-input__input,
+.citeforge-mass-rename-col--suggest .cdx-text-input {
+	font-size: 12px;
+	min-height: 28px;
+	min-width: 0;
+	max-width: 200px;
+}
+
+.citeforge-mass-rename-col--actions .cdx-button {
+	font-size: 12px;
+	padding: 4px 8px;
+}
+
+.citeforge-mass-rename-empty {
+	text-align: center;
+	padding: 12px;
+	color: #5c6475;
+	font-size: 13px;
+}
+
+.citeforge-mass-rename-footer {
+	padding: 10px 14px;
+	border-top: 1px solid #e4e6eb;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	background: #f9fafc;
+}
+
+.citeforge-mass-rename-status {
+	display: flex;
+	gap: 8px;
+	font-size: 12px;
+	color: #2a3550;
+}
+
+.citeforge-mass-rename-footer-actions {
+	display: flex;
+	gap: 8px;
+}
+
+@media (max-width: 1024px) {
+	.citeforge-mass-rename-window {
+		inset: 3vh 3vw;
+	}
+
+	.citeforge-mass-rename-body {
+		grid-template-columns: 1fr;
+	}
+
+	.citeforge-mass-rename-row {
+		grid-template-columns: 40px 1fr;
+		grid-template-rows: auto auto auto;
+	}
+
+	.citeforge-mass-rename-col--uses,
+	.citeforge-mass-rename-col--actions {
+		grid-column: 2 / span 1;
+	}
+}

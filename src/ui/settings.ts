@@ -1,5 +1,7 @@
+import { TransformOptions } from "../core/references";
+
 /** User-configurable settings for Cite Forge. */
-type Settings = {
+export type Settings = {
 	/** Format used when copying reference names. */
 	copyFormat: 'raw' | 'r' | 'ref';
 	/** Whether to show the copy button on citation hover. */
@@ -80,6 +82,36 @@ export function saveSettings(next: Partial<Settings>): void {
  */
 export function getSettings(): Settings {
 	return loadSettings();
+}
+
+/**
+ * Convert stored settings plus rename maps into transform options understood by the wikitext transformer.
+ * @param settings - Cite Forge user settings.
+ * @param renameMap - Mapping of existing ref names to their replacements (null to drop a name).
+ * @param renameNameless - Mapping of ref IDs for unnamed refs to the names they should receive.
+ * @returns A populated TransformOptions object.
+ */
+export function settingsToTransformOptions(
+	settings: Settings,
+	renameMap: Record<string, string | null>,
+	renameNameless: Record<string, string | null>
+): TransformOptions {
+	const placementMode = (() => {
+		if (settings.placementMode === 'all_inline') return 'all_inline' as const;
+		if (settings.placementMode === 'all_ldr') return 'all_ldr' as const;
+		const minUses = Math.max(1, Number(settings.minUsesForLdr) || 1);
+		return { minUsesForLdr: minUses };
+	})();
+
+	return {
+		renameMap,
+		renameNameless,
+		sortRefs: Boolean(settings.sortRefs),
+		useTemplateR: Boolean(settings.useTemplateR),
+		locationMode: placementMode,
+		dedupe: !settings.makeCopies,
+		normalizeAll: Boolean(settings.normalizeAll)
+	};
 }
 
 /**

@@ -5,20 +5,28 @@ import {
 	getMountedRoot,
 	loadCodexAndVue,
 	mountApp,
-	registerCodexComponents
+	registerCodexComponents,
+	ensureStyleElement
 } from './codex';
-import { getSettings, namespaceAllowed, saveSettings } from './settings';
+import { getSettings, namespaceAllowed, saveSettings, settingsToTransformOptions } from './settings';
 import { getWikitext } from '../data/wikitext_fetch';
-import { transformWikitext } from '../core/wikitext_transforms';
 import { openDiffPreview } from '../data/diff_preview';
 import { initCitationPopup } from './citations';
+import { formatCopy, groupKey, transformWikitext } from '../core/references';
+import { openMassRenameDialog } from './mass_rename';
 import panelStyles from './panel.css';
 import PANEL_TEMPLATE from './panel.template.vue';
+
+import { alphaIndex } from "../core/string_utils";
 
 const PANEL_STYLE_ELEMENT_ID = 'citeforge-panel-styles';
 const HIGHLIGHT_CLASS = 'citeforge-ref-highlight';
 const PORTLET_LINK_ID = 'citeforge-portlet-link';
 const PANEL_SIZE_KEY = 'citeforge-panel-size';
+
+const safeGroupKey = (name: string | null | undefined): string => groupKey(name);
+const safeAlphaIndex = (char: string): number => alphaIndex(char);
+const safeFormatCopy = (name: string, fmt: 'raw' | 'r' | 'ref'): string => formatCopy(name, fmt);
 
 let panelStylesInjected = false;
 
@@ -27,26 +35,8 @@ let panelStylesInjected = false;
  */
 function injectPanelStyles(): void {
 	if (panelStylesInjected) return;
-	const existing = document.getElementById(PANEL_STYLE_ELEMENT_ID);
-	if (existing) {
-		panelStylesInjected = true;
-		return;
-	}
-	try {
-		const styleEl = document.createElement('style');
-		styleEl.id = PANEL_STYLE_ELEMENT_ID;
-		styleEl.appendChild(document.createTextNode(panelStyles));
-		document.head.appendChild(styleEl);
-		panelStylesInjected = true;
-	} catch {
-		const div = document.createElement('div');
-		div.innerHTML = `<style id="${PANEL_STYLE_ELEMENT_ID}">${panelStyles}</style>`;
-		const styleEl = div.firstChild as HTMLElement | null;
-		if (styleEl) {
-			document.head.appendChild(styleEl);
-			panelStylesInjected = true;
-		}
-	}
+	ensureStyleElement(PANEL_STYLE_ELEMENT_ID, panelStyles);
+	panelStylesInjected = true;
 }
 
 /**
@@ -237,9 +227,9 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			sortedRefs(this: InspectorCtx): Reference[] {
 				const arr = Array.isArray(this.refs) ? this.refs.slice() : [];
 				arr.sort((a, b) => {
-					const ga = groupKey(a.name);
-					const gb = groupKey(b.name);
-					if (ga !== gb) return alphaIndex(ga) - alphaIndex(gb);
+					const ga = safeGroupKey(a.name);
+					const gb = safeGroupKey(b.name);
+					if (ga !== gb) return safeAlphaIndex(ga) - safeAlphaIndex(gb);
 					return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true });
 				});
 				return arr;
@@ -256,7 +246,7 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			firstByBucket(this: InspectorCtx): Record<string, string> {
 				const map: Record<string, string> = {};
 				this.filteredRefs.forEach((ref) => {
-					const bucket = groupKey(ref.name);
+					const bucket = safeGroupKey(ref.name);
 					if (!map[bucket]) {
 						map[bucket] = `citeforge-anchor-${bucket}`;
 					}
@@ -272,7 +262,7 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				return ref?.uses?.length ?? 0;
 			},
 			bucketFor(this: InspectorCtx, ref: Reference): string {
-				return groupKey(ref?.name);
+				return safeGroupKey(ref?.name);
 			},
 			selectRef(this: InspectorCtx, ref: Reference): void {
 				this.selectedRef = ref;
@@ -321,6 +311,13 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					await refreshCallback();
 				}
 			},
+			openMassRename(this: InspectorCtx & { applyMassRename: (renameMap: Record<string, string | null>, renameNameless: Record<string, string | null>) => void }): void {
+				void openMassRenameDialog(this.refs, {
+					onApply: (renameMap, renameNameless) => {
+						this.applyMassRename(renameMap, renameNameless);
+					}
+				});
+			},
 			onQueryInput(this: InspectorCtx, evt: Event): void {
 				const target = evt.target as HTMLInputElement | null;
 				this.query = target?.value ?? '';
@@ -333,7 +330,7 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			copyRefName(this: InspectorCtx, ref: Reference): void {
 				const name = ref.name || '';
 				if (!name) return;
-				const formatted = formatCopy(name, this.settings.copyFormat);
+				const formatted = safeFormatCopy(name, this.settings.copyFormat);
 				void navigator.clipboard?.writeText(formatted).catch(() => {
 					/* ignore */
 				});
@@ -393,6 +390,38 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				}
 				this.editingRefId = null;
 			},
+			applyMassRename(this: InspectorCtx, renameMap: Record<string, string | null>, renameNameless: Record<string, string | null>): void {
+				this.editingRefId = null;
+				this.refs.forEach((ref) => {
+					const currentName = ref.name || '';
+					const proposed = currentName ? renameMap[currentName] : renameNameless[ref.id];
+					if (proposed === undefined || proposed === null) return;
+					const existing = this.pendingChanges.find((c) => c.refId === ref.id);
+					const originalName = existing ? existing.oldName : currentName;
+					if (proposed === originalName) {
+						if (existing) {
+							const idx = this.pendingChanges.indexOf(existing);
+							if (idx >= 0) this.pendingChanges.splice(idx, 1);
+						}
+						ref.name = originalName;
+						return;
+					}
+					ref.name = proposed;
+					if (existing) {
+						existing.newName = proposed;
+					} else {
+						this.pendingChanges.push({ refId: ref.id, oldName: originalName, newName: proposed });
+					}
+				});
+				if (!this.pendingChanges.length) {
+					mw.notify?.('No rename changes were added from mass rename.', { type: 'info', title: 'Cite Forge' });
+				} else {
+					mw.notify?.('Mass rename populated pending changes. Review and save to preview diffs.', {
+						type: 'info',
+						title: 'Cite Forge'
+					});
+				}
+			},
 			toggleSettings(this: InspectorCtx): void {
 				this.showSettings = !this.showSettings;
 			},
@@ -407,8 +436,8 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				}
 				try {
 					const base = await getWikitext();
-					const renameMap: Record<string, string> = {};
-					const renameNameless: Record<string, string> = {};
+					const renameMap: Record<string, string | null> = {};
+					const renameNameless: Record<string, string | null> = {};
 					this.pendingChanges.forEach((c) => {
 						if (c.newName && c.oldName !== c.newName) {
 							if (c.oldName) {
@@ -419,22 +448,7 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 						}
 					});
 
-					const placementMode = (() => {
-						if (this.settings.placementMode === 'all_inline') return 'all_inline' as const;
-						if (this.settings.placementMode === 'all_ldr') return 'all_ldr' as const;
-						const minUses = Math.max(1, Number(this.settings.minUsesForLdr) || 1);
-						return { minUsesForLdr: minUses };
-					})();
-
-					const transformOpts = {
-						renameMap,
-						renameNameless,
-						sortRefs: Boolean(this.settings.sortRefs),
-						useTemplateR: Boolean(this.settings.useTemplateR),
-						locationMode: placementMode,
-						dedupe: !this.settings.makeCopies,
-						normalizeAll: Boolean(this.settings.normalizeAll)
-					} satisfies import('../core/wikitext_transforms').TransformOptions;
+					const transformOpts = settingsToTransformOptions(this.settings, renameMap, renameNameless);
 
 					const result = transformWikitext(base, transformOpts);
 
@@ -547,33 +561,6 @@ export function isHubVisible(): boolean {
 }
 
 /**
- * Get the alphabetical grouping key for a reference name.
- * Returns '#' for numeric, '*' for unnamed/special, or uppercase letter.
- * @param name - The reference name to categorize.
- * @returns Single character representing the group.
- */
-function groupKey(name: string | null | undefined): string {
-	if (!name) return '*';
-	const first = name.trim().charAt(0);
-	if (!first) return '*';
-	if (/[0-9]/.test(first)) return '#';
-	if (/[a-z]/i.test(first)) return first.toUpperCase();
-	return '*';
-}
-
-/**
- * Get the sort index for an alphabetical group character.
- * Used to sort references by their group key.
- * @param char - The group character to get the index for.
- * @returns Numeric index for sorting (0-27, with 28 for unknown).
- */
-function alphaIndex(char: string): number {
-	const alphabet = ['#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''), '*'];
-	const idx = alphabet.indexOf(char);
-	return idx === -1 ? alphabet.length : idx;
-}
-
-/**
  * Calculate and apply minimum height to the panel based on content.
  * Ensures the panel is tall enough to show the index and topbar.
  * @param state - The inspector state to update with minHeight.
@@ -594,25 +581,4 @@ function applyMinHeight(state: InspectorCtx): void {
 	if (currentH < state.minHeight) {
 		panelEl.style.height = `${state.minHeight}px`;
 	}
-}
-
-/**
- * Format a reference name for copying based on user preference.
- * @param name - The reference name to format.
- * @param fmt - The format style: 'raw', 'r' (template), or 'ref' (tag).
- * @returns Formatted string ready for clipboard.
- */
-function formatCopy(name: string, fmt: 'raw' | 'r' | 'ref'): string {
-	if (fmt === 'r') return `{{r|${name}}}`;
-	if (fmt === 'ref') return `<ref name="${escapeAttr(name)}" />`;
-	return name;
-}
-
-/**
- * Escape double quotes in a string for use in HTML attributes.
- * @param value - The string to escape.
- * @returns String with double quotes replaced by &quot;.
- */
-function escapeAttr(value: string): string {
-	return value.replace(/"/g, '&quot;');
 }

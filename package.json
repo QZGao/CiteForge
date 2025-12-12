@@ -1,26 +1,28 @@
 {
-  "name": "citeforge",
-  "version": "0.0.1",
-  "private": true,
-  "description": "Unified reference workbench that lets you inspect, rename, reorganize, and check all citations on a page. ",
-  "type": "module",
-  "scripts": {
-    "build": "node build.mjs",
-    "build:debug": "node build.mjs --debug",
-    "watch": "node build.mjs --watch",
-    "watch:debug": "node build.mjs --watch --debug",
-    "lint": "eslint \"src/**/*.{ts,tsx}\"",
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
-  "devDependencies": {
-    "@types/node": "^24.10.1",
-    "esbuild": "^0.21.5",
-    "eslint": "^9.14.0",
-    "@typescript-eslint/eslint-plugin": "^8.13.0",
-    "@typescript-eslint/parser": "^8.13.0",
-    "types-mediawiki": "^1.9.1",
-    "vitest": "^2.1.0",
-    "vue": "^3.4.27"
-  }
+	"name": "citeforge",
+	"version": "0.0.1",
+	"private": true,
+	"description": "Unified reference workbench that lets you inspect, rename, reorganize, and check all citations on a page. ",
+	"type": "module",
+	"scripts": {
+		"build": "node build.mjs",
+		"build:debug": "node build.mjs --debug",
+		"watch": "node build.mjs --watch",
+		"watch:debug": "node build.mjs --watch --debug",
+		"lint": "eslint \"src/**/*.{ts,tsx,vue}\"",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"devDependencies": {
+		"@types/node": "^24.10.1",
+		"@typescript-eslint/eslint-plugin": "^8.13.0",
+		"@typescript-eslint/parser": "^8.13.0",
+		"esbuild": "^0.21.5",
+		"eslint": "^9.14.0",
+		"eslint-plugin-vue": "^10.6.2",
+		"types-mediawiki": "^1.9.1",
+		"vitest": "^2.1.0",
+		"vue": "^3.4.27",
+		"vue-eslint-parser": "^10.2.0"
+	}
 }

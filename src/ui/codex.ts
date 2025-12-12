@@ -13,6 +13,8 @@ type CodexModule = Partial<{
 	CdxSelect: unknown;
 	CdxTextInput: unknown;
 	CdxCheckbox: unknown;
+	CdxField: unknown;
+	CdxMultiselectLookup: unknown;
 }>;
 
 let mountedApp: VueApp | null = null;
@@ -64,18 +66,50 @@ export async function loadCodexAndVue(): Promise<{ Vue: VueModule; Codex: CodexM
 }
 
 /**
+ * Ensure a DOM mount point exists for Vue apps.
+ * Creates a div with the provided id and appends to body if missing.
+ * @param id - Element id to create or reuse.
+ * @returns The mount point element.
+ */
+export function ensureMount(id = MOUNT_ID): HTMLElement {
+	let mount = document.getElementById(id);
+	if (!mount) {
+		mount = document.createElement('div');
+		mount.id = id;
+		document.body.appendChild(mount);
+	}
+	return mount;
+}
+
+/**
+ * Ensure a style element with given id exists, injecting the provided CSS text.
+ * @param id - Element id for the style tag.
+ * @param cssText - CSS text content to inject.
+ */
+export function ensureStyleElement(id: string, cssText: string): void {
+	if (document.getElementById(id)) return;
+	try {
+		const styleEl = document.createElement('style');
+		styleEl.id = id;
+		styleEl.appendChild(document.createTextNode(cssText));
+		document.head.appendChild(styleEl);
+	} catch {
+		const div = document.createElement('div');
+		div.innerHTML = `<style id="${id}">${cssText}</style>`;
+		const styleEl = div.firstChild as HTMLElement | null;
+		if (styleEl) {
+			document.head.appendChild(styleEl);
+		}
+	}
+}
+
+/**
  * Create the dialog mount point in the DOM if it doesn't exist.
  * The mount point is where Vue apps are mounted.
  * @returns The mount point HTMLElement.
  */
 export function createDialogMountIfNeeded(): HTMLElement {
-	let mount = document.getElementById(MOUNT_ID);
-	if (!mount) {
-		mount = document.createElement('div');
-		mount.id = MOUNT_ID;
-		document.body.appendChild(mount);
-	}
-	return mount;
+	return ensureMount(MOUNT_ID);
 }
 
 /**
@@ -134,6 +168,8 @@ export function registerCodexComponents(app: VueApp, Codex: CodexModule): void {
 		if (Codex.CdxSelect) app.component('cdx-select', Codex.CdxSelect);
 		if (Codex.CdxTextInput) app.component('cdx-text-input', Codex.CdxTextInput);
 		if (Codex.CdxCheckbox) app.component('cdx-checkbox', Codex.CdxCheckbox);
+		if (Codex.CdxField) app.component('cdx-field', Codex.CdxField);
+		if (Codex.CdxMultiselectLookup) app.component('cdx-multiselect-lookup', Codex.CdxMultiselectLookup);
 	} catch {
 		// best effort; ignore registration errors
 	}

@@ -596,17 +596,20 @@
 	display: block;
 	min-width: 0 !important;
 }
+
 .citeforge-settings .cdx-select-vue .cdx-select,
 .citeforge-settings .cdx-text-input-vue .cdx-text-input {
 	width: 100% !important;
 	max-width: 240px;
 	min-width: 0 !important;
 }
+
 .citeforge-settings .cdx-select-vue__handle {
 	width: 100% !important;
 	max-width: 240px;
 	min-width: 0 !important;
 }
+
 .citeforge-settings .cdx-select__handle,
 .citeforge-settings .cdx-select-vue__handle,
 .citeforge-settings .cdx-text-input__input,
@@ -614,11 +617,13 @@
 	font-size: 13px;
 	line-height: 1.4;
 }
+
 .citeforge-settings .cdx-select__handle,
 .citeforge-settings .cdx-select-vue__handle,
 .citeforge-settings .cdx-text-input__input {
 	min-height: 28px;
 }
+
 .citeforge-settings .cdx-checkbox__label,
 .citeforge-settings .cdx-checkbox__input {
 	font-size: 13px;
