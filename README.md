@@ -6,11 +6,14 @@ A citation management workbench for Wikipedia. Inspect, search, edit, and copy r
 
 - **Floating panel** – Collapsible panel (bottom-left) with portlet toggle; remembers visibility and size across sessions
 - **Reference browser** – Alphabetical index, search filter, and refresh button to navigate all citations
-- **Inline editing** – Click the edit icon to rename references in-place; changes are queued for batch saving
+- **Inline editing** – Click the edit icon to rename references (including previously unnamed ones); conflicts are highlighted and block saving until resolved; changes are queued for batch saving
 - **Highlight & scroll** – Selecting a reference highlights and scrolls to its uses in the article (with blink animation)
 - **Copy options** – Copy ref names (raw, `{{r|name}}`, or `<ref name="..." />`) or raw citation content
+- **Save to diff** – Applies wikitext transforms and opens the standard MediaWiki diff in a new tab (no direct API saves)
 - **Hover popup** – Quick copy button on reference superscripts (optional, toggle in settings)
 - **Theme support** – Adapts to light/dark/system preference; namespace-aware (disabled on non-wikitext pages)
+- **Wikitext transforms** (configurable): rename, dedupe, normalize ref markup, prefer `{{r}}` or `<ref>`, move refs inline↔LDR (all-inline, all-LDR, or threshold), sort reflist entries, keep copies vs dedupe, and rename nameless refs
+- **Template support** – Parses `<ref>`, self-closing `<ref />`, `{{r}}` (including chained names), and reflist `refs=` blocks
 
 ## Installation
 
