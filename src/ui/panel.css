@@ -1,6 +1,6 @@
-/* Cite Hub floating panel */
+/* Cite Forge floating panel */
 
-.citehub-panel {
+.citeforge-panel {
 	position: fixed;
 	left: 16px;
 	bottom: 16px;
@@ -16,11 +16,11 @@
 	border-radius: 8px;
 }
 
-.citehub-panel.is-open {
+.citeforge-panel.is-open {
 	display: flex;
 }
 
-.citehub-ref-popup {
+.citeforge-ref-popup {
 	position: absolute;
 	z-index: 12000;
 	background: #1d3a6c;
@@ -34,22 +34,22 @@
 	transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
-.citehub-ref-popup.is-open {
+.citeforge-ref-popup.is-open {
 	opacity: 1;
 	transform: translateY(0);
 }
 
-.citehub-ref-popup a {
+.citeforge-ref-popup a {
 	color: #f7fbff;
 	text-decoration: none;
 	font-weight: 700;
 }
 
-.citehub-ref-popup a:hover {
+.citeforge-ref-popup a:hover {
 	text-decoration: underline;
 }
 
-.citehub-panel__header {
+.citeforge-panel__header {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -60,28 +60,28 @@
 	border-radius: 8px 8px 0 0;
 }
 
-.citehub-panel__title {
+.citeforge-panel__title {
 	font-weight: 700;
 	font-size: 14px;
 }
 
-.citehub-panel__actions {
+.citeforge-panel__actions {
 	display: flex;
 	gap: 6px;
 }
 
-.citehub-panel__actions .cdx-button {
+.citeforge-panel__actions .cdx-button {
 	color: #f7fbff;
 }
 
-.citehub-panel__actions .cdx-button:enabled.cdx-button--weight-quiet:hover,
-.citehub-panel__actions .cdx-button.cdx-button--fake-button--enabled.cdx-button--weight-quiet:hover {
+.citeforge-panel__actions .cdx-button:enabled.cdx-button--weight-quiet:hover,
+.citeforge-panel__actions .cdx-button.cdx-button--fake-button--enabled.cdx-button--weight-quiet:hover {
 	color: #e2eaf7 !important;
 	background-color: transparent !important;
 	mix-blend-mode: normal !important;
 }
 
-.citehub-panel__body {
+.citeforge-panel__body {
 	display: flex;
 	flex-direction: row;
 	gap: 10px;
@@ -90,17 +90,17 @@
 }
 
 @media (max-width: 900px) {
-	.citehub-panel {
+	.citeforge-panel {
 		width: 94vw;
 		left: 3vw;
 	}
 
-	.citehub-panel__body {
+	.citeforge-panel__body {
 		grid-template-columns: 1fr;
 	}
 }
 
-.citehub-panel__index {
+.citeforge-panel__index {
 	display: grid;
 	grid-template-columns: repeat(2, 1fr);
 	gap: 4px;
@@ -108,7 +108,7 @@
 	flex-shrink: 0;
 }
 
-.citehub-index-btn {
+.citeforge-index-btn {
 	border: 1px solid #d7dce3;
 	background: #f5f7fb;
 	border-radius: 4px;
@@ -118,17 +118,17 @@
 	transition: background 0.12s ease, transform 0.12s ease;
 }
 
-.citehub-index-btn:disabled {
+.citeforge-index-btn:disabled {
 	cursor: not-allowed;
 	opacity: 0.4;
 }
 
-.citehub-index-btn:not(:disabled):hover {
+.citeforge-index-btn:not(:disabled):hover {
 	background: #e2eaf7;
 	transform: translateY(-1px);
 }
 
-.citehub-panel__list {
+.citeforge-panel__list {
 	overflow-x: hidden;
 	overflow-y: auto;
 	max-height: 100%;
@@ -137,7 +137,7 @@
 	transition: flex 0.2s ease;
 }
 
-.citehub-panel__detail {
+.citeforge-panel__detail {
 	overflow: auto;
 	max-height: 100%;
 	background: var(--cdx-color-surface-2, #f6f6f6);
@@ -146,7 +146,7 @@
 	padding: 10px;
 }
 
-.citehub-badge {
+.citeforge-badge {
 	display: inline-block;
 	margin-left: 6px;
 	padding: 2px 6px;
@@ -157,7 +157,7 @@
 	font-weight: 700;
 }
 
-.citehub-panel__toolbar {
+.citeforge-panel__toolbar {
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
@@ -168,17 +168,17 @@
 	transition: width 0.2s ease;
 }
 
-.citehub-panel__toolbar:hover {
+.citeforge-panel__toolbar:hover {
 	width: 110px;
 }
 
-.citehub-toolbar__group {
+.citeforge-toolbar__group {
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
 }
 
-.citehub-tool-btn {
+.citeforge-tool-btn {
 	width: 28px;
 	height: 28px;
 	display: inline-flex;
@@ -194,44 +194,44 @@
 	flex-shrink: 0;
 }
 
-.citehub-panel__toolbar:hover .citehub-tool-btn {
+.citeforge-panel__toolbar:hover .citeforge-tool-btn {
 	width: 110px;
 	border-radius: 6px;
 	justify-content: flex-start;
 	padding-left: 8px;
 }
 
-.citehub-tool-btn:hover {
+.citeforge-tool-btn:hover {
 	background: #e2eaf7;
 	box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
 	transform: translateY(-1px);
 }
 
-.citehub-tool-btn--primary {
+.citeforge-tool-btn--primary {
 	background: linear-gradient(135deg, #2a4b8d, #1d3a6c);
 	color: #fff;
 }
 
-.citehub-tool-btn--primary:hover {
+.citeforge-tool-btn--primary:hover {
 	background: linear-gradient(135deg, #3a5b9d, #2d4a7c);
 }
 
-.citehub-tool-btn--primary .citehub-tool-label {
+.citeforge-tool-btn--primary .citeforge-tool-label {
 	color: #fff;
 }
 
-.citehub-tool-icon {
+.citeforge-tool-icon {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
 	flex-shrink: 0;
 }
 
-.citehub-panel__toolbar:hover .citehub-tool-icon {
+.citeforge-panel__toolbar:hover .citeforge-tool-icon {
 	margin-right: 6px;
 }
 
-.citehub-tool-label {
+.citeforge-tool-label {
 	font-size: 11px;
 	font-weight: 600;
 	color: #1d3a6c;
@@ -242,12 +242,12 @@
 	transition: opacity 0.2s ease, width 0.2s ease;
 }
 
-.citehub-panel__toolbar:hover .citehub-tool-label {
+.citeforge-panel__toolbar:hover .citeforge-tool-label {
 	opacity: 1;
 	width: auto;
 }
 
-.citehub-list-topbar {
+.citeforge-list-topbar {
 	display: flex;
 	gap: 8px;
 	align-items: center;
@@ -260,7 +260,7 @@
 	border-bottom: 1px solid #d7dce3;
 }
 
-.citehub-search {
+.citeforge-search {
 	flex: 1;
 	padding: 6px 8px;
 	border: 1px solid #d7dce3;
@@ -269,13 +269,13 @@
 	min-width: 0;
 }
 
-.citehub-row__actions {
+.citeforge-row__actions {
 	margin-top: 6px;
 	display: flex;
 	gap: 6px;
 }
 
-.citehub-copy-btn {
+.citeforge-copy-btn {
 	border: 1px solid #d7dce3;
 	background: #f5f7fb;
 	border-radius: 4px;
@@ -288,17 +288,17 @@
 	color: #3c4554;
 }
 
-.citehub-copy-btn:hover {
+.citeforge-copy-btn:hover {
 	background: #e2eaf7;
 }
 
-.citehub-list-wrap {
+.citeforge-list-wrap {
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
 }
 
-.citehub-row {
+.citeforge-row {
 	border: 1px solid #dfe3ea;
 	border-radius: 6px;
 	padding: 8px;
@@ -308,18 +308,18 @@
 	transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
 }
 
-.citehub-row:hover {
+.citeforge-row:hover {
 	border-color: #c2d5f6;
 	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 	transform: translateY(-1px);
 }
 
-.citehub-row.is-selected {
+.citeforge-row.is-selected {
 	border-color: #7da4f7;
 	box-shadow: 0 4px 12px rgba(29, 58, 108, 0.15);
 }
 
-.citehub-resizer {
+.citeforge-resizer {
 	position: absolute;
 	right: 6px;
 	top: 6px;
@@ -329,7 +329,7 @@
 	background: linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.25) 50%);
 }
 
-.citehub-row__title {
+.citeforge-row__title {
 	display: flex;
 	align-items: baseline;
 	gap: 4px;
@@ -337,12 +337,12 @@
 	flex-wrap: wrap;
 }
 
-.citehub-row__name {
+.citeforge-row__name {
 	font-weight: 700;
 	color: #24334f;
 }
 
-.citehub-row__name-input {
+.citeforge-row__name-input {
 	font-weight: 700;
 	color: #24334f;
 	font-size: inherit;
@@ -357,18 +357,18 @@
 	max-width: 200px;
 }
 
-.citehub-row__name-input:focus {
+.citeforge-row__name-input:focus {
 	box-shadow: 0 0 0 2px rgba(51, 102, 204, 0.25);
 }
 
-.citehub-row__name-actions {
+.citeforge-row__name-actions {
 	display: inline-flex;
 	gap: 2px;
 	align-items: center;
 	margin-left: 2px;
 }
 
-.citehub-icon-btn {
+.citeforge-icon-btn {
 	border: none;
 	background: transparent;
 	padding: 2px;
@@ -382,41 +382,41 @@
 	transition: opacity 0.15s, background 0.15s;
 }
 
-.citehub-icon-btn:hover {
+.citeforge-icon-btn:hover {
 	opacity: 1;
 	background: #e2eaf7;
 }
 
-.citehub-row__meta {
+.citeforge-row__meta {
 	font-size: 12px;
 	color: #5a6475;
 	margin-left: auto;
 }
 
-.citehub-row__snippet {
+.citeforge-row__snippet {
 	font-size: 12px;
 	color: #3c4554;
 	line-height: 1.35;
 }
 
-.citehub-empty {
+.citeforge-empty {
 	color: var(--cdx-color-base--subtle, #54595d);
 	padding: 8px 0;
 	font-style: italic;
 }
 
-.citehub-ref-detail__title {
+.citeforge-ref-detail__title {
 	font-weight: 600;
 	margin-bottom: 4px;
 }
 
-.citehub-ref-detail__meta {
+.citeforge-ref-detail__meta {
 	color: var(--cdx-color-base--subtle, #54595d);
 	font-size: 12px;
 	margin-bottom: 6px;
 }
 
-.citehub-ref-detail__code {
+.citeforge-ref-detail__code {
 	background: var(--cdx-color-surface-1, #fff);
 	border: 1px solid var(--cdx-color-border-subtle, #eaecf0);
 	border-radius: 2px;
@@ -428,36 +428,36 @@
 	font-size: 12px;
 }
 
-.citehub-table {
+.citeforge-table {
 	width: 100%;
 	border-collapse: collapse;
 	font-size: 13px;
 }
 
-.citehub-table th,
-.citehub-table td {
+.citeforge-table th,
+.citeforge-table td {
 	padding: 6px 6px;
 	border-bottom: 1px solid var(--cdx-color-border-subtle, #eaecf0);
 	text-align: left;
 }
 
-.citehub-table tbody tr:hover {
+.citeforge-table tbody tr:hover {
 	background: #eef3fb;
 	cursor: pointer;
 }
 
-.citehub-table tbody tr.is-selected {
+.citeforge-table tbody tr.is-selected {
 	background: #dce8ff;
 }
 
-.citehub-ref-highlight {
+.citeforge-ref-highlight {
 	background: #fff2a8;
 	outline: 2px solid #f0c400;
 	border-radius: 2px;
 	display: inline-block;
 }
 
-@keyframes citehub-blink {
+@keyframes citeforge-blink {
 
 	0%,
 	100% {
@@ -473,18 +473,18 @@
 	}
 }
 
-.citehub-ref-highlight.citehub-ref-blink {
-	animation: citehub-blink 0.4s ease-in-out 3;
+.citeforge-ref-highlight.citeforge-ref-blink {
+	animation: citeforge-blink 0.4s ease-in-out 3;
 }
 
-.citehub-shell {
+.citeforge-shell {
 	position: fixed;
 	left: 16px;
 	bottom: 16px;
 	z-index: 10000;
 }
 
-.citehub-launcher {
+.citeforge-launcher {
 	border: none;
 	background: linear-gradient(135deg, #2a4b8d, #1d3a6c);
 	color: #f7fbff;
@@ -498,22 +498,22 @@
 	transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.citehub-launcher:hover {
+.citeforge-launcher:hover {
 	transform: translateY(-1px);
 	box-shadow: 0 14px 30px rgba(29, 58, 108, 0.45);
 }
 
-.citehub-launcher__icon {
+.citeforge-launcher__icon {
 	font-size: 14px;
 }
 
-.citehub-launcher__label {
+.citeforge-launcher__label {
 	font-weight: 700;
 	font-size: 13px;
 	letter-spacing: 0.02em;
 }
 
-.citehub-settings {
+.citeforge-settings {
 	position: absolute;
 	top: 12px;
 	right: 12px;
@@ -526,12 +526,12 @@
 	z-index: 1;
 }
 
-.citehub-settings__title {
+.citeforge-settings__title {
 	font-weight: 700;
 	margin-bottom: 8px;
 }
 
-.citehub-settings__row {
+.citeforge-settings__row {
 	display: flex;
 	align-items: center;
 	gap: 8px;
@@ -539,11 +539,11 @@
 	font-size: 13px;
 }
 
-.citehub-settings__row select {
+.citeforge-settings__row select {
 	flex: 1;
 }
 
-.citehub-settings__actions {
+.citeforge-settings__actions {
 	display: flex;
 	gap: 6px;
 	justify-content: flex-end;
@@ -552,92 +552,92 @@
 
 /* Dark theme adaptations (approximate skin night/follow OS) */
 @media (prefers-color-scheme: dark) {
-	.citehub-panel {
+	.citeforge-panel {
 		background: #1c1f26;
 		color: #e8ecf5;
 		border-color: #2c3340;
 		box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
 	}
 
-	.citehub-panel__header {
+	.citeforge-panel__header {
 		background: linear-gradient(135deg, #1f2f55, #13243d);
 		border-bottom-color: #0f1a2f;
 		color: #e8ecf5;
 	}
 
-	.citehub-panel__actions .cdx-button {
+	.citeforge-panel__actions .cdx-button {
 		color: #e8ecf5;
 	}
 
-	.citehub-panel__actions .cdx-button:enabled.cdx-button--weight-quiet:hover,
-	.citehub-panel__actions .cdx-button.cdx-button--fake-button--enabled.cdx-button--weight-quiet:hover {
+	.citeforge-panel__actions .cdx-button:enabled.cdx-button--weight-quiet:hover,
+	.citeforge-panel__actions .cdx-button.cdx-button--fake-button--enabled.cdx-button--weight-quiet:hover {
 		color: #fff !important;
 		background-color: transparent !important;
 		mix-blend-mode: normal !important;
 	}
 
-	.citehub-panel__detail,
-	.citehub-panel__list {
+	.citeforge-panel__detail,
+	.citeforge-panel__list {
 		border-color: #2c3340;
 	}
 
-	.citehub-list-topbar {
+	.citeforge-list-topbar {
 		background: #1c1f26;
 		border-bottom-color: #2c3340;
 	}
 
-	.citehub-row {
+	.citeforge-row {
 		background: #252b36;
 		border-color: #2f3744;
 		color: #e8ecf5;
 	}
 
-	.citehub-row__meta {
+	.citeforge-row__meta {
 		color: #c2c8d6;
 	}
 
-	.citehub-row__snippet {
+	.citeforge-row__snippet {
 		color: #d6dbe6;
 	}
 
-	.citehub-index-btn {
+	.citeforge-index-btn {
 		background: #2b3342;
 		border-color: #3a4354;
 		color: #d6dbe6;
 	}
 
-	.citehub-index-btn:not(:disabled):hover {
+	.citeforge-index-btn:not(:disabled):hover {
 		background: #354059;
 	}
 
-	.citehub-panel__toolbar {
+	.citeforge-panel__toolbar {
 		background: #252b36;
 		border-color: #3a4354;
 	}
 
-	.citehub-tool-btn {
+	.citeforge-tool-btn {
 		background: #2b3342;
 		border-color: #3a4354;
 		color: #d6dbe6;
 	}
 
-	.citehub-tool-label {
+	.citeforge-tool-label {
 		color: #d6dbe6;
 	}
 
-	.citehub-ref-detail__code {
+	.citeforge-ref-detail__code {
 		background: #252b36;
 		border-color: #2f3744;
 		color: #e8ecf5;
 	}
 
-	.citehub-launcher {
+	.citeforge-launcher {
 		box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
 	}
 }
 
 /* Night skin class hint */
-.skin-theme-clientpref-night .citehub-panel,
-.skin-theme-clientpref-night .citehub-launcher {
+.skin-theme-clientpref-night .citeforge-panel,
+.skin-theme-clientpref-night .citeforge-launcher {
 	filter: brightness(0.92);
 }

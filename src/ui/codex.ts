@@ -16,7 +16,7 @@ type CodexModule = Partial<{
 
 let mountedApp: VueApp | null = null;
 let mountedRoot: unknown = null;
-const MOUNT_ID = 'citehub-dialog-mount';
+const MOUNT_ID = 'citeforge-dialog-mount';
 
 /**
  * Load Codex and Vue from ResourceLoader. Mirrors ReviewTool pattern for future UI work.

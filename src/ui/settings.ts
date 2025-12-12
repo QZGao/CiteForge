@@ -1,14 +1,14 @@
-/** User-configurable settings for Cite Hub. */
+/** User-configurable settings for Cite Forge. */
 type Settings = {
 	/** Format used when copying reference names. */
 	copyFormat: 'raw' | 'r' | 'ref';
 	/** Whether to show the copy button on citation hover. */
 	showCiteRefCopyBtn: boolean;
-	/** Whether Cite Hub is enabled in User namespace. */
+	/** Whether Cite Forge is enabled in User namespace. */
 	showInUserNs: boolean;
 };
 
-const SETTINGS_KEY = 'citehub-settings';
+const SETTINGS_KEY = 'citeforge-settings';
 let cachedSettings: Settings | null = null;
 
 /** Default settings applied when no user settings exist. */
@@ -65,10 +65,10 @@ export function getSettings(): Settings {
 }
 
 /**
- * Check if Cite Hub should be enabled in the current namespace.
+ * Check if Cite Forge should be enabled in the current namespace.
  * Allows mainspace (0), User (2 if enabled), and Draft namespaces.
  * Also checks that the page content model is wikitext.
- * @returns True if Cite Hub should be enabled.
+ * @returns True if Cite Forge should be enabled.
  */
 export function namespaceAllowed(): boolean {
 	const ns = mw.config?.get('wgNamespaceNumber');

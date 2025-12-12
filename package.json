@@ -1,6 +1,6 @@
 {
-  "name": "citehub",
-  "version": "1.0.0",
+  "name": "citeforge",
+  "version": "0.0.1",
   "private": true,
   "description": "Unified reference workbench that lets you inspect, rename, reorganize, and check all citations on a page. ",
   "type": "module",

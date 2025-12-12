@@ -48,7 +48,7 @@ export async function getWikitext(): Promise<string> {
 		wikitextCache = content || '';
 		return wikitextCache;
 	} catch (e) {
-		console.error('[CiteHub] Failed to fetch wikitext', e);
+		console.error('[Cite Forge] Failed to fetch wikitext', e);
 		wikitextCache = '';
 		return wikitextCache;
 	}

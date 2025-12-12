@@ -52,9 +52,9 @@ const createBuildOptions = () => {
             '.css': 'text'
         },
         banner: {
-            js: `// Cite Hub - Bundled Version
+            js: `// Cite Forge - Bundled Version
 // Maintainer: SuperGrey
-// Repository: https://github.com/QZGao/CiteHub
+// Repository: https://github.com/QZGao/CiteForge
 // Release: ${pkgJson.version}
 // Timestamp: ${timestamp}
 // <nowiki>`
@@ -70,13 +70,13 @@ const createBuildOptions = () => {
         if (watch) {
             const ctx = await esbuild.context(buildOptions);
             await ctx.watch();
-            console.log('[Cite Hub build] Watching for changes...');
+            console.log('[Cite Forge build] Watching for changes...');
         } else {
             await esbuild.build(buildOptions);
-            console.log('[Cite Hub build] Build complete');
+            console.log('[Cite Forge build] Build complete');
         }
     } catch (e) {
-        console.error('[Cite Hub build] Build failed:', e);
+        console.error('[Cite Forge build] Build failed:', e);
         process.exit(1);
     }
 })();

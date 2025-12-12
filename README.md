@@ -1,4 +1,4 @@
-# (WIP) Cite Hub
+# (WIP) Cite Forge
 
 A citation management workbench for Wikipedia. Inspect, search, edit, and copy references from a floating panel.
 
@@ -21,10 +21,10 @@ npm install
 npm run build
 ```
 
-Upload `dist/bundled.js` to your wiki userspace (e.g., `User:YourName/CiteHub.js`), then load it via your `common.js`:
+Upload `dist/bundled.js` to your wiki userspace (e.g., `User:YourName/CiteForge.js`), then load it via your `common.js`:
 
 ```js
-mw.loader.load('//en.wikipedia.org/w/index.php?title=User:YourName/CiteHub.js&action=raw&ctype=text/javascript');
+mw.loader.load('//en.wikipedia.org/w/index.php?title=User:YourName/CiteForge.js&action=raw&ctype=text/javascript');
 ```
 
 ## Development

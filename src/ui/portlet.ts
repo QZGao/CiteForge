@@ -1,5 +1,5 @@
 /**
- * Add or update a Cite Hub link in the actions menu (fallback to toolbox).
+ * Add or update a Cite Forge link in the actions menu (fallback to toolbox).
  * @param portletId - The HTML id attribute for the portlet link.
  * @param label - The text label for the portlet link.
  * @param onClick - Click handler function for the portlet link.

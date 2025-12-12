@@ -16,10 +16,10 @@ async function fetchRefs(): Promise<import('./types').Reference[]> {
 }
 
 /**
- * Load references and open the Cite Hub inspector dialog.
+ * Load references and open the Cite Forge inspector dialog.
  * Sets up a refresh callback to reload data when requested.
  */
-async function loadCiteHubData(): Promise<void> {
+async function loadCiteForgeData(): Promise<void> {
 	const refs = await fetchRefs();
 	const refreshOnce = async () => {
 		const next = await fetchRefs();
@@ -29,7 +29,7 @@ async function loadCiteHubData(): Promise<void> {
 }
 
 /**
- * Initialize the Cite Hub gadget.
+ * Initialize the Cite Forge gadget.
  * Loads dependencies, sets up the portlet link, and optionally opens the panel.
  */
 async function init(): Promise<void> {
@@ -39,14 +39,14 @@ async function init(): Promise<void> {
 		if (isHubVisible()) {
 			setHubVisible(false);
 		} else {
-			await loadCiteHubData();
+			await loadCiteForgeData();
 			setHubVisible(true);
 		}
 		refreshPortletLabel();
 	};
 
 	const refreshPortletLabel = () => {
-		const label = isHubVisible() ? 'Hide Cite Hub' : 'Show Cite Hub';
+		const label = isHubVisible() ? 'Hide Cite Forge' : 'Show Cite Forge';
 		addPortletTrigger(getPortletLinkId(), label, () => {
 			void toggle();
 		});
@@ -54,7 +54,7 @@ async function init(): Promise<void> {
 
 	refreshPortletLabel();
 	if (isHubVisible()) {
-		await loadCiteHubData();
+		await loadCiteForgeData();
 	}
 	mw.hook('wikipage.content').add(() => {
 		refreshPortletLabel();

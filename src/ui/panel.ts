@@ -12,10 +12,10 @@ import { initCitationPopup } from './citations';
 import panelStyles from './panel.css';
 import PANEL_TEMPLATE from './panel.template.vue';
 
-const PANEL_STYLE_ELEMENT_ID = 'citehub-panel-styles';
-const HIGHLIGHT_CLASS = 'citehub-ref-highlight';
-const PORTLET_LINK_ID = 'citehub-portlet-link';
-const PANEL_SIZE_KEY = 'citehub-panel-size';
+const PANEL_STYLE_ELEMENT_ID = 'citeforge-panel-styles';
+const HIGHLIGHT_CLASS = 'citeforge-ref-highlight';
+const PORTLET_LINK_ID = 'citeforge-portlet-link';
+const PANEL_SIZE_KEY = 'citeforge-panel-size';
 
 let panelStylesInjected = false;
 
@@ -59,7 +59,7 @@ function highlightRef(ref: Reference | null): void {
 	ref.uses.forEach((use) => {
 		if (use.anchor) {
 			use.anchor.classList.add(HIGHLIGHT_CLASS);
-			use.anchor.classList.add('citehub-ref-blink');
+			use.anchor.classList.add('citeforge-ref-blink');
 			anchors.push(use.anchor);
 		}
 	});
@@ -75,7 +75,7 @@ function highlightRef(ref: Reference | null): void {
 export function clearHighlights(): void {
 	document.querySelectorAll(`.${HIGHLIGHT_CLASS}`).forEach((node) => {
 		node.classList.remove(HIGHLIGHT_CLASS);
-		node.classList.remove('citehub-ref-blink');
+		node.classList.remove('citeforge-ref-blink');
 	});
 }
 
@@ -86,12 +86,12 @@ export function clearHighlights(): void {
 function showCopiedBadge(ref: Reference): void {
 	const name = ref.name || ref.id || '';
 	const badge = document.createElement('span');
-	badge.className = 'citehub-badge';
+	badge.className = 'citeforge-badge';
 	badge.textContent = 'Copied!';
-	const rows = document.querySelectorAll('.citehub-row');
+	const rows = document.querySelectorAll('.citeforge-row');
 	rows.forEach((row) => {
 		if (row.textContent?.includes(name)) {
-			const existing = row.querySelector('.citehub-badge');
+			const existing = row.querySelector('.citeforge-badge');
 			existing?.remove();
 			row.appendChild(badge);
 			setTimeout(() => badge.remove(), 900);
@@ -153,14 +153,14 @@ function isInspectorRoot(val: unknown): val is InspectorRoot {
 }
 
 /**
- * Open the Cite Hub inspector dialog with the given references.
+ * Open the Cite Forge inspector dialog with the given references.
  * If the dialog is already open, updates its reference list instead.
  * @param refs - Array of references to display in the inspector.
  * @param refreshFn - Optional callback to refresh the reference list.
  */
 export async function openInspectorDialog(refs: Reference[], refreshFn?: () => Promise<void>): Promise<void> {
 	if (!namespaceAllowed()) {
-		mw.notify?.('Cite Hub is disabled in this namespace or content model.', { type: 'warn' });
+		mw.notify?.('Cite Forge is disabled in this namespace or content model.', { type: 'warn' });
 		return;
 	}
 
@@ -224,7 +224,7 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				this.filteredRefs.forEach((ref) => {
 					const bucket = groupKey(ref.name);
 					if (!map[bucket]) {
-						map[bucket] = `citehub-anchor-${bucket}`;
+						map[bucket] = `citeforge-anchor-${bucket}`;
 					}
 				});
 				return map;
@@ -311,7 +311,7 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				this.editingRefId = ref.id;
 				// Focus the input after Vue updates the DOM
 				setTimeout(() => {
-					const input = document.querySelector<HTMLInputElement>('.citehub-row__name-input');
+					const input = document.querySelector<HTMLInputElement>('.citeforge-row__name-input');
 					if (input) {
 						input.focus();
 						input.select();
@@ -366,7 +366,7 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				this.showSettings = false;
 			},
 			startResize(this: InspectorCtx, event: MouseEvent): void {
-				const panelEl = document.querySelector<HTMLElement>('.citehub-panel');
+				const panelEl = document.querySelector<HTMLElement>('.citeforge-panel');
 				if (!panelEl) return;
 				const startW = panelEl.offsetWidth;
 				const startH = panelEl.offsetHeight;
@@ -395,7 +395,7 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			if (this.selectedRef) {
 				highlightRef(this.selectedRef);
 			}
-			const panelEl = document.querySelector<HTMLElement>('.citehub-panel');
+			const panelEl = document.querySelector<HTMLElement>('.citeforge-panel');
 			const sz = loadPanelSize();
 			if (panelEl) {
 				if (sz.width) panelEl.style.width = `${sz.width}px`;
@@ -416,7 +416,7 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 }
 
 /**
- * Get the ID used for the Cite Hub portlet link element.
+ * Get the ID used for the Cite Forge portlet link element.
  * @returns The portlet link element ID string.
  */
 export function getPortletLinkId(): string {
@@ -424,7 +424,7 @@ export function getPortletLinkId(): string {
 }
 
 /**
- * Set the visibility state of the Cite Hub panel.
+ * Set the visibility state of the Cite Forge panel.
  * Updates both the Vue component state and localStorage.
  * @param show - Whether the panel should be visible.
  */
@@ -434,14 +434,14 @@ export function setHubVisible(show: boolean): void {
 		root.setVisible(show);
 	}
 	try {
-		localStorage.setItem('citehub-visible', show ? '1' : '0');
+		localStorage.setItem('citeforge-visible', show ? '1' : '0');
 	} catch {
 		/* ignore */
 	}
 }
 
 /**
- * Check if the Cite Hub panel is currently visible.
+ * Check if the Cite Forge panel is currently visible.
  * Checks the Vue component state first, then falls back to localStorage.
  * @returns True if the panel is visible.
  */
@@ -451,7 +451,7 @@ export function isHubVisible(): boolean {
 		return root.getVisible();
 	}
 	try {
-		return localStorage.getItem('citehub-visible') === '1';
+		return localStorage.getItem('citeforge-visible') === '1';
 	} catch {
 		return false;
 	}
@@ -490,10 +490,10 @@ function alphaIndex(char: string): number {
  * @param state - The inspector state to update with minHeight.
  */
 function applyMinHeight(state: InspectorCtx): void {
-	const panelEl = document.querySelector<HTMLElement>('.citehub-panel');
-	const indexCol = document.querySelector<HTMLElement>('.citehub-panel__index');
-	const topbarEl = document.querySelector<HTMLElement>('.citehub-list-topbar');
-	const headerEl = document.querySelector<HTMLElement>('.citehub-panel__header');
+	const panelEl = document.querySelector<HTMLElement>('.citeforge-panel');
+	const indexCol = document.querySelector<HTMLElement>('.citeforge-panel__index');
+	const topbarEl = document.querySelector<HTMLElement>('.citeforge-list-topbar');
+	const headerEl = document.querySelector<HTMLElement>('.citeforge-panel__header');
 	if (!panelEl) return;
 	const pad = 24; // body padding approx
 	const headerH = headerEl?.offsetHeight || 0;

@@ -1,7 +1,7 @@
 import { getSettings, loadSettings } from './settings';
 
-const POPUP_ID = 'citehub-ref-popup';
-const DATA_ATTACHED = 'citehubAttached';
+const POPUP_ID = 'citeforge-ref-popup';
+const DATA_ATTACHED = 'citeforgeAttached';
 
 /**
  * Initialize the citation hover popup feature.
@@ -15,14 +15,14 @@ export function initCitationPopup(): void {
 
 	const popup = document.createElement('div');
 	popup.id = POPUP_ID;
-	popup.className = 'citehub-ref-popup';
+	popup.className = 'citeforge-ref-popup';
 	popup.setAttribute('role', 'dialog');
 	popup.setAttribute('aria-hidden', 'true');
 	popup.style.display = 'none';
-	popup.innerHTML = '<a href="#" class="citehub-ref-popup-copy">Copy</a>';
+	popup.innerHTML = '<a href="#" class="citeforge-ref-popup-copy">Copy</a>';
 	document.body.appendChild(popup);
 
-	const popupLink = popup.querySelector<HTMLAnchorElement>('.citehub-ref-popup-copy');
+	const popupLink = popup.querySelector<HTMLAnchorElement>('.citeforge-ref-popup-copy');
 	let hideTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function scheduleHide(delay = 150): void {
