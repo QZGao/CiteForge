@@ -1,7 +1,8 @@
 import { parseReferences, attachDomUses } from './core/references';
-import { getWikitext } from './data/wikitext';
+import { getWikitext } from './data/wikitext_fetch';
 import { openInspectorDialog, getPortletLinkId, isHubVisible, setHubVisible } from './ui/panel';
 import { addPortletTrigger } from './ui/portlet';
+import { namespaceAllowed } from './ui/settings';
 
 /**
  * Fetch and parse references from the current page's wikitext.
@@ -39,7 +40,11 @@ async function init(): Promise<void> {
 		if (isHubVisible()) {
 			setHubVisible(false);
 		} else {
-			await loadCiteForgeData();
+			if (namespaceAllowed()) {
+				await loadCiteForgeData();
+			} else {
+				mw.notify?.('Cite Forge is disabled in this namespace or content model.', { type: 'warn', title: 'Cite Forge' });
+			}
 			setHubVisible(true);
 		}
 		refreshPortletLabel();

@@ -8,6 +8,9 @@ import {
 	registerCodexComponents
 } from './codex';
 import { getSettings, namespaceAllowed, saveSettings } from './settings';
+import { getWikitext } from '../data/wikitext_fetch';
+import { transformWikitext } from '../core/wikitext_transforms';
+import { openDiffPreview } from '../data/diff_preview';
 import { initCitationPopup } from './citations';
 import panelStyles from './panel.css';
 import PANEL_TEMPLATE from './panel.template.vue';
@@ -160,7 +163,7 @@ function isInspectorRoot(val: unknown): val is InspectorRoot {
  */
 export async function openInspectorDialog(refs: Reference[], refreshFn?: () => Promise<void>): Promise<void> {
 	if (!namespaceAllowed()) {
-		mw.notify?.('Cite Forge is disabled in this namespace or content model.', { type: 'warn' });
+		console.warn('[Cite Forge] Cite Forge is disabled in this namespace or content model.');
 		return;
 	}
 
@@ -357,9 +360,48 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			toggleSettings(this: InspectorCtx): void {
 				this.showSettings = !this.showSettings;
 			},
-			saveChanges(this: InspectorCtx): void {
-				// TODO: Implement actual wikitext editing
-				mw.notify?.(`${this.pendingChanges.length} change(s) to save (not yet implemented)`, { type: 'info' });
+			async saveChanges(this: InspectorCtx): Promise<void> {
+				if (!this.pendingChanges.length) {
+					mw.notify?.('No pending Cite Forge changes to apply.', { type: 'info' });
+					return;
+				}
+				try {
+					const base = await getWikitext();
+					const renameMap: Record<string, string> = {};
+					this.pendingChanges.forEach((c) => {
+						if (c.oldName && c.newName && c.oldName !== c.newName) {
+							renameMap[c.oldName] = c.newName;
+						}
+					});
+
+					const placementMode = (() => {
+						if (this.settings.placementMode === 'all_inline') return 'all_inline' as const;
+						if (this.settings.placementMode === 'all_ldr') return 'all_ldr' as const;
+						const minUses = Math.max(1, Number(this.settings.minUsesForLdr) || 1);
+						return { minUsesForLdr: minUses };
+					})();
+
+					const transformOpts = {
+						renameMap,
+						sortRefs: Boolean(this.settings.sortRefs),
+						useTemplateR: Boolean(this.settings.useTemplateR),
+						locationMode: placementMode,
+						dedupe: !this.settings.makeCopies
+					} satisfies import('../core/wikitext_transforms').TransformOptions;
+
+					const result = transformWikitext(base, transformOpts);
+
+					if (result.wikitext === base) {
+						mw.notify?.('No changes were generated.', { type: 'info' });
+						return;
+					}
+
+					openDiffPreview(result.wikitext, 'Cite Forge: reference adjustments');
+					mw.notify?.('Opening diff view in a new tab...', { type: 'info' });
+				} catch (err: unknown) {
+					console.error('[Cite Forge] Failed to apply changes', err);
+					mw.notify?.('Cite Forge could not prepare the diff. Please try again.', { type: 'error' });
+				}
 			},
 			saveSettings(this: InspectorCtx): void {
 				saveSettings(this.settings);

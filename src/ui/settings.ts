@@ -6,6 +6,16 @@ type Settings = {
 	showCiteRefCopyBtn: boolean;
 	/** Whether Cite Forge is enabled in User namespace. */
 	showInUserNs: boolean;
+	/** Placement strategy for references. */
+	placementMode: 'all_inline' | 'all_ldr' | 'threshold';
+	/** Threshold for LDR placement when placementMode is threshold. */
+	minUsesForLdr: number;
+	/** Sort reflist entries alphabetically. */
+	sortRefs: boolean;
+	/** Prefer {{r}} for uses when possible. */
+	useTemplateR: boolean;
+	/** Do not dedupe identical refs; keep separate copies. */
+	makeCopies: boolean;
 };
 
 const SETTINGS_KEY = 'citeforge-settings';
@@ -15,7 +25,12 @@ let cachedSettings: Settings | null = null;
 const DEFAULT_SETTINGS: Settings = {
 	copyFormat: 'raw',
 	showCiteRefCopyBtn: true,
-	showInUserNs: true
+	showInUserNs: true,
+	placementMode: 'threshold',
+	minUsesForLdr: 2,
+	sortRefs: true,
+	useTemplateR: false,
+	makeCopies: false
 };
 
 /**

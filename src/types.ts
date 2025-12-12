@@ -45,7 +45,16 @@ export interface InspectorState {
 	refs: Reference[];
 	selectedRef: Reference | null;
 	query: string;
-	settings: { copyFormat: 'raw' | 'r' | 'ref'; showCiteRefCopyBtn: boolean; showInUserNs: boolean };
+	settings: {
+		copyFormat: 'raw' | 'r' | 'ref';
+		showCiteRefCopyBtn: boolean;
+		showInUserNs: boolean;
+		placementMode: 'all_inline' | 'all_ldr' | 'threshold';
+		minUsesForLdr: number;
+		sortRefs: boolean;
+		useTemplateR: boolean;
+		makeCopies: boolean;
+	};
 	showSettings: boolean;
 	minHeight: number;
 	pendingChanges: PendingChange[];

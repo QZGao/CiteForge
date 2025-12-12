@@ -174,6 +174,30 @@
 						<input type="checkbox" v-model="settings.showInUserNs" />
 						<span>Enable in User namespace</span>
 					</label>
+					<label class="citeforge-settings__row">
+						<span>Placement</span>
+						<select v-model="settings.placementMode">
+							<option value="threshold">Refs with ≥ N uses to reflist</option>
+							<option value="all_ldr">All refs to reflist</option>
+							<option value="all_inline">All refs inline</option>
+						</select>
+					</label>
+					<label class="citeforge-settings__row" v-if="settings.placementMode === 'threshold'">
+						<span>Minimum uses for reflist</span>
+						<input type="number" min="1" v-model.number="settings.minUsesForLdr" />
+					</label>
+					<label class="citeforge-settings__row">
+						<input type="checkbox" v-model="settings.sortRefs" />
+						<span>Sort reflist entries</span>
+					</label>
+					<label class="citeforge-settings__row">
+						<input type="checkbox" v-model="settings.useTemplateR" />
+						<span>Prefer {{ '{' }}{r|name}} for uses</span>
+					</label>
+					<label class="citeforge-settings__row">
+						<input type="checkbox" v-model="settings.makeCopies" />
+						<span>Keep separate copies (no dedupe)</span>
+					</label>
 					<div class="citeforge-settings__actions">
 						<cdx-button weight="quiet" size="small" @click.prevent="saveSettings">
 							Save

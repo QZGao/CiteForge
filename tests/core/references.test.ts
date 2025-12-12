@@ -127,6 +127,20 @@ describe('parseReferences', () => {
 			expect(refs.map((r) => r.name)).toContain('ref1');
 			expect(refs.map((r) => r.name)).toContain('ref2');
 		});
+
+		it('parses chained r template names', () => {
+			const wikitext = '{{r|bilibili-05|sohu-02|dualshockers-01}}';
+			const refs = parseReferences(wikitext);
+
+			expect(refs).toHaveLength(3);
+			expect(refs.map((r) => r.name)).toEqual(expect.arrayContaining(['bilibili-05', 'sohu-02', 'dualshockers-01']));
+		});
+
+		it('parses chained r template names with multiple segments', () => {
+			const wikitext = '{{r|yicai-01|io.gov.mo-01}}';
+			const refs = parseReferences(wikitext);
+			expect(refs.map((r) => r.name)).toEqual(expect.arrayContaining(['yicai-01', 'io.gov.mo-01']));
+		});
 	});
 
 	describe('unnamed refs', () => {

@@ -61,16 +61,37 @@ export function parseReferences(wikitext: string): Reference[] {
 		ref.uses.push({ index: ref.uses.length, anchor: null });
 	}
 
-	// Parse {{r|name}} templates
-	const refTemplate = /\{\{\s*r\s*\|\s*(?:name\s*=\s*)?([^|}]+)[^}]*\}\}/gi;
+	// Parse {{r|...}} templates (may contain multiple names)
+	const refTemplate = /\{\{\s*r\s*(\|[\s\S]*?)\}\}/gi;
 	while ((match = refTemplate.exec(sanitized)) !== null) {
-		const name = match[1]?.trim();
-		if (!name) continue;
-		const ref = getOrCreateRef(name, null, '');
-		ref.uses.push({ index: ref.uses.length, anchor: null });
+		const params = match[1] ?? '';
+		const names = parseRTemplateNames(params);
+		names.forEach((name) => {
+			const ref = getOrCreateRef(name, null, '');
+			ref.uses.push({ index: ref.uses.length, anchor: null });
+		});
 	}
 
 	return Array.from(refs.values());
+}
+
+/**
+ * Extract reference names from an {{r|...}} template parameter string.
+ * Supports chained names: {{r|foo|bar|baz}} and name=foo form.
+ */
+function parseRTemplateNames(paramString: string): string[] {
+	const trimmed = paramString.replace(/^\|/, '');
+	if (!trimmed) return [];
+	const parts = trimmed.split('|');
+	const names: string[] = [];
+	parts.forEach((part) => {
+		const val = part.trim();
+		if (!val) return;
+		const nameMatch = val.match(/^(?:name\s*=\s*)?(.*)$/i);
+		const name = nameMatch?.[1]?.trim();
+		if (name) names.push(name);
+	});
+	return names;
 }
 
 /**
