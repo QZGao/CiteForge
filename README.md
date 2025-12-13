@@ -1,5 +1,7 @@
 # Cite Forge
 
+Project page: [meta:Cite Forge](https://meta.wikimedia.org/wiki/Cite_Forge)
+
 A citation management workbench for Wikipedia. Inspect, search, edit, and copy references from a floating panel.
 
 ## Features
@@ -30,8 +32,8 @@ Marks CS1/CS2 style and surfaces Harv link/target issues, page-range anomalies, 
 
 To use Cite Forge on one of the supported wikis, or install it on all wikis:
 
-- For one wiki: Add the following line to your `common.js` page on that wiki ( e.g. [English Wikipedia common.js](https://en.wikipedia.org/wiki/Special:MyPage/common.js) ).
-- For all wikis: Add the following line to your [global.js page on Meta-Wiki](https://meta.wikimedia.org/wiki/Special:MyPage/global.js).
+- For one wiki: Add the following line to your `common.js` page on that wiki ( e.g. [English Wikipedia `common.js`](https://en.wikipedia.org/wiki/Special:MyPage/common.js) ).
+- For all wikis: Add the following line to your [`global.js` page on Meta-Wiki](https://meta.wikimedia.org/wiki/Special:MyPage/global.js).
 
 ```js
 mw.loader.load("//meta.wikimedia.org/w/index.php?title=User:SuperGrey/gadgets/CiteForge.js&action=raw&ctype=text/javascript"); // Backlink: [[meta:Cite Forge]]
@@ -70,4 +72,4 @@ npm test              # Run Vitest tests
   - [RefRenamer](https://en.wikipedia.org/wiki/User:Nardog/RefRenamer) (CC BY-SA 4.0) by Nardog
   - [Citation Style Marker](https://en.wikipedia.org/wiki/User:BrandonXLF/CitationStyleMarker) (CC BY-SA 4.0) by BrandonXLF
   - [HarvErrors](https://en.wikipedia.org/wiki/User:Ucucha/HarvErrors) (CC BY-SA 4.0) by Ucucha
-  - [reviewsourcecheck](https://en.wikipedia.org/wiki/User:Lingzhi2/reviewsourcecheck) (CC BY-SA 4.0) by Lingzhi2 & Ucucha
+  - [reviewsourcecheck](https://en.wikipedia.org/wiki/User:Lingzhi2/reviewsourcecheck) (CC BY-SA 4.0) by Lingzhi & Ucucha
