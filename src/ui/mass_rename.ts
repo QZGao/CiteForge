@@ -1,26 +1,25 @@
 import { Reference } from '../types';
 import { ensureMount, ensureStyleElement, loadCodexAndVue, registerCodexComponents } from './codex';
-import {
-	groupKey,
-	isAutoName,
-	pickTemplateParams,
-	parseTemplateParams,
-	getRefContentMap
-} from '../core/references';
+import { groupKey, isAutoName, getRefContentMap } from '../core/references';
 import styles from './mass_rename.css';
 import MASS_RENAME_TEMPLATE from './mass_rename.template.vue';
 import {
-	alphaIndex,
-	convertDigitsToAscii,
-	domainFromUrl,
-	domainShortFromUrl,
-	extractUrl,
-	firstYearCandidate,
-	normalizeNameKey,
-	stripMarkup,
-	toLatin
+	alphaIndex
 } from '../core/string_utils';
 import { getWikitext } from '../data/wikitext_fetch';
+import {
+	DEFAULT_FIELDS,
+	IncrementStyle,
+	MassRenameConfig,
+	NAMING_FIELDS,
+	NamingField,
+	RefMetadata,
+	buildSuggestion,
+	createDefaultConfig,
+	extractMetadata,
+	normalizeFieldSelection,
+	normalizeKey
+} from '../core/mass_rename';
 
 type VueModule = { createMwApp: (options: unknown) => VueApp };
 type VueApp = { mount: (selector: string) => unknown; component?: (name: string, value: unknown) => VueApp };
@@ -30,50 +29,6 @@ const MOUNT_ID = 'citeforge-mass-rename-mount';
 type ApplyCallback = (renameMap: Record<string, string | null>, renameNameless: Record<string, string | null>) => void;
 type MassRenameOptions = { onApply?: ApplyCallback };
 let onApplyMassRename: ApplyCallback | null = null;
-
-type NamingField =
-	| 'last'
-	| 'first'
-	| 'author'
-	| 'title'
-	| 'work'
-	| 'publisher'
-	| 'domain'
-	| 'domainShort'
-	| 'phrase'
-	| 'year'
-	| 'fulldate';
-type IncrementStyle = 'latin' | 'numeric';
-
-interface RefMetadata {
-	last?: string;
-	first?: string;
-	author?: string;
-	title?: string;
-	work?: string;
-	publisher?: string;
-	domain?: string;
-	domainShort?: string;
-	phrase?: string;
-	year?: string;
-	yearAscii?: string;
-	textYear?: string;
-	textYearAscii?: string;
-	dateYMD?: string;
-	dateDisplay?: string;
-}
-
-interface MassRenameConfig {
-	fields: NamingField[];
-	lowercase: boolean;
-	stripDiacritics: boolean;
-	stripPunctuation: boolean;
-	replaceSpaceWith: string;
-	convertYearDigits: boolean;
-	delimiter: string;
-	delimiterConditional: boolean;
-	incrementStyle: IncrementStyle;
-}
 
 interface RenameRow {
 	ref: Reference;
@@ -109,6 +64,7 @@ interface MassRenameState {
 }
 
 type MassRenameCtx = MassRenameState & {
+	queryRows: RenameRow[];
 	sortedRows: RenameRow[];
 	filteredRows: RenameRow[];
 	activeCount: number;
@@ -116,14 +72,14 @@ type MassRenameCtx = MassRenameState & {
 	conflictCount: number;
 	applyDisabled: boolean;
 	incrementOptions: Array<{ label: string; value: IncrementStyle }>;
+	selectAllChecked: boolean;
+	selectAllIndeterminate: boolean;
 };
 
 type MassRenameRoot = {
 	setRefs: (next: Reference[], contentMap?: Map<string, string>) => void;
 	openDialog: () => void;
 };
-
-const DEFAULT_FIELDS: NamingField[] = ['domainShort', 'fulldate'];
 
 const FIELD_OPTIONS: Array<{ value: NamingField; label: string; description?: string }> = [
 	{ value: 'last', label: 'Author last name', description: 'Uses last/surname or author field' },
@@ -141,41 +97,13 @@ const FIELD_OPTIONS: Array<{ value: NamingField; label: string; description?: st
 
 const FIELD_MENU_CONFIG = { visibleItemLimit: 8 };
 
-function normalizeFieldSelection(selection: NamingField[]): NamingField[] {
-	const allowed = new Set(FIELD_OPTIONS.map((o) => o.value));
-	const seen = new Set<NamingField>();
-	const result: NamingField[] = [];
-	selection.forEach((field) => {
-		if (!allowed.has(field) || seen.has(field)) return;
-		seen.add(field);
-		result.push(field);
-	});
-	return result;
-}
-
 function chipForField(field: NamingField): { label: string; value: NamingField } {
 	const option = FIELD_OPTIONS.find((o) => o.value === field);
 	return { label: option?.label || field, value: field };
 }
 
 function chipsFromSelection(selection: NamingField[]): Array<{ label: string; value: NamingField }> {
-	return normalizeFieldSelection(selection).map(chipForField);
-}
-
-const DEFAULT_CONFIG: MassRenameConfig = {
-	fields: DEFAULT_FIELDS,
-	lowercase: true,
-	stripDiacritics: false,
-	stripPunctuation: false,
-	replaceSpaceWith: '_',
-	convertYearDigits: true,
-	delimiter: '-',
-	delimiterConditional: false,
-	incrementStyle: 'latin'
-};
-
-function createDefaultConfig(): MassRenameConfig {
-	return { ...DEFAULT_CONFIG, fields: [...DEFAULT_FIELDS] };
+	return normalizeFieldSelection(selection, NAMING_FIELDS).map(chipForField);
 }
 
 let mountedApp: VueApp | null = null;
@@ -183,242 +111,6 @@ let mountedRoot: unknown = null;
 
 function isMassRenameRoot(val: unknown): val is MassRenameRoot {
 	return Boolean(val && typeof (val as MassRenameRoot).setRefs === 'function' && typeof (val as MassRenameRoot).openDialog === 'function');
-}
-
-function stripLanguagePrefix(value: string): string {
-	return (value || '').replace(/^[a-zA-Z-]{2,}:\s*/, '');
-}
-
-function extractMetadata(ref: Reference): RefMetadata {
-	const content = ref.contentWikitext || '';
-	const params = parseTemplateParams(content);
-	const meta: RefMetadata = {};
-
-	const pick = (...keys: string[]): string | undefined => pickTemplateParams(params, ...keys);
-	meta.last = pick('last', 'last1', 'surname', 'author1');
-	meta.first = pick('first', 'first1', 'given');
-	meta.author = pick('author', 'authors');
-	const titleRaw = pick('title', 'script-title', 'chapter', 'contribution');
-	meta.title = stripMarkup(stripLanguagePrefix(titleRaw || ''));
-	meta.work = stripMarkup(pick('work', 'journal', 'newspaper', 'website', 'periodical') || '');
-	meta.publisher = stripMarkup(pick('publisher', 'institution') || '');
-
-	const url = pick('url', 'archive-url') || extractUrl(content);
-	if (url) {
-		meta.domain = domainFromUrl(url) || undefined;
-		const shortDomain = (domainShortFromUrl as (val: string) => string | null)(url);
-		meta.domainShort = typeof shortDomain === 'string' ? shortDomain : undefined;
-	}
-
-	const rawDate = pick('date');
-	const normalizedDate = rawDate ? convertDigitsToAscii(stripMarkup(rawDate)) : '';
-	if (normalizedDate) {
-		const pad = (n: number) => n.toString().padStart(2, '0');
-		const parsed = Date.parse(normalizedDate);
-		if (!Number.isNaN(parsed)) {
-			const d = new Date(parsed);
-			meta.dateYMD = `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}`;
-			if (typeof d.toLocaleDateString === 'function') {
-				meta.dateDisplay = d.toLocaleDateString(undefined, { timeZone: 'UTC' });
-			} else {
-				meta.dateDisplay = normalizedDate;
-			}
-		} else {
-			const match = normalizedDate.match(/(\d{4})(?:\D?(\d{1,2})(?:\D?(\d{1,2}))?)?/);
-			if (match) {
-				const [, y, m, d] = match;
-				if (y && m && d) {
-					meta.dateYMD = `${y}${pad(Number(m))}${pad(Number(d))}`;
-					meta.dateDisplay = `${y}-${pad(Number(m))}-${pad(Number(d))}`;
-				} else if (y && m) {
-					meta.dateYMD = `${y}${pad(Number(m))}`;
-					meta.dateDisplay = `${y}-${pad(Number(m))}`;
-				} else if (y) {
-					meta.dateYMD = y;
-					meta.dateDisplay = y;
-				}
-			}
-		}
-	}
-
-	const baseYear = firstYearCandidate(pick('year', 'date') || rawDate || '');
-	if (baseYear) {
-		meta.year = baseYear.original;
-		if (baseYear.ascii !== baseYear.original) meta.yearAscii = baseYear.ascii;
-	}
-	if (!meta.year) {
-		const fallback = firstYearCandidate(content);
-		if (fallback) {
-			meta.textYear = fallback.original;
-			if (fallback.ascii !== fallback.original) meta.textYearAscii = fallback.ascii;
-		}
-	}
-
-	const authorGuess = meta.author ? stripMarkup(meta.author) : '';
-	if (!meta.last && authorGuess) {
-		const parts = authorGuess.split(/[,;]| and /i);
-		meta.last = parts[0]?.trim();
-	}
-
-	const phraseSource = stripMarkup(content);
-	if (phraseSource) {
-		meta.phrase = phraseSource.split(/\s+/).slice(0, 6).join(' ');
-	}
-
-	return meta;
-}
-
-function sanitizeToken(token: string, config: MassRenameConfig): string {
-	if (!token) return '';
-	let text = stripMarkup(token);
-	if (config.stripDiacritics) {
-		text = text.normalize('NFD').replace(/\p{Mn}/gu, '');
-	}
-	if (config.stripPunctuation) {
-		text = text.replace(/[\p{P}\p{S}]+/gu, ' ');
-	}
-	text = text.replace(/[<>{}\[\]|"]/g, ' ');
-	text = text.trim();
-	if (config.lowercase) {
-		text = text.toLowerCase();
-	}
-	const spaceReplacement = config.replaceSpaceWith;
-	if (typeof spaceReplacement === 'string') {
-		text = text.replace(/\s+/g, spaceReplacement);
-	}
-	text = text.replace(/_{2,}/g, '_').replace(/\s{2,}/g, ' ');
-	return text.trim();
-}
-
-function normalizeKey(name: string): string {
-	return normalizeNameKey(name);
-}
-
-function pickField(meta: RefMetadata, field: NamingField): string | null {
-	switch (field) {
-		case 'last':
-			return meta.last || null;
-		case 'first':
-			return meta.first || null;
-		case 'author':
-			return meta.author || meta.last || null;
-		case 'title':
-			return meta.title || null;
-		case 'work':
-			return meta.work || null;
-		case 'publisher':
-			return meta.publisher || null;
-		case 'domain':
-			return meta.domain || null;
-		case 'domainShort':
-			return meta.domainShort || null;
-		case 'phrase':
-			return meta.phrase || null;
-		case 'year':
-			return meta.year || meta.textYear || null;
-		case 'fulldate':
-			return meta.dateYMD || null;
-		default:
-			return null;
-	}
-}
-
-function pickYear(meta: RefMetadata, config: MassRenameConfig): string | null {
-	const direct = config.convertYearDigits ? meta.yearAscii || meta.year : meta.year;
-	if (direct) return direct;
-	return null;
-}
-
-function ensureUniqueName(base: string, reserved: Set<string>, config: MassRenameConfig): string {
-	const cleanBase = base || 'ref';
-	let name = cleanBase;
-	let normalized = normalizeKey(name);
-	if (normalized && !reserved.has(normalized)) {
-		reserved.add(normalized);
-		return name;
-	}
-	const delimiter = config.delimiterConditional && !/\d$/.test(cleanBase) ? '' : config.delimiter;
-	let counter = config.incrementStyle === 'numeric' ? 2 : 0;
-	do {
-		const suffix = config.incrementStyle === 'numeric' ? String(counter) : toLatin(counter);
-		name = `${cleanBase}${delimiter}${suffix}`;
-		normalized = normalizeKey(name);
-		counter++;
-	} while (normalized && reserved.has(normalized));
-	if (normalized) reserved.add(normalized);
-	return name;
-}
-
-function joinParts(parts: string[], config: MassRenameConfig): string {
-	let acc = '';
-	for (const part of parts) {
-		if (!part) continue;
-		if (!acc) {
-			acc = part;
-			continue;
-		}
-		const useDelimiter = config.delimiterConditional ? /\d$/.test(acc) : true;
-		acc += (useDelimiter ? config.delimiter : '') + part;
-	}
-	return acc;
-}
-
-function buildSuggestion(row: RenameRow, config: MassRenameConfig, reserved: Set<string>): string {
-	const fields = normalizeFieldSelection(config.fields && config.fields.length ? config.fields : DEFAULT_FIELDS);
-	const rawParts: string[] = [];
-
-	fields.forEach((key) => {
-		if (key === 'year') {
-			const year = pickYear(row.metadata, config);
-			if (year) rawParts.push(year);
-			return;
-		}
-		if (key === 'fulldate') {
-			if (row.metadata.dateYMD) rawParts.push(row.metadata.dateYMD);
-			return;
-		}
-		const candidate = pickField(row.metadata, key);
-		if (candidate) rawParts.push(candidate);
-	});
-
-	if (rawParts.length === 0) {
-		const fallbackOrder: NamingField[] = ['title', 'domainShort', 'domain', 'phrase', 'author', 'work', 'year', 'fulldate'];
-		for (const key of fallbackOrder) {
-			if (key === 'year') {
-				const year = pickYear(row.metadata, config);
-				if (year) {
-					rawParts.push(year);
-					break;
-				}
-				continue;
-			}
-			if (key === 'fulldate') {
-				if (row.metadata.dateYMD) {
-					rawParts.push(row.metadata.dateYMD);
-					break;
-				}
-				continue;
-			}
-			const candidate = pickField(row.metadata, key);
-			if (candidate) {
-				rawParts.push(candidate);
-				break;
-			}
-		}
-	}
-
-	const sanitizedParts = rawParts
-		.map((p) => sanitizeToken(p, config))
-		.map((p) => p.trim())
-		.filter((p) => p.length > 0);
-
-	let combined = joinParts(sanitizedParts, config);
-	if (!combined) {
-		combined = sanitizeToken(row.ref.name || row.metadata.domain || row.metadata.phrase || row.ref.id || 'ref', config);
-	}
-	combined = combined || 'ref';
-	combined = ensureUniqueName(combined, reserved, config);
-	return combined;
 }
 
 function validateRows(rows: RenameRow[]): string[] {
@@ -483,7 +175,7 @@ function regenerate(rows: RenameRow[], config: MassRenameConfig, respectLocked: 
 
 	rows.forEach((row) => {
 		if (!row.active) return;
-		const suggestion = buildSuggestion(row, config, reserved);
+		const suggestion = buildSuggestion(row.metadata, row.ref, config, reserved);
 		row.suggestion = suggestion;
 		row.locked = false;
 		const norm = normalizeKey(row.suggestion);
@@ -520,7 +212,7 @@ function prepareRows(refs: Reference[], contentMap?: Map<string, string>): Renam
 	const rows = refs.map((ref) => {
 		const content = resolveContent(ref, contentMap, stats);
 		const snippet = (content || '').replace(/\s+/g, ' ').trim();
-		const metadata = extractMetadata({ ...ref, contentWikitext: content });
+		const metadata = extractMetadata(ref, content);
 		if (!content.trim()) {
 			console.info('[Cite Forge][mass-rename] Missing content for ref', {
 				refId: ref.id,
@@ -641,6 +333,9 @@ export async function openMassRenameDialog(refs: Reference[], options?: MassRena
 					{ label: 'Numbers (2, 3, 4)', value: 'numeric' }
 				];
 			},
+			queryRows(this: MassRenameCtx): RenameRow[] {
+				return this.sortedRows.filter((row) => matchesQuery(row, this.query));
+			},
 			sortedRows(this: MassRenameCtx): RenameRow[] {
 				return this.rows.slice().sort((a, b) => {
 					const ga = groupKey(a.ref.name);
@@ -650,7 +345,7 @@ export async function openMassRenameDialog(refs: Reference[], options?: MassRena
 				});
 			},
 			filteredRows(this: MassRenameCtx): RenameRow[] {
-				return this.sortedRows.filter((row) => matchesQuery(row, this.query) && (this.showInactive || row.active));
+				return this.queryRows.filter((row) => this.showInactive || row.active);
 			},
 			activeCount(this: MassRenameCtx): number {
 				return this.rows.filter((r) => r.active).length;
@@ -664,6 +359,14 @@ export async function openMassRenameDialog(refs: Reference[], options?: MassRena
 			applyDisabled(this: MassRenameCtx): boolean {
 				const hasError = this.rows.some((row) => row.active && (row.error || !(row.suggestion || '').trim()));
 				return this.applyBusy || hasError || this.activeCount === 0;
+			},
+			selectAllChecked(this: MassRenameCtx): boolean {
+				if (!this.queryRows.length) return false;
+				return this.queryRows.every((row) => row.active);
+			},
+			selectAllIndeterminate(this: MassRenameCtx): boolean {
+				const active = this.queryRows.filter((row) => row.active).length;
+				return active > 0 && active < this.queryRows.length;
 			}
 		},
 		watch: {
@@ -701,7 +404,7 @@ export async function openMassRenameDialog(refs: Reference[], options?: MassRena
 					: FIELD_OPTIONS;
 			},
 			onFieldSelection(this: MassRenameCtx, value: NamingField[]): void {
-				const normalized = normalizeFieldSelection(value || []);
+				const normalized = normalizeFieldSelection(value || [], NAMING_FIELDS);
 				this.fieldSelection = normalized;
 				this.fieldChips = chipsFromSelection(normalized);
 				this.config.fields = normalized;
@@ -734,6 +437,16 @@ export async function openMassRenameDialog(refs: Reference[], options?: MassRena
 				row.suggestion = value;
 				row.locked = true;
 				this.conflictKeys = validateRows(this.rows);
+			},
+			onToggleAll(this: MassRenameCtx, checked: boolean): void {
+				this.queryRows.forEach((row) => {
+					row.active = checked;
+					if (!checked) {
+						row.locked = false;
+						row.error = null;
+					}
+				});
+				this.conflictKeys = regenerate(this.rows, this.config, true);
 			},
 			regenerateRow(this: MassRenameCtx, row: RenameRow): void {
 				row.locked = false;

@@ -95,7 +95,14 @@
 					</div>
 					<div class="citeforge-mass-rename-table">
 						<div class="citeforge-mass-rename-row citeforge-mass-rename-head">
-							<div class="citeforge-mass-rename-col citeforge-mass-rename-col--check"></div>
+							<div class="citeforge-mass-rename-col citeforge-mass-rename-col--check">
+								<cdx-checkbox
+									:indeterminate="selectAllIndeterminate"
+									:model-value="selectAllChecked"
+									@update:model-value="onToggleAll"
+									aria-label="Select all references"
+								/>
+							</div>
 							<div class="citeforge-mass-rename-col citeforge-mass-rename-col--name">Reference</div>
 							<div class="citeforge-mass-rename-col citeforge-mass-rename-col--uses">Uses</div>
 							<div class="citeforge-mass-rename-col citeforge-mass-rename-col--suggest">Suggested name</div>

@@ -303,6 +303,7 @@
 	color: #47546b;
 	max-height: 42px;
 	overflow-y: auto;
+	word-break: break-word;
 }
 
 .citeforge-mass-rename-meta {
