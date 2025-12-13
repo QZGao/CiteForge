@@ -49,9 +49,8 @@ export interface InspectorState {
 		copyFormat: 'raw' | 'r' | 'ref';
 		showCiteRefCopyBtn: boolean;
 		showInUserNs: boolean;
-		placementMode: 'all_inline' | 'all_ldr' | 'threshold';
+		placementMode: 'keep' | 'all_inline' | 'all_ldr' | 'threshold';
 		minUsesForLdr: number;
-		sortRefs: boolean;
 		useTemplateR: boolean;
 		makeCopies: boolean;
 		normalizeAll: boolean;

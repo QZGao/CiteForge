@@ -171,9 +171,6 @@
 							<cdx-text-input type="number" min="1" v-model.number="settings.minUsesForLdr" />
 						</div>
 					</div>
-					<cdx-checkbox v-model="settings.sortRefs">
-						Sort reflist entries
-					</cdx-checkbox>
 					<cdx-checkbox v-model="settings.useTemplateR">
 						Prefer {{ '{' }}{r|name}} for uses
 					</cdx-checkbox>

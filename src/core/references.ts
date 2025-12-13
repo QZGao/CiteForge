@@ -320,7 +320,7 @@ export function isAutoName(name: string | null): boolean {
 	return /^:\d+$/.test(trimmed) || /^(?:ref|reference|note|auto(?:generated)?\d*|Reference[A-Z]+)$/i.test(trimmed);
 }
 
-type LocationMode = 'all_inline' | 'all_ldr' | { minUsesForLdr: number };
+type LocationMode = 'keep' | 'all_inline' | 'all_ldr' | { minUsesForLdr: number };
 
 export interface TransformOptions {
 	renameMap?: Record<string, string | null>;
@@ -393,10 +393,11 @@ export function transformWikitext(wikitext: string, options: TransformOptions = 
 	const renameMap = normalizeRenameMap(options.renameMap || {});
 	const renameNameless = options.renameNameless || {};
 	const dedupe = Boolean(options.dedupe);
-	const sortRefs = Boolean(options.sortRefs);
+	const sortRefs = options.sortRefs === undefined ? false : Boolean(options.sortRefs);
 	const useTemplateR = Boolean(options.useTemplateR);
-	const normalizeAll = options.normalizeAll !== false;
+	const normalizeAll = options.normalizeAll === undefined ? false : options.normalizeAll !== false;
 	const reflistNames = (options.reflistTemplates && options.reflistTemplates.length > 0 ? options.reflistTemplates : DEFAULT_REFLIST_TEMPLATES).map((n) => n.toLowerCase());
+	const targetMode = normalizeLocationMode(options.locationMode);
 
 	const ctx = parseWikitext(wikitext, reflistNames);
 	ctx.refs = normalizeRefKeys(ctx.refs);
@@ -404,11 +405,14 @@ export function transformWikitext(wikitext: string, options: TransformOptions = 
 	applyRenames(ctx.refs, renameMap, renameNameless);
 	ctx.refs = normalizeRefKeys(ctx.refs);
 	const deduped = dedupe ? applyDedupe(ctx.refs) : [];
-	const targetMode = normalizeLocationMode(options.locationMode);
 	assignLocations(ctx.refs, targetMode);
 
 	const plan = buildReplacementPlan(ctx, {
-		useTemplateR, sortRefs, normalizeAll, renameLookup: (name: string) => renameMap[name]
+		useTemplateR,
+		sortRefs,
+		normalizeAll,
+		locationModeKeep: targetMode === 'keep',
+		renameLookup: (name: string) => renameMap[name]
 	});
 
 	const replaced = applyReplacements(wikitext, plan.replacements);
@@ -445,7 +449,8 @@ export function getRefContentMap(wikitext: string, reflistTemplates?: string[]):
 }
 
 function normalizeLocationMode(mode?: LocationMode): LocationMode {
-	if (!mode) return { minUsesForLdr: 2 };
+	if (mode === 'keep') return 'keep';
+	if (!mode) return 'keep';
 	if (typeof mode === 'string') return mode;
 	if (typeof mode.minUsesForLdr === 'number' && mode.minUsesForLdr >= 1) return mode;
 	return { minUsesForLdr: 2 };
@@ -536,6 +541,15 @@ function assignLocations(refs: Map<RefKey, RefRecord>, mode: LocationMode): void
 	refIterator(refs).forEach((ref) => {
 		const canonical = ref.canonical ?? ref;
 		if (processed.has(canonical)) return;
+		if (mode === 'keep') {
+			if (canonical.ldrDefinitions.length > 0) {
+				canonical.targetLocation = 'ldr';
+			} else {
+				canonical.targetLocation = 'inline';
+			}
+			processed.add(canonical);
+			return;
+		}
 		if (!canonical.name) {
 			canonical.targetLocation = 'inline';
 			processed.add(canonical);
@@ -686,13 +700,15 @@ function parseWikitext(wikitext: string, reflistNames: string[]): {
 			const inner = refsParam.value;
 			let innerMatch: RegExpExecArray | null;
 			const innerFull = /<ref\b([^>/]*?)>([\s\S]*?)<\/ref>/gi;
+			const paramOffset = tpl.content.indexOf(inner);
+			const basePos = paramOffset >= 0 ? tpl.start + paramOffset : tpl.start;
 			while ((innerMatch = innerFull.exec(inner)) !== null) {
 				const attrs = innerMatch[1] ?? '';
 				const content = innerMatch[2] ?? '';
 				const name = extractAttr(attrs, 'name');
 				const group = extractAttr(attrs, 'group');
 				const ref = getRef(name, group);
-				const posStart = tpl.start + refsParam.value.indexOf(innerMatch[0]);
+				const posStart = basePos + (innerMatch.index ?? 0);
 				const use: RefUseInternal = {
 					name, group, start: posStart, end: posStart + innerMatch[0].length, kind: 'full', content
 				};
@@ -719,6 +735,7 @@ function buildReplacementPlan(ctx: {
 	useTemplateR: boolean;
 	sortRefs: boolean;
 	normalizeAll: boolean;
+	locationModeKeep: boolean;
 	renameLookup?: (name: string) => string | null | undefined;
 }): { replacements: Replacement[]; movedInline: string[]; movedLdr: string[] } {
 	const replacements: Replacement[] = [];
@@ -755,6 +772,16 @@ function buildReplacementPlan(ctx: {
 			const isDefinition = ref.definitions.includes(use);
 			const canonicalContent = content || '';
 			const normalizedContent = opts.normalizeAll ? normalizeContentBlock(canonicalContent) : canonicalContent;
+			if (
+				opts.locationModeKeep &&
+				!opts.useTemplateR &&
+				!opts.normalizeAll &&
+				targetName === use.name &&
+				ref.group === use.group &&
+				((use.kind === 'full' && canonicalContent === use.content) || use.kind !== 'full')
+			) {
+				return;
+			}
 			if (targetLocation === 'inline' && canonical === ref && useIdx === 0 && canonicalContent) {
 				// Ensure first use holds definition
 				const rendered = renderRefTag(targetName, ref.group, normalizedContent);
@@ -768,21 +795,38 @@ function buildReplacementPlan(ctx: {
 				movedLdr.push(targetName);
 			}
 		});
-	});
 
-	// Rebuild reflist templates
-	const ldrEntries = buildLdrEntries(ctx.refs);
-	ctx.templates.forEach((tpl) => {
-		const updated = updateReflistTemplate(tpl, ldrEntries, opts.sortRefs);
-		if (updated !== tpl.content) {
-			replacements.push({ start: tpl.start, end: tpl.end, text: updated });
+		if (opts.locationModeKeep && ref.ldrDefinitions.length > 0) {
+			ref.ldrDefinitions.forEach((def) => {
+				const content = def.content ?? '';
+				const targetGroup = def.group ?? ref.group;
+				if (!opts.useTemplateR && !opts.normalizeAll && targetName === def.name && targetGroup === def.group) {
+					return;
+				}
+				const rendered = content
+					? renderRefTag(targetName, targetGroup, opts.normalizeAll ? normalizeContentBlock(content) : content)
+					: renderRefSelf(targetName, targetGroup, opts.useTemplateR);
+				replacements.push({ start: def.start, end: def.end, text: rendered });
+				if (targetName) movedLdr.push(targetName);
+			});
 		}
 	});
 
-	// If no reflist but we have LDR entries, append one
-	if (ldrEntries.length > 0 && ctx.templates.length === 0) {
-		const appendText = buildStandaloneReflist(ldrEntries, opts.sortRefs);
-		replacements.push({ start: Number.MAX_SAFE_INTEGER, end: Number.MAX_SAFE_INTEGER, text: appendText });
+	// Rebuild reflist templates
+	if (!opts.locationModeKeep) {
+		const ldrEntries = buildLdrEntries(ctx.refs);
+		ctx.templates.forEach((tpl) => {
+			const updated = updateReflistTemplate(tpl, ldrEntries, opts.sortRefs);
+			if (updated !== tpl.content) {
+				replacements.push({ start: tpl.start, end: tpl.end, text: updated });
+			}
+		});
+
+		// If no reflist but we have LDR entries, append one
+		if (ldrEntries.length > 0 && ctx.templates.length === 0) {
+			const appendText = buildStandaloneReflist(ldrEntries, opts.sortRefs);
+			replacements.push({ start: Number.MAX_SAFE_INTEGER, end: Number.MAX_SAFE_INTEGER, text: appendText });
+		}
 	}
 
 	// De-duplicate overlapping replacements by keeping last
@@ -914,7 +958,9 @@ function collapseRefsAndRp(text: string, preferTemplateR: boolean): string {
 		if (block.includes('\n') || block.includes('\r')) {
 			return block;
 		}
-		const tokens = tokenize(block);
+		const trailingWs = block.match(/\s+$/)?.[0] ?? '';
+		const trimmedBlock = trailingWs ? block.slice(0, -trailingWs.length) : block;
+		const tokens = tokenize(trimmedBlock);
 		if (!tokens.length) return block;
 		const parts: string[] = [];
 		let chain: Array<{ name: string; group?: string | null; page?: string; pages?: string; at?: string }> = [];
@@ -993,7 +1039,7 @@ function collapseRefsAndRp(text: string, preferTemplateR: boolean): string {
 			parts.push(tok.raw);
 		}
 		flushChain();
-		return parts.join(' ');
+		return parts.join(' ') + trailingWs;
 	});
 }
 function renderRTemplate(

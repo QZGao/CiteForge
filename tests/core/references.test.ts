@@ -302,6 +302,61 @@ describe('parseReferences', () => {
 
 
 describe('transformWikitext', () => {
+	it('keeps wikitext unchanged when no transformations are specified', () => {
+		const source = `
+Intro <ref name="unchanged" /> mid <ref name="unchanged" /> end.<ref name="another-unchanged" />
+
+==References==
+{{reflist|refs=
+<!-- No changes should be made here -->
+<ref name="unchanged">This reference stays the same.</ref>
+<ref name="another-unchanged">Another stable reference.</ref>
+<!-- Even comments should remain intact. -->
+}}
+`;
+		const result = transformWikitext(source, {});
+		expect(result.wikitext).toBe(source); // No changes should be made, even for the comments in reflist
+	});
+
+	it('keeps wikitext positionally unchanged when only renaming is specified', () => {
+		const source = `
+Intro <ref name="unchanged" /> mid <ref name="unchanged" /> end.<ref name="another-unchanged" />
+
+==References==
+{{reflist|refs=
+<!-- No changes should be made here -->
+<ref name="unchanged">This reference stays the same.</ref>
+<ref name="another-unchanged">Another stable reference.</ref>
+<!-- Even comments should remain intact. -->
+}}
+`;
+		const result = transformWikitext(source, {
+			renameMap: { unchanged: 'still-unchanged', 'another-unchanged': 'also-unchanged' }
+		});
+		expect(result.wikitext).toBe(source.replace(/name="unchanged"/g, 'name="still-unchanged"').replace(/name="another-unchanged"/g, 'name="also-unchanged"'));
+	});
+
+	it('keeps wikitext positionally unchanged when only templateR is toggled, on or off', () => {
+		const source1 = `
+Intro <ref name="unchanged" /> mid <ref name="unchanged" /> end.<ref name="another-unchanged" />
+
+==References==
+{{reflist|refs=
+<!-- No changes should be made here -->
+<ref name="unchanged">This reference stays the same.</ref>
+<ref name="another-unchanged">Another stable reference.</ref>
+<!-- Even comments should remain intact. -->
+}}
+`;
+		const source2 = source1.replace(/<ref name="unchanged" \/>/g, '{{r|unchanged}}').replace(/<ref name="another-unchanged" \/>/g, '{{r|another-unchanged}}');
+
+		const result1 = transformWikitext(source1, { useTemplateR: true });
+		expect(result1.wikitext).toBe(source2);
+
+		const result2 = transformWikitext(source2, { useTemplateR: false });
+		expect(result2.wikitext).toBe(source1);
+	});
+
 	it('renames references across inline, self-closing, template r, and LDR definitions', () => {
 		const source = `
 Intro <ref name="foo">Alpha</ref> mid {{r|foo}} end <ref name="foo" />

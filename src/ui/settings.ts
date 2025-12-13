@@ -9,11 +9,9 @@ export type Settings = {
 	/** Whether Cite Forge is enabled in User namespace. */
 	showInUserNs: boolean;
 	/** Placement strategy for references. */
-	placementMode: 'all_inline' | 'all_ldr' | 'threshold';
+	placementMode: 'keep' | 'all_inline' | 'all_ldr' | 'threshold';
 	/** Threshold for LDR placement when placementMode is threshold. */
 	minUsesForLdr: number;
-	/** Sort reflist entries alphabetically. */
-	sortRefs: boolean;
 	/** Prefer {{r}} for uses when possible. */
 	useTemplateR: boolean;
 	/** Do not dedupe identical refs; keep separate copies. */
@@ -30,9 +28,8 @@ const DEFAULT_SETTINGS: Settings = {
 	copyFormat: 'raw',
 	showCiteRefCopyBtn: true,
 	showInUserNs: true,
-	placementMode: 'threshold',
+	placementMode: 'keep',
 	minUsesForLdr: 2,
-	sortRefs: true,
 	useTemplateR: false,
 	makeCopies: false,
 	normalizeAll: true
@@ -97,16 +94,18 @@ export function settingsToTransformOptions(
 	renameNameless: Record<string, string | null>
 ): TransformOptions {
 	const placementMode = (() => {
+		if (settings.placementMode === 'keep') return 'keep' as const;
 		if (settings.placementMode === 'all_inline') return 'all_inline' as const;
 		if (settings.placementMode === 'all_ldr') return 'all_ldr' as const;
 		const minUses = Math.max(1, Number(settings.minUsesForLdr) || 1);
 		return { minUsesForLdr: minUses };
 	})();
+	const sortRefs = placementMode === 'all_ldr' || placementMode === 'threshold';
 
 	return {
 		renameMap,
 		renameNameless,
-		sortRefs: Boolean(settings.sortRefs),
+		sortRefs,
 		useTemplateR: Boolean(settings.useTemplateR),
 		locationMode: placementMode,
 		dedupe: !settings.makeCopies,

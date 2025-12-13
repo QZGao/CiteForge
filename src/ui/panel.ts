@@ -217,13 +217,14 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					{ label: '<ref name="name" />', value: 'ref' }
 				];
 			},
-			placementOptions(): Array<{ label: string; value: 'threshold' | 'all_ldr' | 'all_inline' }> {
-				return [
-					{ label: 'Refs with ≥ N uses to reflist', value: 'threshold' },
-					{ label: 'All refs to reflist', value: 'all_ldr' },
-					{ label: 'All refs inline', value: 'all_inline' }
-				];
-			},
+				placementOptions(): Array<{ label: string; value: 'keep' | 'threshold' | 'all_ldr' | 'all_inline' }> {
+					return [
+						{ label: 'Keep as is', value: 'keep' },
+						{ label: 'Refs with ≥ N uses to reflist', value: 'threshold' },
+						{ label: 'All refs to reflist', value: 'all_ldr' },
+						{ label: 'All refs inline', value: 'all_inline' }
+					];
+				},
 			sortedRefs(this: InspectorCtx): Reference[] {
 				const arr = Array.isArray(this.refs) ? this.refs.slice() : [];
 				arr.sort((a, b) => {
@@ -368,13 +369,14 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			},
 			commitRefNameFromEvent(this: InspectorCtx & { commitRefName: (ref: Reference, newName: string) => void }, ref: Reference, event: Event): void {
 				const target = event.target as HTMLInputElement | null;
-				const value = target?.value ?? '';
+				const value = (target?.value ?? '').trim();
 				this.commitRefName(ref, value);
 			},
 			commitRefName(this: InspectorCtx, ref: Reference, newName: string): void {
+				const nextName = newName.trim();
 				const oldName = this.pendingChanges.find((c) => c.refId === ref.id)?.oldName ?? ref.name ?? '';
 				this.editingRefId = null;
-				if (newName === oldName) {
+				if (nextName === oldName) {
 					// Reverted to original - remove from queue if exists
 					const idx = this.pendingChanges.findIndex((c) => c.refId === ref.id);
 					if (idx >= 0) {
@@ -383,13 +385,13 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					}
 					return;
 				}
-				ref.name = newName;
+				ref.name = nextName;
 				// Queue the change
 				const existingIdx = this.pendingChanges.findIndex((c) => c.refId === ref.id);
 				if (existingIdx >= 0) {
-					this.pendingChanges[existingIdx].newName = newName;
+					this.pendingChanges[existingIdx].newName = nextName;
 				} else {
-					this.pendingChanges.push({ refId: ref.id, oldName, newName });
+					this.pendingChanges.push({ refId: ref.id, oldName, newName: nextName });
 				}
 			},
 			cancelEditRefName(this: InspectorCtx, ref: Reference): void {
