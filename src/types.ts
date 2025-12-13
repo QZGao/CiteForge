@@ -60,6 +60,8 @@ export interface InspectorState {
 	pendingChanges: PendingChange[];
 	/** ID of the reference currently being edited inline, or null if none. */
 	editingRefId: string | null;
+	/** Whether the on-page checks overlay is active. */
+	checksOn: boolean;
 }
 
 /**

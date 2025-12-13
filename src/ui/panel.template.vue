@@ -126,7 +126,8 @@
 						</span>
 						<span class="citeforge-tool-label">Mass rename</span>
 					</button>
-					<button class="citeforge-tool-btn" type="button" title="Checks (soon)">
+					<button class="citeforge-tool-btn" :class="{ 'is-active': checksOn }" type="button" title="Toggle citation checks"
+						@click.prevent="toggleChecks">
 						<span class="citeforge-tool-icon" aria-hidden="true">
 							<svg viewBox="0 0 20 20" width="16" height="16">
 								<path fill="currentColor"
@@ -135,6 +136,15 @@
 						</span>
 						<span class="citeforge-tool-label">Checks</span>
 					</button>
+					<a
+						v-if="checksOn"
+						class="citeforge-tool-note"
+						href="https://en.wikipedia.org/wiki/User:Lingzhi2/reviewsourcecheck#Descriptive_table"
+						target="_blank"
+						rel="noreferrer"
+					>
+						Harv checks reference table
+					</a>
 				</div>
 				<div class="citeforge-settings" v-if="showSettings">
 					<div class="citeforge-settings__title">Cite Forge Settings</div>

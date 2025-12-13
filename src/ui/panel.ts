@@ -15,6 +15,7 @@ import { initCitationPopup } from './citations';
 import { formatCopy, groupKey, transformWikitext } from '../core/references';
 import { prefetchTemplateDataForWikitext } from '../data/templatedata_fetch';
 import { openMassRenameDialog } from './mass_rename';
+import { disableChecks, enableChecks, isChecksActive } from './checks';
 import panelStyles from './panel.css';
 import PANEL_TEMPLATE from './panel.template.vue';
 
@@ -184,7 +185,8 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				showSettings: false,
 				minHeight: 300,
 				pendingChanges: [],
-				editingRefId: null
+				editingRefId: null,
+				checksOn: false
 			};
 		},
 		computed: {
@@ -276,6 +278,10 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				const nextSelected = prevId ? nextRefs.find((r) => r.id === prevId) ?? nextRefs[0] : nextRefs[0];
 				this.selectedRef = nextSelected ?? null;
 				this.visible = true;
+				if (this.checksOn) {
+					enableChecks(this.refs);
+					this.checksOn = isChecksActive();
+				}
 				if (this.selectedRef) {
 					highlightRef(this.selectedRef);
 				} else {
@@ -287,6 +293,8 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				if (!show) {
 					this.open = false;
 					clearHighlights();
+					disableChecks();
+					this.checksOn = false;
 				}
 			},
 			getVisible(this: InspectorCtx): boolean {
@@ -319,6 +327,18 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 						this.applyMassRename(renameMap, renameNameless);
 					}
 				});
+			},
+			toggleChecks(this: InspectorCtx): void {
+				console.info('[Cite Forge][Checks] Toggle requested', { current: this.checksOn, refs: this.refs.length });
+				if (isChecksActive() || this.checksOn) {
+					disableChecks();
+					this.checksOn = false;
+					console.info('[Cite Forge][Checks] Turned off');
+					return;
+				}
+				enableChecks(this.refs);
+				this.checksOn = isChecksActive();
+				console.info('[Cite Forge][Checks] Turned on', { active: this.checksOn });
 			},
 			onQueryInput(this: InspectorCtx, evt: Event): void {
 				const target = evt.target as HTMLInputElement | null;
@@ -527,6 +547,7 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 		},
 		beforeUnmount() {
 			clearHighlights();
+			disableChecks();
 		},
 		template: PANEL_TEMPLATE
 	};
