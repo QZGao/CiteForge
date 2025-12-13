@@ -1,3 +1,5 @@
+import { parse as parseDomain } from 'tldts';
+
 /**
  * Convert any Unicode digit to its ASCII counterpart.
  * @param value - String containing digits.
@@ -61,6 +63,19 @@ export function firstYearCandidate(value: string): YearCandidate | null {
 export function extractUrl(content: string): string | null {
 	const match = content.match(/https?:\/\/[^\s|<>"]+/i);
 	return match ? match[0] : null;
+}
+
+/**
+ * Get domain (without public suffix) from a URL.
+ * @param url - URL string.
+ */
+export function domainShortFromUrl(url: string): string | null {
+	try {
+		const res = parseDomain(url);
+		return res.domainWithoutSuffix || res.domain || null;
+	} catch {
+		return null;
+	}
 }
 
 /**

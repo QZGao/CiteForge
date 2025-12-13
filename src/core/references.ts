@@ -911,6 +911,9 @@ function collapseRefsAndRp(text: string, preferTemplateR: boolean): string {
 	};
 
 	return text.replace(chainRegex, (block) => {
+		if (block.includes('\n') || block.includes('\r')) {
+			return block;
+		}
 		const tokens = tokenize(block);
 		if (!tokens.length) return block;
 		const parts: string[] = [];
@@ -963,10 +966,10 @@ function collapseRefsAndRp(text: string, preferTemplateR: boolean): string {
 					.filter((e) => e.isName)
 					.forEach((e) => {
 						const idx = e.index || 1;
-						const group = entries.find((en) => en.kind === 'group' && en.index === idx)?.value ?? entries.find((en) => en.kind === 'group' && en.index === 1)?.value ?? null;
-						const page = entries.find((en) => en.kind === 'page' && en.index === idx)?.value ?? entries.find((en) => en.kind === 'page' && en.index === 1)?.value;
-						const pages = entries.find((en) => en.kind === 'pages' && en.index === idx)?.value ?? entries.find((en) => en.kind === 'pages' && en.index === 1)?.value;
-						const at = entries.find((en) => en.kind === 'at' && en.index === idx)?.value ?? entries.find((en) => en.kind === 'at' && en.index === 1)?.value;
+						const group = entries.find((en) => en.kind === 'group' && en.index === idx)?.value ?? null;
+						const page = entries.find((en) => en.kind === 'page' && en.index === idx)?.value;
+						const pages = entries.find((en) => en.kind === 'pages' && en.index === idx)?.value;
+						const at = entries.find((en) => en.kind === 'at' && en.index === idx)?.value;
 						chain.push({ name: e.value, group, page, pages, at });
 					});
 				if (rpTok) {

@@ -13,6 +13,7 @@ import {
 	alphaIndex,
 	convertDigitsToAscii,
 	domainFromUrl,
+	domainShortFromUrl,
 	extractUrl,
 	firstYearCandidate,
 	normalizeNameKey,
@@ -30,7 +31,18 @@ type ApplyCallback = (renameMap: Record<string, string | null>, renameNameless: 
 type MassRenameOptions = { onApply?: ApplyCallback };
 let onApplyMassRename: ApplyCallback | null = null;
 
-type NamingField = 'last' | 'first' | 'author' | 'title' | 'work' | 'publisher' | 'domain' | 'phrase' | 'year' | 'fulldate';
+type NamingField =
+	| 'last'
+	| 'first'
+	| 'author'
+	| 'title'
+	| 'work'
+	| 'publisher'
+	| 'domain'
+	| 'domainShort'
+	| 'phrase'
+	| 'year'
+	| 'fulldate';
 type IncrementStyle = 'latin' | 'numeric';
 
 interface RefMetadata {
@@ -41,6 +53,7 @@ interface RefMetadata {
 	work?: string;
 	publisher?: string;
 	domain?: string;
+	domainShort?: string;
 	phrase?: string;
 	year?: string;
 	yearAscii?: string;
@@ -110,7 +123,7 @@ type MassRenameRoot = {
 	openDialog: () => void;
 };
 
-const DEFAULT_FIELDS: NamingField[] = ['work', 'fulldate'];
+const DEFAULT_FIELDS: NamingField[] = ['domainShort', 'fulldate'];
 
 const FIELD_OPTIONS: Array<{ value: NamingField; label: string; description?: string }> = [
 	{ value: 'last', label: 'Author last name', description: 'Uses last/surname or author field' },
@@ -120,6 +133,7 @@ const FIELD_OPTIONS: Array<{ value: NamingField; label: string; description?: st
 	{ value: 'work', label: 'Work/publication', description: 'Journal, newspaper, website, periodical' },
 	{ value: 'publisher', label: 'Publisher/institution', description: 'Publisher or institution field' },
 	{ value: 'domain', label: 'Website domain', description: 'Domain derived from URL' },
+	{ value: 'domainShort', label: 'Website domain (short)', description: 'Domain without public suffix' },
 	{ value: 'phrase', label: 'First phrase', description: 'First few words of the reference text' },
 	{ value: 'year', label: 'Year', description: 'Year from date/year fields' },
 	{ value: 'fulldate', label: 'Full date (yyyymmdd)', description: 'Full date in yyyymmdd format when available' }
@@ -150,7 +164,7 @@ function chipsFromSelection(selection: NamingField[]): Array<{ label: string; va
 
 const DEFAULT_CONFIG: MassRenameConfig = {
 	fields: DEFAULT_FIELDS,
-	lowercase: false,
+	lowercase: true,
 	stripDiacritics: false,
 	stripPunctuation: false,
 	replaceSpaceWith: '_',
@@ -192,20 +206,37 @@ function extractMetadata(ref: Reference): RefMetadata {
 	const url = pick('url', 'archive-url') || extractUrl(content);
 	if (url) {
 		meta.domain = domainFromUrl(url) || undefined;
+		const shortDomain = (domainShortFromUrl as (val: string) => string | null)(url);
+		meta.domainShort = typeof shortDomain === 'string' ? shortDomain : undefined;
 	}
 
 	const rawDate = pick('date');
 	const normalizedDate = rawDate ? convertDigitsToAscii(stripMarkup(rawDate)) : '';
 	if (normalizedDate) {
+		const pad = (n: number) => n.toString().padStart(2, '0');
 		const parsed = Date.parse(normalizedDate);
 		if (!Number.isNaN(parsed)) {
 			const d = new Date(parsed);
-			const pad = (n: number) => n.toString().padStart(2, '0');
 			meta.dateYMD = `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}`;
 			if (typeof d.toLocaleDateString === 'function') {
 				meta.dateDisplay = d.toLocaleDateString(undefined, { timeZone: 'UTC' });
 			} else {
 				meta.dateDisplay = normalizedDate;
+			}
+		} else {
+			const match = normalizedDate.match(/(\d{4})(?:\D?(\d{1,2})(?:\D?(\d{1,2}))?)?/);
+			if (match) {
+				const [, y, m, d] = match;
+				if (y && m && d) {
+					meta.dateYMD = `${y}${pad(Number(m))}${pad(Number(d))}`;
+					meta.dateDisplay = `${y}-${pad(Number(m))}-${pad(Number(d))}`;
+				} else if (y && m) {
+					meta.dateYMD = `${y}${pad(Number(m))}`;
+					meta.dateDisplay = `${y}-${pad(Number(m))}`;
+				} else if (y) {
+					meta.dateYMD = y;
+					meta.dateDisplay = y;
+				}
 			}
 		}
 	}
@@ -279,6 +310,8 @@ function pickField(meta: RefMetadata, field: NamingField): string | null {
 			return meta.publisher || null;
 		case 'domain':
 			return meta.domain || null;
+		case 'domainShort':
+			return meta.domainShort || null;
 		case 'phrase':
 			return meta.phrase || null;
 		case 'year':
@@ -349,7 +382,7 @@ function buildSuggestion(row: RenameRow, config: MassRenameConfig, reserved: Set
 	});
 
 	if (rawParts.length === 0) {
-		const fallbackOrder: NamingField[] = ['title', 'domain', 'phrase', 'author', 'work', 'year', 'fulldate'];
+		const fallbackOrder: NamingField[] = ['title', 'domainShort', 'domain', 'phrase', 'author', 'work', 'year', 'fulldate'];
 		for (const key of fallbackOrder) {
 			if (key === 'year') {
 				const year = pickYear(row.metadata, config);

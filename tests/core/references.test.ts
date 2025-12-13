@@ -541,6 +541,19 @@ Repeat <ref name="common">Common content</ref> and again <ref name="common" />
 		expect(result.wikitext).toContain('<ref name="baz" />{{rp|at=fig1}}');
 	});
 
+	it('does not populate r-template params beyond what is associated with a ref', () => {
+		const source = 'See {{r|eurogamer_20110728|p=2|youxichaguan_20231130}}.';
+		const result = transformWikitext(source, { useTemplateR: true });
+		expect(result.wikitext).toContain('{{r|eurogamer_20110728|p=2|youxichaguan_20231130}}');
+	});
+
+	it('does not remove line breaks', () => {
+		const source = `| MC = PC：83/100{{r|metacritic_pc}}<br />{{tooltip|PS3|PlayStation 3}}：81/100{{r|metacritic_playstation-3}}
+| OC = 76%{{r|opencritic}}`
+		const result = transformWikitext(source, { useTemplateR: true });
+		expect(result.wikitext).toBe(source);
+	});
+
 	it('renames and preserves all r-template aliases and indexed params when templateR is on', () => {
 		const source = 'See {{r|name=alpha|grp=g1|p=2|pages2=10-12|at3=fig1}}.';
 		const result = transformWikitext(source, {
