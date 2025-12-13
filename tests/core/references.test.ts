@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseReferences, transformWikitext } from '../../src/core/references';
+import { prefetchTemplateDataForWikitext } from '../../src/data/templatedata_fetch';
 
 describe('parseReferences', () => {
 	describe('named refs with content', () => {
@@ -663,9 +664,38 @@ Repeat <ref name="common">Common content</ref> and again <ref name="common" />
 		expect(result.wikitext).toContain('<ref>Tres</ref>');
 	});
 
-	it('normalizes ref content', () => {
-		const source = 'This is a reference: <ref name="metacritic">{{Cite web|title=Gamersky|url=https://www.metacritic.com/publication/gamersky/|website=www.metacritic.com|language=en|access-date=2024-04-06|archive-date=2024-06-21|archive-url=https://web.archive.org/web/20240621172355/https://www.metacritic.com/publication/gamersky/|dead-url=no}}</ref>';
+	it('normalizes ref content, test 1', async () => {
+		const source = '<ref name="metacritic">{{Cite web|title=Gamersky|url=https://www.metacritic.com/publication/gamersky/|website=www.metacritic.com|language=en|access-date=2024-04-06|archive-date=2024-06-21|archive-url=https://web.archive.org/web/20240621172355/https://www.metacritic.com/publication/gamersky/|dead-url=no}}</ref>';
+		await prefetchTemplateDataForWikitext(source);
 		const result = transformWikitext(source, { normalizeAll: true });
-		expect(result.wikitext).toContain('<ref name="metacritic">{{Cite web |title=Gamersky |url=https://www.metacritic.com/publication/gamersky/ |website=www.metacritic.com |language=en |dead-url=no |archive-url=https://web.archive.org/web/20240621172355/https://www.metacritic.com/publication/gamersky/ |archive-date=2024-06-21 |access-date=2024-04-06}}</ref>');
+		expect(result.wikitext).toBe('<ref name="metacritic">{{Cite web |title=Gamersky |url=https://www.metacritic.com/publication/gamersky/ |website=www.metacritic.com |language=en |dead-url=no |archive-url=https://web.archive.org/web/20240621172355/https://www.metacritic.com/publication/gamersky/ |archive-date=2024-06-21 |access-date=2024-04-06}}</ref>');
+	});
+
+	it('normalizes ref content, test 2', async () => {
+		const source = '<ref name="Custom maps">{{cite web|last=Savage|first=Phil|title=The 25 best Minecraft custom maps|url=http://www.pcgamer.com/2012/10/20/the-25-best-minecraft-custom-maps/|work=[[PC Gamer]]|publisher=[[Future plc]]|accessdate=2012-10-28|archive-url=https://web.archive.org/web/20121023211322/http://www.pcgamer.com/2012/10/20/the-25-best-minecraft-custom-maps/|archive-date=2012-10-23|dead-url=no}}</ref>';
+		await prefetchTemplateDataForWikitext(source);
+		const result = transformWikitext(source, { normalizeAll: true });
+		expect(result.wikitext).toBe('<ref name="Custom maps">{{cite web |title=The 25 best Minecraft custom maps |url=http://www.pcgamer.com/2012/10/20/the-25-best-minecraft-custom-maps/ |work=[[PC Gamer]] |last=Savage |first=Phil |dead-url=no |archive-url=https://web.archive.org/web/20121023211322/http://www.pcgamer.com/2012/10/20/the-25-best-minecraft-custom-maps/ |archive-date=2012-10-23 |accessdate=2012-10-28 |publisher=[[Future plc]]}}</ref>');
+	});
+
+	it('normalizes ref content, test 3', async () => {
+		const source = `<ref name="OXMUK_20130510">{{Cite magazine |title=''Terraria'' – Can Re-Logic’s tile-based sandbox dig its way out of Minecraft’s shadow? |last=Borthwick |first=Ben |magazine=[[Official Xbox Magazine|Xbox 360: The Official Xbox Magazine (UK)]] |date=2013-05-10 |issue=99 (June 2013) |publisher=[[Future Publishing]] |pages=84–85 |language=en-GB |issn=1534-7850}}</ref>`;
+		await prefetchTemplateDataForWikitext(source);
+		const result = transformWikitext(source, { normalizeAll: true });
+		expect(result.wikitext).toBe(source);
+	});
+
+	it('normalizes ref content, test 4', async () => {
+		const source = `<ref name="3dmgame_20150813">{{Cite news |title=神作依旧坚挺！《泰拉瑞亚》正式登陆Mac和Linux |url=https://www.3dmgame.com/news/201508/3515626.html |author=Sophie |work=[[3DMGAME]] |date=2015-08-13 |language=zh-Hans-CN |access-date=2025-08-11 |archive-url=https://web.archive.org/web/20170829055848/http://www.3dmgame.com/news/201508/3515626.html |archive-date=2017-08-29 |url-status=live}}</ref>`;
+		await prefetchTemplateDataForWikitext(source);
+		const result = transformWikitext(source, { normalizeAll: true });
+		expect(result.wikitext).toBe(source);
+	});
+
+	it('normalizes ref content, test 5', async () => {
+		const source = `<ref name="4gamer_20110525">{{Cite web |url=https://www.4gamer.net/games/040/G004096/20110524056/ |website=[[4Gamer.net]] |date=2011-05-25 |script-title=ja:インディーズゲームの小部屋：Room＃182「Terraria」 |language=ja |author=ginger |url-status=live |archive-url=https://web.archive.org/web/20240420063819/https://www.4gamer.net/games/040/G004096/20110524056/ |archive-date=2024-04-20 |access-date=2025-08-23}}</ref>`;
+		await prefetchTemplateDataForWikitext(source);
+		const result = transformWikitext(source, { normalizeAll: true });
+		expect(result.wikitext).toBe(source);
 	});
 });

@@ -13,6 +13,7 @@ import { getWikitext } from '../data/wikitext_fetch';
 import { openDiffPreview } from '../data/diff_preview';
 import { initCitationPopup } from './citations';
 import { formatCopy, groupKey, transformWikitext } from '../core/references';
+import { prefetchTemplateDataForWikitext } from '../data/templatedata_fetch';
 import { openMassRenameDialog } from './mass_rename';
 import panelStyles from './panel.css';
 import PANEL_TEMPLATE from './panel.template.vue';
@@ -463,6 +464,10 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					});
 
 					const transformOpts = settingsToTransformOptions(this.settings, renameMap, renameNameless);
+
+					if (transformOpts.normalizeAll) {
+						await prefetchTemplateDataForWikitext(base);
+					}
 
 					const result = transformWikitext(base, transformOpts);
 

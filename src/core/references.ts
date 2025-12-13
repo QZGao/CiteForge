@@ -1,5 +1,6 @@
 import { Reference } from '../types';
 import { escapeAttr } from './string_utils';
+import { getTemplateAliasMap, getTemplateParamOrder } from '../data/templatedata_fetch';
 
 /**
  * Parse wikitext for basic ref usages.
@@ -876,29 +877,29 @@ function renderRefTag(name: string | null, group: string | null, content: string
 function normalizeRefBody(content: string): string {
 	let text = normalizeContentBlock(content);
 	const citeRegex = /\{\{\s*([Cc]ite\s+[^\|\}]+)\s*\|([\s\S]*?)\}\}/g;
-	const priority = ['title', 'url', 'website', 'language', 'dead-url', 'archive-url', 'archive-date', 'access-date'];
-
 	text = text.replace(citeRegex, (match, name: string, paramText: string) => {
 		const params = parseTemplateParams('|' + paramText);
 		if (!params.length) return match;
 
 		const ordered: TemplateParam[] = [];
 		const used = new Set<number>();
+		const templateOrder = getTemplateParamOrder(name);
+		const aliasMap = getTemplateAliasMap(name);
 
-		const findParamIndex = (key: string): number => {
-			const lower = key.toLowerCase();
-			return params.findIndex((p) => {
-				const n = p.name?.trim().toLowerCase();
-				if (!n) return false;
-				if (n === lower) return true;
-				if (lower === 'dead-url' && n === 'deadurl') return true;
-				return false;
-			});
+		const canonicalParam = (paramName?: string | null): string | null => {
+			if (!paramName) return null;
+			const norm = paramName.trim().toLowerCase();
+			return aliasMap[norm] ?? norm;
 		};
 
-		priority.forEach((key) => {
-			const idx = findParamIndex(key);
-			if (idx >= 0) {
+		templateOrder.forEach((key) => {
+			const target = canonicalParam(key);
+			if (!target) return;
+			const idx = params.findIndex((p, paramIdx) => {
+				if (used.has(paramIdx)) return false;
+				return canonicalParam(p.name) === target;
+			});
+			if (idx >= 0 && !used.has(idx)) {
 				ordered.push(params[idx]);
 				used.add(idx);
 			}
@@ -1447,6 +1448,7 @@ function splitParams(text: string): string[] {
 	const parts: string[] = [];
 	let current = '';
 	let depth = 0;
+	let linkDepth = 0;
 	for (let i = 0; i < text.length; i++) {
 		const ch = text[i];
 		const next = text[i + 1];
@@ -1460,7 +1462,17 @@ function splitParams(text: string): string[] {
 			current += ch;
 			continue;
 		}
-		if (ch === '|' && depth === 0) {
+		if (ch === '[' && next === '[') {
+			linkDepth++;
+			current += ch;
+			continue;
+		}
+		if (ch === ']' && next === ']') {
+			if (linkDepth > 0) linkDepth--;
+			current += ch;
+			continue;
+		}
+		if (ch === '|' && depth === 0 && linkDepth === 0) {
 			parts.push(current);
 			current = '';
 			continue;

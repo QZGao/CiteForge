@@ -100,7 +100,7 @@ export function settingsToTransformOptions(
 		const minUses = Math.max(1, Number(settings.minUsesForLdr) || 1);
 		return { minUsesForLdr: minUses };
 	})();
-	const sortRefs = placementMode === 'all_ldr' || placementMode === 'threshold';
+	const sortRefs = placementMode === 'all_ldr' || typeof placementMode === 'object';
 
 	return {
 		renameMap,
