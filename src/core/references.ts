@@ -617,7 +617,7 @@ function parseWikitext(wikitext: string, reflistNames: string[]): {
 } {
 	const refs = new Map<RefKey, RefRecord>();
 	const templates = findTemplates(wikitext, reflistNames);
-	const rTemplates: Array<{ id: number; start: number; end: number; names: string[] }> = [];
+	const rTemplates: Array<{ id: number; start: number; end: number; entries: RTemplateEntry[] }> = [];
 	let namelessCounter = 0;
 
 	const getRef = (name: string | null, group: string | null): RefRecord => {
@@ -714,7 +714,7 @@ function inTemplateRange(idx: number, templates: TemplateMatch[]): boolean {
 function buildReplacementPlan(ctx: {
 	refs: Map<RefKey, RefRecord>;
 	templates: TemplateMatch[];
-	rTemplates: Array<{ id: number; start: number; end: number; names: string[] }>
+	rTemplates: Array<{ id: number; start: number; end: number; entries: RTemplateEntry[] }>
 }, opts: {
 	useTemplateR: boolean;
 	sortRefs: boolean;
@@ -1157,7 +1157,7 @@ function buildRTemplateString(
 		let val = e.value;
 		if (e.isName) {
 			const mapped = renameLookup ? renameLookup(e.value) : undefined;
-			val = mapped !== undefined ? mapped : val;
+			val = mapped !== undefined ? (mapped ?? val) : val;
 			if (e.key) {
 				let keyOut = e.key;
 				if (renumber) {
