@@ -92,8 +92,9 @@ export function initCitationPopup(): void {
 		const tgtId = (popup as HTMLElement).dataset.qeecTargetId;
 		const linkText = (popup as HTMLElement).dataset.qeecLinkText || '';
 		if (!tgtId) return;
-		const pageName = mw.config.get('wgPageName');
-		const fullLink = `[[${pageName}#${tgtId}|#${linkText}]]`;
+		const revisionId = mw.config.get('wgRevisionId') || mw.config.get('wgCurRevisionId');
+		const permalink = `Special:Permalink/` + revisionId;
+		const fullLink = `[[${permalink}#${tgtId}|#${linkText}]]`;
 		void navigator.clipboard?.writeText(fullLink).catch(() => {
 			try {
 				document.execCommand('copy');
