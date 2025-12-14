@@ -44,7 +44,7 @@ const createBuildOptions = () => {
 		format: 'iife',
 		charset: 'utf8',
 		target: ['es2017'],
-		minify: false,
+		minify: debug ? false : true,
 		sourcemap: debug ? 'inline' : false,
 		plugins: [vueTemplatePlugin],
 		// Tell esbuild to load CSS files as text so they're bundled into the JS
