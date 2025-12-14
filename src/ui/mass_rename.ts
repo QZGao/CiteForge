@@ -97,11 +97,21 @@ const FIELD_OPTIONS: Array<{ value: NamingField; label: string; description?: st
 
 const FIELD_MENU_CONFIG = { visibleItemLimit: 8 };
 
+/**
+ * Convert a NamingField to a chip object for UI display.
+ * @param field - NamingField value.
+ * @returns Chip object with label and value.
+ */
 function chipForField(field: NamingField): { label: string; value: NamingField } {
 	const option = FIELD_OPTIONS.find((o) => o.value === field);
 	return { label: option?.label || field, value: field };
 }
 
+/**
+ * Convert a selection of NamingFields to chip objects for UI display.
+ * @param selection - Array of NamingField values.
+ * @returns Array of chip objects.
+ */
 function chipsFromSelection(selection: NamingField[]): Array<{ label: string; value: NamingField }> {
 	return normalizeFieldSelection(selection, NAMING_FIELDS).map(chipForField);
 }
@@ -109,10 +119,20 @@ function chipsFromSelection(selection: NamingField[]): Array<{ label: string; va
 let mountedApp: VueApp | null = null;
 let mountedRoot: unknown = null;
 
+/**
+ * Type guard to check if a value is a MassRenameRoot.
+ * @param val - Value to check.
+ * @returns True if val is a MassRenameRoot, false otherwise.
+ */
 function isMassRenameRoot(val: unknown): val is MassRenameRoot {
 	return Boolean(val && typeof (val as MassRenameRoot).setRefs === 'function' && typeof (val as MassRenameRoot).openDialog === 'function');
 }
 
+/**
+ * Validate rename rows for conflicts and errors.
+ * @param rows - Array of RenameRow objects.
+ * @returns Array of conflicting normalized keys.
+ */
 function validateRows(rows: RenameRow[]): string[] {
 	const usage = new Map<string, number>();
 	const bump = (key: string | null) => {
@@ -157,6 +177,13 @@ function validateRows(rows: RenameRow[]): string[] {
 	return Array.from(conflicts);
 }
 
+/**
+ * Regenerate suggestions for rename rows based on configuration.
+ * @param rows - Array of RenameRow objects.
+ * @param config - MassRenameConfig object.
+ * @param respectLocked - Whether to respect locked rows.
+ * @returns Array of conflicting normalized keys.
+ */
 function regenerate(rows: RenameRow[], config: MassRenameConfig, respectLocked: boolean): string[] {
 	const reserved = new Set<string>();
 	rows.forEach((row) => {
@@ -185,6 +212,13 @@ function regenerate(rows: RenameRow[], config: MassRenameConfig, respectLocked: 
 	return validateRows(rows);
 }
 
+/**
+ * Resolve the content for a reference using various sources.
+ * @param ref - Reference object.
+ * @param contentMap - Optional map of reference names/ids to content.
+ * @param stats - Optional ContentStats object to track resolution stats.
+ * @returns Resolved content string.
+ */
 function resolveContent(ref: Reference, contentMap?: Map<string, string>, stats?: ContentStats): string {
 	const fromRef = ref.contentWikitext || '';
 	if (fromRef.trim()) {
@@ -207,6 +241,12 @@ function resolveContent(ref: Reference, contentMap?: Map<string, string>, stats?
 	return '';
 }
 
+/**
+ * Prepare rename rows from references and optional content map.
+ * @param refs - Array of Reference objects.
+ * @param contentMap - Optional map of reference names/ids to content.
+ * @returns Array of RenameRow objects.
+ */
 function prepareRows(refs: Reference[], contentMap?: Map<string, string>): RenameRow[] {
 	const stats: ContentStats = { fromRef: 0, mapByName: 0, mapById: 0, missing: [] };
 	const rows = refs.map((ref) => {
@@ -243,6 +283,12 @@ function prepareRows(refs: Reference[], contentMap?: Map<string, string>): Renam
 	return rows;
 }
 
+/**
+ * Check if a rename row matches the search query.
+ * @param row - RenameRow object.
+ * @param q - Search query string.
+ * @returns True if the row matches the query, false otherwise.
+ */
 function matchesQuery(row: RenameRow, q: string): boolean {
 	if (!q) return true;
 	const needle = q.toLowerCase();
@@ -259,6 +305,11 @@ function matchesQuery(row: RenameRow, q: string): boolean {
 	return haystack.includes(needle);
 }
 
+/**
+ * Build a content map for references using wikitext and existing content.
+ * @param refs - Array of Reference objects.
+ * @returns Map of reference names/ids to content strings.
+ */
 async function buildContentMap(refs: Reference[]): Promise<Map<string, string>> {
 	const map = new Map<string, string>();
 	try {
@@ -289,6 +340,11 @@ async function buildContentMap(refs: Reference[]): Promise<Map<string, string>> 
 	return map;
 }
 
+/**
+ * Open the mass rename dialog for the provided references.
+ * @param refs - Array of Reference objects to rename.
+ * @param options - Optional MassRenameOptions.
+ */
 export async function openMassRenameDialog(refs: Reference[], options?: MassRenameOptions): Promise<void> {
 	ensureStyleElement(STYLE_ID, styles);
 	ensureMount(MOUNT_ID);
@@ -327,15 +383,29 @@ export async function openMassRenameDialog(refs: Reference[], options?: MassRena
 			};
 		},
 		computed: {
+			/**
+			 * Get increment style options for the UI.
+			 * @returns Array of label/value pairs for increment styles.
+			 */
 			incrementOptions(): Array<{ label: string; value: IncrementStyle }> {
 				return [
 					{ label: 'Latin letters (a, b, c)', value: 'latin' },
 					{ label: 'Numbers (2, 3, 4)', value: 'numeric' }
 				];
 			},
+
+			/**
+			 * Get rows matching the current search query.
+			 * @returns Array of RenameRow objects.
+			 */
 			queryRows(this: MassRenameCtx): RenameRow[] {
 				return this.sortedRows.filter((row) => matchesQuery(row, this.query));
 			},
+
+			/**
+			 * Get rows sorted by group key and name.
+			 * @returns Array of RenameRow objects.
+			 */
 			sortedRows(this: MassRenameCtx): RenameRow[] {
 				return this.rows.slice().sort((a, b) => {
 					const ga = groupKey(a.ref.name);
@@ -344,26 +414,61 @@ export async function openMassRenameDialog(refs: Reference[], options?: MassRena
 					return (a.ref.name || '').localeCompare(b.ref.name || '', undefined, { sensitivity: 'base', numeric: true });
 				});
 			},
+
+			/**
+			 * Get rows filtered by active/inactive status.
+			 * @returns Array of RenameRow objects.
+			 */
 			filteredRows(this: MassRenameCtx): RenameRow[] {
 				return this.queryRows.filter((row) => this.showInactive || row.active);
 			},
+
+			/**
+			 * Count of active rows.
+			 * @returns Number of active RenameRow objects.
+			 */
 			activeCount(this: MassRenameCtx): number {
 				return this.rows.filter((r) => r.active).length;
 			},
+
+			/**
+			 * Check if there are any conflicts in the current rows.
+			 * @returns True if there are conflicts, false otherwise.
+			 */
 			hasConflicts(this: MassRenameCtx): boolean {
 				return this.conflictKeys.length > 0;
 			},
+
+			/**
+			 * Count of conflicting keys.
+			 * @returns Number of conflicting normalized keys.
+			 */
 			conflictCount(this: MassRenameCtx): number {
 				return this.conflictKeys.length;
 			},
+
+			/**
+			 * Determine if the apply button should be disabled.
+			 * @returns True if apply is disabled, false otherwise.
+			 */
 			applyDisabled(this: MassRenameCtx): boolean {
 				const hasError = this.rows.some((row) => row.active && (row.error || !(row.suggestion || '').trim()));
 				return this.applyBusy || hasError || this.activeCount === 0;
 			},
+
+			/**
+			 * Check if all query rows are selected.
+			 * @returns True if all query rows are active, false otherwise.
+			 */
 			selectAllChecked(this: MassRenameCtx): boolean {
 				if (!this.queryRows.length) return false;
 				return this.queryRows.every((row) => row.active);
 			},
+
+			/**
+			 * Check if some but not all query rows are selected.
+			 * @returns True if some query rows are active, false otherwise.
+			 */
 			selectAllIndeterminate(this: MassRenameCtx): boolean {
 				const active = this.queryRows.filter((row) => row.active).length;
 				return active > 0 && active < this.queryRows.length;
@@ -380,22 +485,44 @@ export async function openMassRenameDialog(refs: Reference[], options?: MassRena
 		methods: {
 			openDialog(this: MassRenameCtx): void {
 				this.open = true;
-				this.conflictKeys = regenerate(this.rows, this.config, true);
+				this.conflictKeys = regenerate(this.rows, this.config, true);  // Ensure suggestions are up to date
 			},
 			closeDialog(this: MassRenameCtx): void {
 				this.open = false;
 			},
+
+			/**
+			 * Set the references to rename and prepare rows.
+			 * @param next - Array of Reference objects.
+			 * @param contentMap - Optional map of reference names/ids to content.
+			 */
 			setRefs(this: MassRenameCtx, next: Reference[], contentMap?: Map<string, string>): void {
 				this.rows = prepareRows(next, contentMap);
 				this.conflictKeys = regenerate(this.rows, this.config, true);
 			},
+
+			/**
+			 * Handle input in the search query field.
+			 * @param evt - Input event.
+			 */
 			onQueryInput(this: MassRenameCtx, evt: Event): void {
 				const target = evt.target as HTMLInputElement | null;
 				this.query = target?.value ?? '';
 			},
+
+			/**
+			 * Get the grouping bucket for a rename row.
+			 * @param row - RenameRow object.
+			 * @returns Group key string.
+			 */
 			bucketFor(this: MassRenameCtx, row: RenameRow): string {
 				return groupKey(row.ref.name);
 			},
+
+			/**
+			 * Handle input in the field selection filter.
+			 * @param value - Input string.
+			 */
 			onFieldInput(this: MassRenameCtx, value: string): void {
 				this.fieldInput = value;
 				const lower = value.toLowerCase();
@@ -403,6 +530,11 @@ export async function openMassRenameDialog(refs: Reference[], options?: MassRena
 					? FIELD_OPTIONS.filter((opt) => opt.label.toLowerCase().includes(lower))
 					: FIELD_OPTIONS;
 			},
+
+			/**
+			 * Handle selection changes in the field selection menu.
+			 * @param value - Array of selected NamingField values.
+			 */
 			onFieldSelection(this: MassRenameCtx, value: NamingField[]): void {
 				const normalized = normalizeFieldSelection(value || [], NAMING_FIELDS);
 				this.fieldSelection = normalized;
@@ -410,9 +542,18 @@ export async function openMassRenameDialog(refs: Reference[], options?: MassRena
 				this.config.fields = normalized;
 				this.conflictKeys = regenerate(this.rows, this.config, true);
 			},
+
+			/**
+			 * Regenerate suggestions for all rows.
+			 * @param respectLocked - Whether to respect locked rows.
+			 */
 			regenerateSuggestions(this: MassRenameCtx, respectLocked = true): void {
 				this.conflictKeys = regenerate(this.rows, this.config, respectLocked);
 			},
+
+			/**
+			 * Reset all settings and rows to default.
+			 */
 			resetAll(this: MassRenameCtx): void {
 				this.config = createDefaultConfig();
 				this.fieldSelection = [...DEFAULT_FIELDS];
@@ -424,6 +565,11 @@ export async function openMassRenameDialog(refs: Reference[], options?: MassRena
 				});
 				this.conflictKeys = regenerate(this.rows, this.config, false);
 			},
+
+			/**
+			 * Handle toggling the active state of a row.
+			 * @param row - RenameRow object.
+			 */
 			onToggleRow(this: MassRenameCtx, row: RenameRow): void {
 				row.locked = false;
 				if (row.active) {
@@ -433,11 +579,22 @@ export async function openMassRenameDialog(refs: Reference[], options?: MassRena
 					this.conflictKeys = validateRows(this.rows);
 				}
 			},
+
+			/**
+			 * Handle editing the suggestion of a row.
+			 * @param row - RenameRow object.
+			 * @param value - New suggestion string.
+			 */
 			onSuggestionEdited(this: MassRenameCtx, row: RenameRow, value: string): void {
 				row.suggestion = value;
 				row.locked = true;
 				this.conflictKeys = validateRows(this.rows);
 			},
+
+			/**
+			 * Handle toggling the active state of all query rows.
+			 * @param checked - Whether all rows should be active.
+			 */
 			onToggleAll(this: MassRenameCtx, checked: boolean): void {
 				this.queryRows.forEach((row) => {
 					row.active = checked;
@@ -448,10 +605,19 @@ export async function openMassRenameDialog(refs: Reference[], options?: MassRena
 				});
 				this.conflictKeys = regenerate(this.rows, this.config, true);
 			},
+
+			/**
+			 * Regenerate the suggestion for a specific row.
+			 * @param row - RenameRow object.
+			 */
 			regenerateRow(this: MassRenameCtx, row: RenameRow): void {
 				row.locked = false;
 				this.conflictKeys = regenerate(this.rows, this.config, true);
 			},
+
+			/**
+			 * Apply the rename changes.
+			 */
 			applyRenames(this: MassRenameCtx): void {
 				if (this.applyDisabled) return;
 				const renameMap: Record<string, string | null> = {};

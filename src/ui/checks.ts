@@ -9,6 +9,11 @@ let markers: MarkerRecord[] = [];
 const processedHarvParents = new WeakSet<HTMLElement>();
 const annotationsByParent = new Map<HTMLElement, { errors: Set<string>; warnings: Set<string> }>();
 
+/**
+ * Get or create the annotation bucket for a parent element.
+ * @param parent - Parent HTMLElement.
+ * @returns Annotation bucket with error and warning sets.
+ */
 function getAnnotationBucket(parent: HTMLElement): { errors: Set<string>; warnings: Set<string> } {
 	let bucket = annotationsByParent.get(parent);
 	if (!bucket) {
@@ -18,6 +23,12 @@ function getAnnotationBucket(parent: HTMLElement): { errors: Set<string>; warnin
 	return bucket;
 }
 
+/**
+ * Append an annotation message to a parent element's bucket.
+ * @param parent - Parent HTMLElement.
+ * @param message - Annotation message.
+ * @param type - 'error' or 'warning'.
+ */
 function appendAnnotation(parent: HTMLElement, message: string, type: 'error' | 'warning' = 'error'): void {
 	const bucket = getAnnotationBucket(parent);
 	const store = type === 'warning' ? bucket.warnings : bucket.errors;
@@ -26,6 +37,11 @@ function appendAnnotation(parent: HTMLElement, message: string, type: 'error' | 
 	store.add(key);
 }
 
+/**
+ * Format a set of messages into a single string.
+ * @param messages - Set of messages.
+ * @returns Formatted message string.
+ */
 function formatMessages(messages: Set<string>): string {
 	const list = Array.from(messages);
 	return list
@@ -57,6 +73,9 @@ function formatMessages(messages: Set<string>): string {
 		.join(' ');
 }
 
+/**
+ * Flush all annotations to the DOM.
+ */
 function flushAnnotations(): void {
 	annotationsByParent.forEach((bucket, parent) => {
 		const errorText = formatMessages(bucket.errors);
@@ -78,6 +97,11 @@ function flushAnnotations(): void {
 	annotationsByParent.clear();
 }
 
+/**
+ * Annotate Harv error text in a citation.
+ * @param anchor - Anchor element with Harv error link.
+ * @param parent - Parent HTMLElement of the anchor.
+ */
 function annotateHarvText(anchor: HTMLAnchorElement, parent: HTMLElement): void {
 	if (processedHarvParents.has(parent)) return;
 	processedHarvParents.add(parent);
@@ -131,6 +155,12 @@ function annotateHarvText(anchor: HTMLAnchorElement, parent: HTMLElement): void 
 	});
 }
 
+/**
+ * Annotate Harv link errors for a given anchor.
+ * @param anchor - Anchor element with Harv error link.
+ * @param id - Target ID from the anchor href.
+ * @returns True if target exists, false otherwise.
+ */
 function annotateHarvErrors(anchor: HTMLAnchorElement, id: string): boolean {
 	const parent = anchor.parentElement;
 	if (!parent) return false;
@@ -144,6 +174,9 @@ function annotateHarvErrors(anchor: HTMLAnchorElement, id: string): boolean {
 	return Boolean(target);
 }
 
+/**
+ * Annotate reference metadata issues in citations.
+ */
 function annotateReferenceMetadata(): void {
 	const spans = document.querySelectorAll<HTMLElement>('.Z3988');
 	const idMarkers = ['arxiv', 'asin', 'bibcode', 'doi:', 'isbn', 'issn', 'jfm', 'jstor', 'lccn', ' mr ', 'oclc', ' ol ', 'osti', 'pmc', 'pmid', 'rfc', 'ssrn', 'zbl'];
@@ -290,6 +323,10 @@ const REF_SECTION_IDS = new Set([
 	'#Specialized_studies'
 ]);
 
+/**
+ * Collect reference section anchors from the TOC.
+ * @returns Array of reference section anchor IDs.
+ */
 function collectRefSectionAnchors(): string[] {
 	const tocNodes = document.querySelectorAll<HTMLElement>('.toctext');
 	const anchors: string[] = [];
@@ -302,6 +339,9 @@ function collectRefSectionAnchors(): string[] {
 	return anchors.filter((id) => REF_SECTION_IDS.has(id));
 }
 
+/**
+ * Annotate reference sorting issues in citations.
+ */
 function annotateReferenceSorting(): void {
 	const refHeaders = collectRefSectionAnchors();
 	const alreadySorted = new WeakSet<HTMLElement>();
@@ -402,6 +442,11 @@ function annotateReferenceSorting(): void {
 	});
 }
 
+/**
+ * Detect citation styles and return info.
+ * @param target - Target HTMLElement.
+ * @returns Detected style info or null if none.
+ */
 function detectStyles(target: HTMLElement | null): { style: 'CS1' | 'CS2'; csblue: boolean; cite: HTMLElement } | null {
 	if (!target) return null;
 	const selector = '.citation, cite, span.citation, div.citation, .cs1, .cs2';
@@ -419,12 +464,20 @@ function detectStyles(target: HTMLElement | null): { style: 'CS1' | 'CS2'; csblu
 	return null;
 }
 
+/**
+ * Collect all citation elements in the document.
+ * @returns Array of citation HTMLElements.
+ */
 function collectCitations(): HTMLElement[] {
 	const nodes = document.querySelectorAll<HTMLElement>('cite, span.citation, div.citation');
 	// console.info('[Cite Forge][Checks] Found citation nodes', { count: nodes.length });
 	return Array.from(nodes);
 }
 
+/**
+ * Collect Harv inbound links and annotate errors.
+ * @returns Map of Harv IDs to inbound link counts and total backlink count.
+ */
 function collectHarvInbound(): { inbound: Map<string, number>; count: number } {
 	const inbound = new Map<string, number>();
 	const anchors = document.querySelectorAll<HTMLAnchorElement>('a[href^="#CITEREF"]');
@@ -439,6 +492,10 @@ function collectHarvInbound(): { inbound: Map<string, number>; count: number } {
 	return { inbound, count: anchors.length };
 }
 
+/**
+ * Enable reference checks and annotate issues.
+ * @param refs - Array of Reference objects.
+ */
 export function enableChecks(refs: Reference[]): void {
 	console.info('[Cite Forge][Checks] Enabling checks', { refCount: refs.length });
 	disableChecks();
@@ -481,6 +538,9 @@ export function enableChecks(refs: Reference[]): void {
 	active = markers.length > 0;
 }
 
+/**
+ * Disable reference checks and remove annotations.
+ */
 export function disableChecks(): void {
 	if (markers.length) {
 		console.info('[Cite Forge][Checks] Disabling checks, removing markers', { markers: markers.length });
@@ -492,6 +552,10 @@ export function disableChecks(): void {
 	active = false;
 }
 
+/**
+ * Check if reference checks are currently active.
+ * @returns True if checks are active, false otherwise.
+ */
 export function isChecksActive(): boolean {
 	return active;
 }

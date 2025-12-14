@@ -194,12 +194,26 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			};
 		},
 		computed: {
+			/**
+			 * Check if there are any references loaded.
+			 * @returns True if there are references, false otherwise.
+			 */
 			hasRefs(this: InspectorCtx): boolean {
 				return Array.isArray(this.filteredRefs) && this.filteredRefs.length > 0;
 			},
+
+			/**
+			 * Check if there are any pending changes.
+			 * @returns True if there are pending changes, false otherwise.
+			 */
 			hasPendingChanges(this: InspectorCtx): boolean {
 				return this.pendingChanges.length > 0;
 			},
+
+			/**
+			 * Get a set of reference names that have conflicts (duplicates).
+			 * @returns Set of conflicting reference names.
+			 */
 			nameConflicts(this: InspectorCtx): Set<string> {
 				const counts = new Map<string, number>();
 				this.refs.forEach((ref) => {
@@ -214,9 +228,19 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				});
 				return dupes;
 			},
+
+			/**
+			 * Check if there are any reference name conflicts.
+			 * @returns True if there are conflicts, false otherwise.
+			 */
 			hasConflicts(this: InspectorCtx): boolean {
 				return (this.nameConflicts?.size ?? 0) > 0;
 			},
+
+			/**
+			 * Get options for reference name copy formatting.
+			 * @returns Array of label/value pairs for copy format selection.
+			 */
 			copyFormatOptions(): Array<{ label: string; value: string }> {
 				return [
 					{ label: 'raw name', value: 'raw' },
@@ -224,14 +248,24 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					{ label: '<ref name="name" />', value: 'ref' }
 				];
 			},
-				placementOptions(): Array<{ label: string; value: 'keep' | 'threshold' | 'all_ldr' | 'all_inline' }> {
-					return [
-						{ label: 'Keep as is', value: 'keep' },
-						{ label: 'Refs with ≥ N uses to reflist', value: 'threshold' },
-						{ label: 'All refs to reflist', value: 'all_ldr' },
-						{ label: 'All refs inline', value: 'all_inline' }
-					];
-				},
+
+			/**
+			 * Get options for reference re-placement strategies.
+			 * @returns Array of label/value pairs for re-placement selection.
+			 */
+			placementOptions(): Array<{ label: string; value: 'keep' | 'threshold' | 'all_ldr' | 'all_inline' }> {
+				return [
+					{ label: 'Keep as is', value: 'keep' },
+					{ label: 'Refs with ≥ N uses to reflist', value: 'threshold' },
+					{ label: 'All refs to reflist', value: 'all_ldr' },
+					{ label: 'All refs inline', value: 'all_inline' }
+				];
+			},
+
+			/**
+			 * Get the filtered and sorted list of references based on the search query.
+			 * @returns Array of filtered and sorted Reference objects.
+			 */
 			sortedRefs(this: InspectorCtx): Reference[] {
 				const arr = Array.isArray(this.refs) ? this.refs.slice() : [];
 				arr.sort((a, b) => {
@@ -242,6 +276,11 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				});
 				return arr;
 			},
+
+			/**
+			 * Get the list of references filtered by the current search query.
+			 * @returns Array of Reference objects matching the query.
+			 */
 			filteredRefs(this: InspectorCtx): Reference[] {
 				const q = (this.query || '').toLowerCase();
 				if (!q) return this.sortedRefs;
@@ -251,6 +290,11 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					return name.includes(q) || content.includes(q);
 				});
 			},
+
+			/**
+			 * Get a mapping of group keys to the first reference ID in that group.
+			 * @returns Record mapping group keys to reference IDs.
+			 */
 			firstByBucket(this: InspectorCtx): Record<string, string> {
 				const map: Record<string, string> = {};
 				this.filteredRefs.forEach((ref) => {
@@ -263,19 +307,46 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			}
 		},
 		methods: {
+			/**
+			 * Get the display name of a reference.
+			 * @param ref - Reference object.
+			 * @returns The name of the reference or '(nameless)' if not named.
+			 */
 			refName(this: InspectorCtx, ref: Reference): string {
 				return ref?.name ?? '(nameless)';
 			},
+
+			/**
+			 * Get the number of uses for a reference.
+			 * @param ref - Reference object.
+			 * @returns Number of uses of the reference.
+			 */
 			refUses(this: InspectorCtx, ref: Reference): number {
 				return ref?.uses?.length ?? 0;
 			},
+
+			/**
+			 * Get the grouping bucket for a reference based on its name.
+			 * @param ref - Reference object.
+			 * @returns The group key for the reference.
+			 */
 			bucketFor(this: InspectorCtx, ref: Reference): string {
 				return safeGroupKey(ref?.name);
 			},
+
+			/**
+			 * Select a reference and highlight it in the document.
+			 * @param ref - Reference to select.
+			 */
 			selectRef(this: InspectorCtx, ref: Reference): void {
 				this.selectedRef = ref;
 				highlightRef(ref);
 			},
+
+			/**
+			 * Set the list of references in the inspector.
+			 * @param nextRefs - Array of Reference objects to set.
+			 */
 			setRefs(this: InspectorCtx, nextRefs: Reference[]): void {
 				const prevId = this.selectedRef?.id;
 				this.refs = nextRefs;
@@ -292,6 +363,11 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					clearHighlights();
 				}
 			},
+
+			/**
+			 * Set the current visibility state of the inspector panel.
+			 * @param show - True to show, false to hide.
+			 */
 			setVisible(this: InspectorCtx, show: boolean): void {
 				this.visible = show;
 				if (!show) {
@@ -301,17 +377,33 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					this.checksOn = false;
 				}
 			},
+
+			/**
+			 * Get the current visibility state of the inspector panel.
+			 * @returns True if visible, false otherwise.
+			 */
 			getVisible(this: InspectorCtx): boolean {
 				return this.visible;
 			},
+
+			/**
+			 * Handle updates to the open state of the panel.
+			 * @param newValue - New open state.
+			 */
 			onUpdateOpen(this: InspectorCtx, newValue: boolean): void {
 				if (!newValue) {
 					performClose(this);
 				}
 			},
+
 			closeDialog(this: InspectorCtx): void {
 				performClose(this);
 			},
+
+			/**
+			 * Scroll to the first reference in the specified bucket.
+			 * @param bucket - The group key bucket to scroll to.
+			 */
 			scrollToBucket(this: InspectorCtx, bucket: string): void {
 				const targetId = this.firstByBucket[bucket];
 				if (!targetId) return;
@@ -320,11 +412,19 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					el.scrollIntoView({ block: 'nearest', inline: 'start', behavior: 'smooth' });
 				}
 			},
+
+			/**
+			 * Refresh the reference list by invoking the provided callback.
+			 */
 			async refreshList(): Promise<void> {
 				if (refreshCallback) {
 					await refreshCallback();
 				}
 			},
+
+			/**
+			 * Open the mass rename dialog for bulk renaming references.
+			 */
 			openMassRename(this: InspectorCtx & { applyMassRename: (renameMap: Record<string, string | null>, renameNameless: Record<string, string | null>) => void }): void {
 				void openMassRenameDialog(this.refs, {
 					onApply: (renameMap, renameNameless) => {
@@ -332,6 +432,10 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					}
 				});
 			},
+
+			/**
+			 * Toggle the checks feature on or off.
+			 */
 			toggleChecks(this: InspectorCtx): void {
 				console.info('[Cite Forge][Checks] Toggle requested', { current: this.checksOn, refs: this.refs.length });
 				if (isChecksActive() || this.checksOn) {
@@ -344,15 +448,30 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				this.checksOn = isChecksActive();
 				console.info('[Cite Forge][Checks] Turned on', { active: this.checksOn });
 			},
+
+			/**
+			 * Handle input events on the search query field.
+			 * @param evt - Input event.
+			 */
 			onQueryInput(this: InspectorCtx, evt: Event): void {
 				const target = evt.target as HTMLInputElement | null;
 				this.query = target?.value ?? '';
 			},
+
+			/**
+			 * Check if a reference has a name conflict.
+			 * @param ref - Reference object.
+			 * @returns True if there is a conflict, false otherwise.
+			 */
 			refHasConflict(this: InspectorCtx, ref: Reference): boolean {
 				if (!ref.name) return false;
 				const conflicts = this.nameConflicts;
 				return conflicts instanceof Set ? conflicts.has(ref.name.trim()) : false;
 			},
+
+			/**
+			 * Copy the name of a reference to the clipboard.
+			 */
 			copyRefName(this: InspectorCtx, ref?: Reference): void {
 				const targetRef = ref ?? this.selectedRef;
 				if (!targetRef) return;
@@ -364,6 +483,10 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				});
 				showCopiedBadge(targetRef);
 			},
+
+			/**
+			 * Copy the full wikitext of a reference to the clipboard.
+			 */
 			copyRefContent(this: InspectorCtx, ref?: Reference): void {
 				const targetRef = ref ?? this.selectedRef;
 				if (!targetRef) {
@@ -381,6 +504,12 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				});
 				showCopiedBadge(targetRef);
 			},
+
+			/**
+			 * Begin editing the name of a reference.
+			 * Focuses the input field for immediate typing.
+			 * @param ref - Reference to edit.
+			 */
 			editRefName(this: InspectorCtx, ref: Reference): void {
 				this.editingRefId = ref.id;
 				// Focus the input after Vue updates the DOM
@@ -392,11 +521,24 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					}
 				}, 0);
 			},
+
+			/**
+			 * Commit the new name for a reference from an event.
+			 * @param ref - Reference being renamed.
+			 * @param event - Event containing the new name value.
+			 */
 			commitRefNameFromEvent(this: InspectorCtx & { commitRefName: (ref: Reference, newName: string) => void }, ref: Reference, event: Event): void {
 				const target = event.target as HTMLInputElement | null;
 				const value = (target?.value ?? '').trim();
 				this.commitRefName(ref, value);
 			},
+
+			/**
+			 * Commit the new name for a reference.
+			 * Updates pending changes and reference state accordingly.
+			 * @param ref - Reference being renamed.
+			 * @param newName - The new name to set.
+			 */
 			commitRefName(this: InspectorCtx, ref: Reference, newName: string): void {
 				const nextName = newName.trim();
 				const oldName = this.pendingChanges.find((c) => c.refId === ref.id)?.oldName ?? ref.name ?? '';
@@ -419,6 +561,12 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					this.pendingChanges.push({ refId: ref.id, oldName, newName: nextName });
 				}
 			},
+
+			/**
+			 * Cancel editing the name of a reference.
+			 * Restores the original name if there was a pending change.
+			 * @param ref - Reference being edited.
+			 */
 			cancelEditRefName(this: InspectorCtx, ref: Reference): void {
 				// Restore original name if there was a pending change
 				const pending = this.pendingChanges.find((c) => c.refId === ref.id);
@@ -429,6 +577,13 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				}
 				this.editingRefId = null;
 			},
+
+			/**
+			 * Apply mass rename changes from the provided maps.
+			 * Updates references and pending changes accordingly.
+			 * @param renameMap - Mapping of current names to new names.
+			 * @param renameNameless - Mapping of reference IDs to new names for nameless refs.
+			 */
 			applyMassRename(this: InspectorCtx, renameMap: Record<string, string | null>, renameNameless: Record<string, string | null>): void {
 				this.editingRefId = null;
 				this.refs.forEach((ref) => {
@@ -461,9 +616,18 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					});
 				}
 			},
+
+			/**
+			 * Toggle the visibility of the settings panel.
+			 */
 			toggleSettings(this: InspectorCtx): void {
 				this.showSettings = !this.showSettings;
 			},
+
+			/**
+			 * Save all pending changes and open a diff preview.
+			 * Validates for conflicts before proceeding.
+			 */
 			async saveChanges(this: InspectorCtx): Promise<void> {
 				if (this.hasConflicts) {
 					mw.notify?.('Resolve duplicate reference names before saving.', { type: 'error', title: 'Cite Forge' });
@@ -507,10 +671,19 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					mw.notify?.('Cite Forge could not prepare the diff. Please try again.', { type: 'error' });
 				}
 			},
+
+			/**
+			 * Save the current settings and close the settings panel.
+			 */
 			saveSettings(this: InspectorCtx): void {
 				saveSettings(this.settings);
 				this.showSettings = false;
 			},
+
+			/**
+			 * Start resizing the panel based on mouse events.
+			 * @param event - The initial mousedown event.
+			 */
 			startResize(this: InspectorCtx, event: MouseEvent): void {
 				const panelEl = document.querySelector<HTMLElement>('.citeforge-panel');
 				if (!panelEl) return;

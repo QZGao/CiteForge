@@ -84,10 +84,19 @@ export const DEFAULT_CONFIG: MassRenameConfig = {
 	incrementStyle: 'latin'
 };
 
+/**
+ * Create a default mass rename configuration.
+ */
 export function createDefaultConfig(): MassRenameConfig {
 	return { ...DEFAULT_CONFIG, fields: [...DEFAULT_FIELDS] };
 }
 
+/**
+ * Normalize and filter a selection of naming fields.
+ * @param selection - Raw field selection.
+ * @param allowed - Allowed fields.
+ * @returns Normalized field list.
+ */
 export function normalizeFieldSelection(
 	selection: NamingField[],
 	allowed: readonly NamingField[] = NAMING_FIELDS
@@ -103,10 +112,21 @@ export function normalizeFieldSelection(
 	return result;
 }
 
+/**
+ * Strip language prefix from a string.
+ * @param value - Input string.
+ * @returns String without language prefix.
+ */
 function stripLanguagePrefix(value: string): string {
 	return (value || '').replace(/^[a-zA-Z-]{2,}:\s*/, '');
 }
 
+/**
+ * Extract reference metadata from content.
+ * @param ref - Reference object.
+ * @param providedContent - Optional content override.
+ * @returns Extracted metadata.
+ */
 export function extractMetadata(ref: Reference, providedContent?: string): RefMetadata {
 	const content = providedContent ?? ref.contentWikitext ?? '';
 	const params = parseTemplateParams(content);
@@ -127,6 +147,7 @@ export function extractMetadata(ref: Reference, providedContent?: string): RefMe
 	meta.work = stripMarkup(pick('work', 'journal', 'newspaper', 'website', 'periodical') || '');
 	meta.publisher = stripMarkup(pick('publisher', 'institution') || '');
 
+	// Extract and normalize domain
 	const url = pick('url', 'archive-url') || extractUrl(content);
 	if (url) {
 		meta.domain = domainFromUrl(url) || undefined;
@@ -134,6 +155,7 @@ export function extractMetadata(ref: Reference, providedContent?: string): RefMe
 		meta.domainShort = typeof shortDomain === 'string' ? shortDomain : undefined;
 	}
 
+	// Extract and normalize date
 	const rawDate = pick('date');
 	const normalizedDate = rawDate ? convertDigitsToAscii(stripMarkup(rawDate)) : '';
 	if (normalizedDate) {
@@ -165,6 +187,7 @@ export function extractMetadata(ref: Reference, providedContent?: string): RefMe
 		}
 	}
 
+	// Extract year
 	const baseYear = firstYearCandidate(pick('year', 'date') || rawDate || '');
 	if (baseYear) {
 		meta.year = baseYear.original;
@@ -178,53 +201,63 @@ export function extractMetadata(ref: Reference, providedContent?: string): RefMe
 		}
 	}
 
+	// Guess last name from author if missing
 	const authorGuess = meta.author ? stripMarkup(meta.author) : '';
 	if (!meta.last && authorGuess) {
 		const parts = authorGuess.split(/[,;]| and /i);
 		meta.last = parts[0]?.trim();
 	}
 
+	// Extract phrase from content
 	const phraseSource = stripMarkup(content);
 	if (phraseSource) {
 		meta.phrase = phraseSource.split(/\s+/).slice(0, 6).join(' ');
 	}
 
-	const applyTemplateOverrides = (): void => {
-		switch (templateName) {
-			case 'cite tweet': {
-				const user = pick('user');
-				const userClean = user ? stripMarkup(user) : '';
-				if (userClean) {
-					if (!meta.author) meta.author = userClean;
-					if (!meta.last) meta.last = userClean;
-				}
-				if (!meta.work) meta.work = 'Twitter';
-				if (!meta.publisher) meta.publisher = 'Twitter';
-				if (!meta.domain) meta.domain = 'twitter.com';
-				if (!meta.domainShort) meta.domainShort = 'twitter';
-				break;
+	// Apply template-specific overrides
+	switch (templateName) {
+		case 'cite tweet': {
+			const user = pick('user');
+			const userClean = user ? stripMarkup(user) : '';
+			if (userClean) {
+				if (!meta.author) meta.author = userClean;
+				if (!meta.last) meta.last = userClean;
 			}
-			case 'cite arxiv': {
-				if (!meta.work) meta.work = 'arXiv';
-				if (!meta.publisher) meta.publisher = 'arXiv';
-				if (!meta.domain) meta.domain = 'arxiv.com';
-				if (!meta.domainShort) meta.domainShort = 'arxiv';
-				break;
-			}
-			default:
-				break;
+			if (!meta.work) meta.work = 'Twitter';
+			if (!meta.publisher) meta.publisher = 'Twitter';
+			if (!meta.domain) meta.domain = 'twitter.com';
+			if (!meta.domainShort) meta.domainShort = 'twitter';
+			break;
 		}
-	};
-
-	applyTemplateOverrides();
+		case 'cite arxiv': {
+			if (!meta.work) meta.work = 'arXiv';
+			if (!meta.publisher) meta.publisher = 'arXiv';
+			if (!meta.domain) meta.domain = 'arxiv.com';
+			if (!meta.domainShort) meta.domainShort = 'arxiv';
+			break;
+		}
+		default:
+			break;
+	}
 
 	return meta;
 }
 
+/**
+ * Normalize a string to a key for comparison.
+ * @param name - Input string.
+ * @returns Normalized key.
+ */
 export function normalizeKey(name: string): string {
 	return normalizeNameKey(name);
 }
 
+/**
+ * Sanitize a token for inclusion in a filename.
+ * @param token - Input token.
+ * @param config - Mass rename configuration.
+ * @returns Sanitized token.
+ */
 function sanitizeToken(token: string, config: MassRenameConfig): string {
 	if (!token) return '';
 	let text = stripMarkup(token);
@@ -247,6 +280,12 @@ function sanitizeToken(token: string, config: MassRenameConfig): string {
 	return text.trim();
 }
 
+/**
+ * Pick a field value from metadata.
+ * @param meta - Reference metadata.
+ * @param field - Field to pick.
+ * @returns Field value or null.
+ */
 function pickField(meta: RefMetadata, field: NamingField): string | null {
 	switch (field) {
 		case 'last':
@@ -276,12 +315,25 @@ function pickField(meta: RefMetadata, field: NamingField): string | null {
 	}
 }
 
+/**
+ * Pick a year value from metadata, considering configuration.
+ * @param meta - Reference metadata.
+ * @param config - Mass rename configuration.
+ * @returns Year value or null.
+ */
 function pickYear(meta: RefMetadata, config: MassRenameConfig): string | null {
 	const direct = config.convertYearDigits ? meta.yearAscii || meta.year : meta.year;
 	if (direct) return direct;
 	return null;
 }
 
+/**
+ * Ensure a name is unique within a reserved set, appending suffixes as needed.
+ * @param base - Base name.
+ * @param reserved - Set of reserved normalized names.
+ * @param config - Mass rename configuration.
+ * @returns Unique name.
+ */
 function ensureUniqueName(base: string, reserved: Set<string>, config: MassRenameConfig): string {
 	const cleanBase = base || 'ref';
 	let name = cleanBase;
@@ -302,6 +354,12 @@ function ensureUniqueName(base: string, reserved: Set<string>, config: MassRenam
 	return name;
 }
 
+/**
+ * Join parts into a single name string.
+ * @param parts - Parts to join.
+ * @param config - Mass rename configuration.
+ * @returns Joined name.
+ */
 function joinParts(parts: string[], config: MassRenameConfig): string {
 	let acc = '';
 	for (const part of parts) {
@@ -316,6 +374,14 @@ function joinParts(parts: string[], config: MassRenameConfig): string {
 	return acc;
 }
 
+/**
+ * Build a suggested name for a reference.
+ * @param meta - Reference metadata.
+ * @param ref - Reference object.
+ * @param config - Mass rename configuration.
+ * @param reserved - Set of reserved normalized names.
+ * @returns Suggested name.
+ */
 export function buildSuggestion(
 	meta: RefMetadata,
 	ref: Reference,
@@ -339,6 +405,7 @@ export function buildSuggestion(
 		if (candidate) rawParts.push(candidate);
 	});
 
+	// Fallback if no parts were extracted
 	if (rawParts.length === 0) {
 		const fallbackOrder: NamingField[] = ['title', 'domainShort', 'domain', 'phrase', 'author', 'work', 'year', 'fulldate'];
 		for (const key of fallbackOrder) {

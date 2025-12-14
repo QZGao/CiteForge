@@ -388,6 +388,9 @@ const DEFAULT_REFLIST_TEMPLATES = ['reflist', 'references'];
 /**
  * Transform wikitext by applying rename, dedupe, and location rules without saving.
  * Produces updated wikitext and a change summary.
+ * @param wikitext - Source wikitext to transform.
+ * @param options - Transformation options.
+ * @returns Transformation result with updated wikitext and change details.
  */
 export function transformWikitext(wikitext: string, options: TransformOptions = {}): TransformResult {
 	const warnings: string[] = [];
@@ -434,6 +437,7 @@ export function transformWikitext(wikitext: string, options: TransformOptions = 
  * including list-defined references inside reflist templates.
  * @param wikitext - Source wikitext.
  * @param reflistTemplates - Optional override of reflist template names.
+ * @returns Map of ref names/IDs to their content strings.
  */
 export function getRefContentMap(wikitext: string, reflistTemplates?: string[]): Map<string, string> {
 	const reflistNames = (reflistTemplates && reflistTemplates.length > 0 ? reflistTemplates : DEFAULT_REFLIST_TEMPLATES).map((n) => n.toLowerCase());
@@ -449,6 +453,11 @@ export function getRefContentMap(wikitext: string, reflistTemplates?: string[]):
 	return map;
 }
 
+/**
+ * Normalize location mode input into a consistent format.
+ * @param mode - Input location mode.
+ * @returns Normalized location mode.
+ */
 function normalizeLocationMode(mode?: LocationMode): LocationMode {
 	if (mode === 'keep') return 'keep';
 	if (!mode) return 'keep';
@@ -457,6 +466,11 @@ function normalizeLocationMode(mode?: LocationMode): LocationMode {
 	return { minUsesForLdr: 2 };
 }
 
+/**
+ * Normalize rename map input.
+ * @param rename - Raw rename map.
+ * @returns Normalized rename map.
+ */
 function normalizeRenameMap(rename: Record<string, string | null>): Record<string, string | null> {
 	const map: Record<string, string | null> = {};
 	Object.entries(rename).forEach(([k, v]) => {
@@ -468,6 +482,13 @@ function normalizeRenameMap(rename: Record<string, string | null>): Record<strin
 	return map;
 }
 
+/**
+ * Apply renames to references based on provided maps.
+ * Handles both named and nameless references.
+ * @param refs - Map of reference records to modify.
+ * @param rename - Map of current names to new names (or null to remove).
+ * @param renameNameless - Map of nameless ref IDs/keys to new names (or null to remove).
+ */
 function applyRenames(refs: Map<RefKey, RefRecord>, rename: Record<string, string | null>, renameNameless: Record<string, string | null>): void {
 	const appliedNameless = new Set<string>();
 	refs.forEach((ref) => {
@@ -509,6 +530,12 @@ function applyRenames(refs: Map<RefKey, RefRecord>, rename: Record<string, strin
 	}
 }
 
+/**
+ * Deduplicate references based on their content.
+ * References with identical content are merged, with one canonical reference retained.
+ * @param refs - Map of reference records to deduplicate.
+ * @returns Array of changes made during deduplication.
+ */
 function applyDedupe(refs: Map<RefKey, RefRecord>): Array<{ from: string; to: string }> {
 	const canonicalByContent = new Map<string, RefRecord>();
 	const changes: Array<{ from: string; to: string }> = [];
@@ -537,6 +564,11 @@ function applyDedupe(refs: Map<RefKey, RefRecord>): Array<{ from: string; to: st
 	return changes;
 }
 
+/**
+ * Assign target locations (inline or ldr) to references based on mode and usage.
+ * @param refs - Map of reference records to assign locations.
+ * @param mode - Location mode determining assignment rules.
+ */
 function assignLocations(refs: Map<RefKey, RefRecord>, mode: LocationMode): void {
 	const processed = new Set<RefRecord>();
 	refIterator(refs).forEach((ref) => {
@@ -574,6 +606,12 @@ function assignLocations(refs: Map<RefKey, RefRecord>, mode: LocationMode): void
 	});
 }
 
+/**
+ * Aggregate all uses of a canonical reference from the given references map.
+ * @param refs - Map of reference records.
+ * @param canonical - The canonical reference record to aggregate uses for.
+ * @returns Sorted array of reference uses.
+ */
 function aggregateUses(refs: Map<RefKey, RefRecord>, canonical: RefRecord): RefUseInternal[] {
 	const collected: RefUseInternal[] = [];
 	refIterator(refs).forEach((ref) => {
@@ -585,23 +623,50 @@ function aggregateUses(refs: Map<RefKey, RefRecord>, canonical: RefRecord): RefU
 	return collected;
 }
 
+/**
+ * Get the first non-empty content from a reference's definitions or ldrDefinitions.
+ * @param ref - Reference record to extract content from.
+ * @returns The first non-empty content string or null if none found.
+ */
 function firstContent(ref: RefRecord): string | null {
 	const def = ref.definitions.find((d) => (d.content || '').trim().length > 0) || ref.ldrDefinitions.find((d) => (d.content || '').trim().length > 0);
 	return def?.content ?? null;
 }
 
+/**
+ * Normalize content by collapsing whitespace and trimming.
+ * @param content - Content string to normalize.
+ * @returns Normalized content string.
+ */
 function normalizeContent(content: string): string {
 	return content.replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * Generate a reference key from name and group.
+ * @param name - Reference name.
+ * @param group - Reference group.
+ * @returns Generated reference key.
+ */
 function refKey(name: string | null, group: string | null): RefKey {
 	return `${group ?? ''}::${name ?? ''}`;
 }
 
+/**
+ * Iterate over reference records in a map.
+ * @param refs - Map of reference records.
+ * @returns Array of reference records.
+ */
 function refIterator(refs: Map<RefKey, RefRecord>): RefRecord[] {
 	return Array.from(refs.values());
 }
 
+/**
+ * Normalize reference keys in the map.
+ * Merges references with the same name and group into a single record.
+ * @param refs - Map of reference records to normalize.
+ * @returns New map of normalized reference records.
+ */
 function normalizeRefKeys(refs: Map<RefKey, RefRecord>): Map<RefKey, RefRecord> {
 	const next = new Map<RefKey, RefRecord>();
 	let namelessCounter = 0;
@@ -624,6 +689,9 @@ function normalizeRefKeys(refs: Map<RefKey, RefRecord>): Map<RefKey, RefRecord> 
 
 /**
  * Parse wikitext for refs, uses, and reflist templates.
+ * @param wikitext - Source wikitext to parse.
+ * @param reflistNames - Names of reflist templates to detect.
+ * @returns Parsed references, templates, and reflist template entries.
  */
 function parseWikitext(wikitext: string, reflistNames: string[]): {
 	refs: Map<RefKey, RefRecord>;
@@ -635,6 +703,7 @@ function parseWikitext(wikitext: string, reflistNames: string[]): {
 	const rTemplates: Array<{ id: number; start: number; end: number; entries: RTemplateEntry[] }> = [];
 	let namelessCounter = 0;
 
+	// Helper to get or create a RefRecord
 	const getRef = (name: string | null, group: string | null): RefRecord => {
 		const key = name ? refKey(name, group) : `__nameless_${namelessCounter++}`;
 		const existing = refs.get(key);
@@ -646,6 +715,7 @@ function parseWikitext(wikitext: string, reflistNames: string[]): {
 		return rec;
 	};
 
+	// Parse full <ref>...</ref> tags
 	const refFull = /<ref\b([^>/]*?)>([\s\S]*?)<\/ref>/gi;
 	for (const match of wikitext.matchAll(refFull)) {
 		const idx = match.index ?? 0;
@@ -662,6 +732,7 @@ function parseWikitext(wikitext: string, reflistNames: string[]): {
 		ref.uses.push(use);
 	}
 
+	// Parse self-closing <ref ... /> tags
 	const refSelf = /<ref\b([^>]*?)\/\s*>/gi;
 	for (const match of wikitext.matchAll(refSelf)) {
 		const idx = match.index ?? 0;
@@ -676,6 +747,7 @@ function parseWikitext(wikitext: string, reflistNames: string[]): {
 		ref.uses.push(use);
 	}
 
+	// Parse {{r|...}} templates
 	const rTemplate = /\{\{\s*r\s*(\|[\s\S]*?)\}\}/gi;
 	for (const match of wikitext.matchAll(rTemplate)) {
 		const idx = match.index ?? 0;
@@ -695,6 +767,7 @@ function parseWikitext(wikitext: string, reflistNames: string[]): {
 			});
 	}
 
+	// Parse list-defined refs inside reflist templates
 	templates.forEach((tpl) => {
 		const refsParam = tpl.params.find((p) => p.name && p.name.toLowerCase() === 'refs');
 		if (refsParam && refsParam.value) {
@@ -721,12 +794,21 @@ function parseWikitext(wikitext: string, reflistNames: string[]): {
 	return { refs, templates, rTemplates };
 }
 
+/**
+ * Check if an index is within any of the given template ranges.
+ * @param idx - Index to check.
+ * @param templates - Array of template matches with start and end positions.
+ * @returns True if index is within any template range, false otherwise.
+ */
 function inTemplateRange(idx: number, templates: TemplateMatch[]): boolean {
 	return templates.some((tpl) => idx >= tpl.start && idx <= tpl.end);
 }
 
 /**
  * Plan replacements for refs and reflist templates.
+ * @param ctx - Parsing context with refs and templates.
+ * @param opts - Options for replacement behavior.
+ * @returns Replacement plan with text changes and moved refs.
  */
 function buildReplacementPlan(ctx: {
 	refs: Map<RefKey, RefRecord>;
@@ -835,6 +917,11 @@ function buildReplacementPlan(ctx: {
 	return { replacements: collapsed, movedInline, movedLdr };
 }
 
+/**
+ * Build list of LDR entries from references.
+ * @param refs - Map of reference records.
+ * @returns Array of LDR entries with name, group, and content.
+ */
 function buildLdrEntries(refs: Map<RefKey, RefRecord>): Array<{ name: string; group: string | null; content: string }> {
 	const list: Array<{ name: string; group: string | null; content: string }> = [];
 	refIterator(refs).forEach((ref) => {
@@ -849,6 +936,13 @@ function buildLdrEntries(refs: Map<RefKey, RefRecord>): Array<{ name: string; gr
 	return list;
 }
 
+/**
+ * Render a self-closing reference tag or template.
+ * @param name - Reference name.
+ * @param group - Reference group.
+ * @param preferTemplateR - Whether to prefer the {{r|...}} template format.
+ * @returns Rendered reference string.
+ */
 function renderRefSelf(name: string | null, group: string | null, preferTemplateR: boolean): string {
 	const safeEscape = (value: string): string => escapeAttr(value);
 	if (!name) {
@@ -865,6 +959,14 @@ function renderRefSelf(name: string | null, group: string | null, preferTemplate
 	return `<ref ${attrs.join(' ')} />`;
 }
 
+/**
+ * Render a full reference tag with content.
+ * @param name - Reference name.
+ * @param group - Reference group.
+ * @param content - Reference content.
+ * @param normalize - Whether to normalize the content body.
+ * @returns Rendered full reference tag string.
+ */
 function renderRefTag(name: string | null, group: string | null, content: string, normalize = false): string {
 	const safeEscape = (value: string): string => escapeAttr(value);
 	const attrs: string[] = [];
@@ -874,6 +976,11 @@ function renderRefTag(name: string | null, group: string | null, content: string
 	return `<ref${attrs.length ? ' ' + attrs.join(' ') : ''}>${inner}</ref>`;
 }
 
+/**
+ * Normalize the body of a reference, reordering citation template parameters.
+ * @param content - Raw content of the reference.
+ * @returns Normalized reference body content.
+ */
 function normalizeRefBody(content: string): string {
 	let text = normalizeContentBlock(content);
 	const citeRegex = /\{\{\s*([Cc]ite\s+[^\|\}]+)\s*\|([\s\S]*?)\}\}/g;
@@ -924,10 +1031,21 @@ function normalizeRefBody(content: string): string {
 	return text;
 }
 
+/**
+ * Collapse chains of <ref/> and {{rp|...}} into single {{r|...}} templates.
+ * @param text - Source wikitext to process.
+ * @param preferTemplateR - Whether to prefer the {{r|...}} template format.
+ * @returns Wikitext with collapsed reference chains.
+ */
 function collapseRefsAndRp(text: string, preferTemplateR: boolean): string {
 	if (!preferTemplateR) return text;
 	const chainRegex = /(?:(?:<ref\b[^>]*\/>\s*(?:\{\{rp\|[^}]+\}\}\s*)?)|\{\{r\|[^}]+\}\}\s*(?:\{\{rp\|[^}]+\}\}\s*)?)+/gi;
 
+	/**
+	 * Tokenize a block of text into ref, r, and rp tokens.
+	 * @param block - Text block to tokenize.
+	 * @returns Array of tokens with type and raw text.
+	 */
 	const tokenize = (block: string): Array<{ type: 'ref' | 'r' | 'rp'; raw: string }> => {
 		const tokens: Array<{ type: 'ref' | 'r' | 'rp'; raw: string }> = [];
 		const re = /<ref\b[^>]*\/>|{{r\|[^}]+}}|{{rp\|[^}]+}}/gi;
@@ -941,6 +1059,11 @@ function collapseRefsAndRp(text: string, preferTemplateR: boolean): string {
 		return tokens;
 	};
 
+	/**
+	 * Parse an {{rp|...}} template into its parameters.
+	 * @param raw - Raw {{rp|...}} template string.
+	 * @returns Parsed parameters including page, pages, at, group, and unsupported flag.
+	 */
 	const parseRp = (raw: string): { page?: string; pages?: string; at?: string; group?: string; unsupported: boolean } => {
 		const inner = raw.replace(/^\{\{rp\|/i, '').replace(/\}\}$/, '');
 		const params = splitTemplateParams(inner);
@@ -963,10 +1086,20 @@ function collapseRefsAndRp(text: string, preferTemplateR: boolean): string {
 		return res;
 	};
 
+	/**
+	 * Extract name and group attributes from a <ref ... /> tag.
+	 * @param raw - Raw <ref ... /> tag string.
+	 * @returns Object with name and group values or null if not present.
+	 */
 	const refInfo = (raw: string): { name: string | null; group: string | null } => {
 		return { name: extractAttr(raw, 'name'), group: extractAttr(raw, 'group') };
 	};
 
+	/**
+	 * Parse entries from an {{r|...}} template.
+	 * @param raw - Raw {{r|...}} template string.
+	 * @returns Array of RTemplateEntry objects or null if invalid.
+	 */
 	const rEntriesFromR = (raw: string): RTemplateEntry[] | null => {
 		const match = raw.match(/^\{\{r\|([\s\S]+)\}\}$/i);
 		if (!match) return null;
@@ -978,6 +1111,11 @@ function collapseRefsAndRp(text: string, preferTemplateR: boolean): string {
 		return entries;
 	};
 
+	/**
+	 * Build an {{r|...}} template string from a chain of references.
+	 * @param items - Array of reference items with name, group, page, pages, and at.
+	 * @returns Rendered {{r|...}} template string.
+	 */
 	const buildChain = (items: Array<{
 		name: string;
 		group?: string | null;
@@ -1004,6 +1142,7 @@ function collapseRefsAndRp(text: string, preferTemplateR: boolean): string {
 		return `{{r|${params.join('|')}}}`;
 	};
 
+	// Process each matched chain
 	return text.replace(chainRegex, (block) => {
 		if (block.includes('\n') || block.includes('\r')) {
 			return block;
@@ -1092,6 +1231,15 @@ function collapseRefsAndRp(text: string, preferTemplateR: boolean): string {
 		return parts.join(' ') + trailingWs;
 	});
 }
+
+/**
+ * Render an {{r|...}} template from entries, resolving names via references.
+ * @param tpl - RTemplate entries to render.
+ * @param refs - Map of reference records for name resolution.
+ * @param preferTemplateR - Whether to prefer the {{r|...}} template format.
+ * @param renameLookup - Optional function to rename reference names.
+ * @returns Rendered {{r|...}} template string or null if not renderable.
+ */
 function renderRTemplate(
 	tpl: { entries: RTemplateEntry[] },
 	refs: Map<RefKey, RefRecord>,
@@ -1185,6 +1333,11 @@ function renderRTemplate(
 	return segments.length ? segments.join(' ') : null;
 }
 
+/**
+ * Normalize a block of content by trimming spaces and collapsing blank lines.
+ * @param content - Content block to normalize.
+ * @returns Normalized content block.
+ */
 function normalizeContentBlock(content: string): string {
 	let text = String(content ?? '');
 	text = text.replace(/[ \t]+\n/g, '\n'); // trim trailing spaces on lines
@@ -1192,6 +1345,13 @@ function normalizeContentBlock(content: string): string {
 	return text.trim();
 }
 
+/**
+ * Update a reflist template with new refs parameter value.
+ * @param tpl - Template match to update.
+ * @param ldrEntries - List-defined reference entries.
+ * @param sort - Whether to sort entries by name.
+ * @returns Updated reflist template string.
+ */
 function updateReflistTemplate(tpl: TemplateMatch, ldrEntries: Array<{
 	name: string; group: string | null; content: string
 }>, sort: boolean): string {
@@ -1214,6 +1374,12 @@ function updateReflistTemplate(tpl: TemplateMatch, ldrEntries: Array<{
 	return renderTemplate(tpl.name, params);
 }
 
+/**
+ * Render the value for a refs parameter from entries.
+ * @param entries - List-defined reference entries.
+ * @param sort - Whether to sort entries by name.
+ * @returns Rendered refs parameter value.
+ */
 function renderRefsValue(entries: Array<{
 	name: string; group: string | null; content: string
 }>, sort: boolean): string {
@@ -1223,6 +1389,12 @@ function renderRefsValue(entries: Array<{
 	return '\n' + sorted.map((e) => renderRefTag(e.name, e.group, e.content)).join('\n') + '\n';
 }
 
+/**
+ * Render a template with given name and parameters.
+ * @param name - Template name.
+ * @param params - Template parameters.
+ * @returns Rendered template string.
+ */
 function renderTemplate(name: string, params: TemplateParam[]): string {
 	const parts = params.map((p) => {
 		if (p.name) return `${p.name}=${p.value}`;
@@ -1231,6 +1403,13 @@ function renderTemplate(name: string, params: TemplateParam[]): string {
 	return `{{${name}${parts.length ? '|' + parts.join('|') : ''}}}`;
 }
 
+/**
+ * Build an {{r|...}} template string from entries.
+ * @param entries - RTemplate entries to include.
+ * @param renameLookup - Optional function to rename reference names.
+ * @param opts - Options for rendering.
+ * @returns Rendered {{r|...}} template string or null if no names present.
+ */
 function buildRTemplateString(
 	entries: RTemplateEntry[],
 	renameLookup?: (name: string) => string | null | undefined,
@@ -1302,6 +1481,12 @@ function buildRTemplateString(
 	return `{{r|${parts.join('|')}}}`;
 }
 
+/**
+ * Build a standalone reflist template with given entries.
+ * @param entries - List-defined reference entries.
+ * @param sort - Whether to sort entries by name.
+ * @returns Rendered standalone reflist template string.
+ */
 function buildStandaloneReflist(entries: Array<{
 	name: string; group: string | null; content: string
 }>, sort: boolean): string {
@@ -1315,6 +1500,11 @@ interface Replacement {
 	text: string;
 }
 
+/**
+ * Collapse overlapping replacements by keeping the last one for each range.
+ * @param repls - Array of replacements to collapse.
+ * @returns Collapsed array of replacements.
+ */
 function collapseReplacements(repls: Replacement[]): Replacement[] {
 	// Remove duplicates and sort
 	const filtered = repls.slice().sort((a, b) => b.start - a.start);
@@ -1329,6 +1519,12 @@ function collapseReplacements(repls: Replacement[]): Replacement[] {
 	return result;
 }
 
+/**
+ * Apply a series of replacements to a source string.
+ * @param source - Original source string.
+ * @param replacements - Array of replacements to apply.
+ * @returns Modified string after applying replacements.
+ */
 function applyReplacements(source: string, replacements: Replacement[]): string {
 	let output = source;
 	let offset = 0;
@@ -1344,6 +1540,9 @@ function applyReplacements(source: string, replacements: Replacement[]): string 
 
 /**
  * Find template instances with simple brace depth parsing.
+ * @param source - Source wikitext to search.
+ * @param names - Template names to look for (case-insensitive).
+ * @returns Array of found template matches.
  */
 function findTemplates(source: string, names: string[]): TemplateMatch[] {
 	const matches: TemplateMatch[] = [];
@@ -1444,6 +1643,11 @@ export function pickTemplateParams(params: TemplateParam[], ...keys: string[]): 
 	return undefined;
 }
 
+/**
+ * Split template parameter string into individual parameters, respecting nested braces and links.
+ * @param text - Raw parameter string.
+ * @returns Array of individual parameter strings.
+ */
 function splitParams(text: string): string[] {
 	const parts: string[] = [];
 	let current = '';

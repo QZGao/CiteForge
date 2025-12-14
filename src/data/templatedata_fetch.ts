@@ -5,15 +5,31 @@ const STORAGE_KEY = 'citeforge-template-param-order';
 let cacheLoaded = false;
 const API_ENDPOINT = 'https://zh.wikipedia.org/w/api.php';  // Only used if mw.Api is not available or in tests
 
+/**
+ * Normalize a template name for consistent caching.
+ * @param name - Template name.
+ * @returns Normalized template name.
+ */
 function normalizeTemplateName(name: string): string {
 	return name.trim().toLowerCase();
 }
 
+/**
+ * Convert a template name to its canonical title form.
+ * @param name - Template name.
+ * @returns Canonical template title.
+ */
 function canonicalTemplateTitle(name: string): string {
 	const trimmed = name.trim().replace(/_/g, ' ');
 	return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 }
 
+/**
+ * Normalize the parameter order array by trimming, lowercasing, and deduplicating.
+ * @param template - Template name for logging.
+ * @param order - Raw parameter order array.
+ * @returns Normalized parameter order array.
+ */
 function normalizeOrder(template: string, order: string[]): string[] {
 	const seen = new Set<string>();
 	const normalized: string[] = [];
@@ -27,6 +43,12 @@ function normalizeOrder(template: string, order: string[]): string[] {
 	return normalized;
 }
 
+/**
+ * Store template data in the cache and persist.
+ * @param name - Template name.
+ * @param order - Parameter order array.
+ * @param aliases - Parameter alias map.
+ */
 function setTemplateData(name: string, order: string[], aliases: Record<string, string>): void {
 	const norm = normalizeTemplateName(name);
 	const normalized = normalizeOrder(norm, order);
@@ -35,6 +57,11 @@ function setTemplateData(name: string, order: string[], aliases: Record<string, 
 	saveCache();
 }
 
+/**
+ * Get the parameter order for a template from cache.
+ * @param name - Template name.
+ * @returns Parameter order array or empty array if not found.
+ */
 export function getTemplateParamOrder(name: string): string[] {
 	loadCache();
 	const key = normalizeTemplateName(name);
@@ -47,12 +74,22 @@ export function getTemplateParamOrder(name: string): string[] {
 	return [];
 }
 
+/**
+ * Get the parameter alias map for a template from cache.
+ * @param name - Template name.
+ * @returns Parameter alias map.
+ */
 export function getTemplateAliasMap(name: string): Record<string, string> {
 	loadCache();
 	const key = normalizeTemplateName(name);
 	return templateDataAliasCache.get(key) ?? {};
 }
 
+/**
+ * Fetch and return the parameter order for a template, caching the result.
+ * @param templateName - Template name.
+ * @returns Parameter order array.
+ */
 export async function fetchTemplateDataOrder(templateName: string): Promise<string[]> {
 	const normName = normalizeTemplateName(templateName);
 	console.info('[Cite Forge][TemplateData] Requesting param order', { templateName, normName });
@@ -60,6 +97,10 @@ export async function fetchTemplateDataOrder(templateName: string): Promise<stri
 	return getTemplateParamOrder(normName);
 }
 
+/**
+ * Ensure TemplateData param orders are cached for the given template names.
+ * @param names - Array of template names.
+ */
 export async function ensureTemplateOrders(names: string[]): Promise<void> {
 	await Promise.all(names.map((n) => fetchTemplateDataOrder(n)));
 }
@@ -80,6 +121,11 @@ export async function prefetchTemplateDataForWikitext(wikitext: string): Promise
 	await ensureTemplateOrders([...names]);
 }
 
+/**
+ * Get the parameter order for a template, fetching and caching if needed.
+ * @param name - Template name.
+ * @returns Parameter order array.
+ */
 export async function getTemplateParamOrderAsync(name: string): Promise<string[]> {
 	loadCache();
 	const key = normalizeTemplateName(name);
@@ -89,6 +135,10 @@ export async function getTemplateParamOrderAsync(name: string): Promise<string[]
 	return getTemplateParamOrder(key);
 }
 
+/**
+ * Fetch TemplateData for a template and store in cache.
+ * @param templateName - Template name.
+ */
 async function fetchAndStoreTemplateData(templateName: string): Promise<void> {
 	loadCache();
 	if (pendingFetches.has(templateName)) {
@@ -176,6 +226,9 @@ async function fetchAndStoreTemplateData(templateName: string): Promise<void> {
 	await promise;
 }
 
+/**
+ * Load cached template data from localStorage.
+ */
 function loadCache(): void {
 	if (cacheLoaded) return;
 	cacheLoaded = true;
@@ -200,6 +253,9 @@ function loadCache(): void {
 	}
 }
 
+/**
+ * Save cached template data to localStorage.
+ */
 function saveCache(): void {
 	try {
 		if (typeof localStorage === 'undefined') return;

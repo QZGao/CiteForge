@@ -25,6 +25,10 @@ export function initCitationPopup(): void {
 	const popupLink = popup.querySelector<HTMLAnchorElement>('.citeforge-ref-popup-copy');
 	let hideTimer: ReturnType<typeof setTimeout> | null = null;
 
+	/**
+	 * Schedule hiding the popup after a delay.
+	 * @param delay - Delay in milliseconds before hiding the popup.
+	 */
 	function scheduleHide(delay = 150): void {
 		if (hideTimer) clearTimeout(hideTimer);
 		hideTimer = setTimeout(() => {
@@ -40,6 +44,11 @@ export function initCitationPopup(): void {
 		}, delay);
 	}
 
+	/**
+	 * Show the popup near the specified superscript element.
+	 * @param sup - Superscript HTMLElement to anchor the popup to.
+	 * @param linkText - Text of the citation link for permalink generation.
+	 */
 	function showPopupForSup(sup: HTMLElement, linkText: string): void {
 		if (!sup || !popup) return;
 		if (hideTimer) clearTimeout(hideTimer);
@@ -111,6 +120,10 @@ export function initCitationPopup(): void {
 	const settings = getSettings();
 	if (!settings.showCiteRefCopyBtn) return;
 
+	/**
+	 * Attach popup behavior to a citation superscript element.
+	 * @param sup - Superscript HTMLElement to attach to.
+	 */
 	const attachToSup = (sup: HTMLElement): void => {
 		if (!sup || sup.dataset[DATA_ATTACHED]) return;
 		const supLink = sup.querySelector('a[href^="#cite_note-"]');
@@ -149,6 +162,7 @@ export function initCitationPopup(): void {
 	const supElements = document.querySelectorAll('sup[id^="cite_ref-"]');
 	supElements.forEach((el) => attachToSup(el as HTMLElement));
 
+	// Observe for dynamically added citation superscripts.
 	const mo = new MutationObserver((muts) => {
 		for (const m of muts) {
 			if (m.type === 'childList' && m.addedNodes?.length) {

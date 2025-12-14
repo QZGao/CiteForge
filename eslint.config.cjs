@@ -35,6 +35,7 @@ module.exports = [
 
 			// Respect tabs in .ts/.tsx
 			indent: 'off',
+			'no-tabs': 'off',
 		},
 	},
 

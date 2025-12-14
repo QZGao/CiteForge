@@ -3,6 +3,7 @@ import { parse as parseDomain } from 'tldts';
 /**
  * Convert any Unicode digit to its ASCII counterpart.
  * @param value - String containing digits.
+ * @returns String with all digits converted to ASCII.
  */
 export function convertDigitsToAscii(value: string): string {
 	return value.replace(/\p{Nd}/gu, (d) => {
@@ -18,6 +19,7 @@ export function convertDigitsToAscii(value: string): string {
 /**
  * Strip basic wikitext/HTML markup for token extraction.
  * @param text - Raw wikitext or HTML snippet.
+ * @returns Plain text with markup removed.
  */
 export function stripMarkup(text: string): string {
 	let t = String(text || '');
@@ -33,10 +35,6 @@ export function stripMarkup(text: string): string {
 	return t.replace(/\s+/g, ' ').trim();
 }
 
-/**
- * Convert any Unicode digit to its ASCII counterpart.
- * @param value - String containing digits.
- */
 export interface YearCandidate {
 	original: string;
 	ascii: string;
@@ -45,6 +43,7 @@ export interface YearCandidate {
 /**
  * Find the first plausible four-digit year in a string.
  * @param value - Text to scan.
+ * @returns YearCandidate object or null if none found.
  */
 export function firstYearCandidate(value: string): YearCandidate | null {
 	if (!value) return null;
@@ -59,6 +58,7 @@ export function firstYearCandidate(value: string): YearCandidate | null {
 /**
  * Extract the first URL-like token from text.
  * @param content - String to search.
+ * @returns Extracted URL or null if none found.
  */
 export function extractUrl(content: string): string | null {
 	const match = content.match(/https?:\/\/[^\s|<>"]+/i);
@@ -68,6 +68,7 @@ export function extractUrl(content: string): string | null {
 /**
  * Get domain (without public suffix) from a URL.
  * @param url - URL string.
+ * @return Domain without suffix or null if parsing fails.
  */
 export function domainShortFromUrl(url: string): string | null {
 	try {
@@ -81,6 +82,7 @@ export function domainShortFromUrl(url: string): string | null {
 /**
  * Get domain from a URL, stripping leading www.
  * @param url - URL string.
+ * @return Domain or null if parsing fails.
  */
 export function domainFromUrl(url: string): string | null {
 	try {
@@ -95,6 +97,7 @@ export function domainFromUrl(url: string): string | null {
 /**
  * Normalize a reference name to a lowercase ASCII key.
  * @param name - Raw reference name.
+ * @returns Normalized name key.
  */
 export function normalizeNameKey(name: string): string {
 	if (!name) return '';
@@ -105,6 +108,7 @@ export function normalizeNameKey(name: string): string {
 /**
  * Convert a zero-based index to a Latin letter sequence (a, b, c... aa, ab...).
  * @param n - Zero-based index.
+ * @returns Corresponding Latin letter sequence.
  */
 export function toLatin(n: number): string {
 	let s = '';

@@ -1,6 +1,8 @@
 /**
  * Open the standard MediaWiki diff view with provided wikitext, without saving.
  * Submits a hidden form to action=submit with wpDiff, letting the user review and save.
+ * @param newText - New wikitext to compare.
+ * @param summary - Edit summary for the diff preview.
  */
 export function openDiffPreview(newText: string, summary = '[[meta:Cite Forge|Cite Forge]]: reference adjustments'): void {
 	const title = mw.config.get('wgPageName');
@@ -36,6 +38,12 @@ export function openDiffPreview(newText: string, summary = '[[meta:Cite Forge|Ci
 	form.remove();
 }
 
+/**
+ * Append a hidden input to a form.
+ * @param form - Form element.
+ * @param name - Input name.
+ * @param value - Input value.
+ */
 function appendHidden(form: HTMLFormElement, name: string, value: string): void {
 	const input = document.createElement('input');
 	input.type = 'hidden';
@@ -43,4 +51,3 @@ function appendHidden(form: HTMLFormElement, name: string, value: string): void 
 	input.value = value;
 	form.appendChild(input);
 }
-
