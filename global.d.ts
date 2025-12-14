@@ -14,3 +14,8 @@ declare module '@vue/runtime-core' {
 		config: any; // or a real type, e.g. Record<string, unknown>
 	}
 }
+
+declare module 'virtual:i18n-catalogues' {
+	const catalogues: Record<string, Record<string, string>>;
+	export default catalogues;
+}

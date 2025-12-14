@@ -20,6 +20,7 @@ import {
 	normalizeFieldSelection,
 	normalizeKey
 } from '../core/mass_rename';
+import { MessageKey, MessageParams, t } from '../i18n';
 
 type VueModule = { createMwApp: (options: unknown) => VueApp };
 type VueApp = { mount: (selector: string) => unknown; component?: (name: string, value: unknown) => VueApp };
@@ -81,21 +82,35 @@ type MassRenameRoot = {
 	openDialog: () => void;
 };
 
-const FIELD_OPTIONS: Array<{ value: NamingField; label: string; description?: string }> = [
-	{ value: 'last', label: 'Author last name', description: 'Uses last/surname or author field' },
-	{ value: 'first', label: 'Author first name', description: 'Uses first/given name' },
-	{ value: 'author', label: 'Author (full)', description: 'Full author string' },
-	{ value: 'title', label: 'Title', description: 'Title/chapter/contribution' },
-	{ value: 'work', label: 'Work/publication', description: 'Journal, newspaper, website, periodical' },
-	{ value: 'publisher', label: 'Publisher/institution', description: 'Publisher or institution field' },
-	{ value: 'domain', label: 'Website domain', description: 'Domain derived from URL' },
-	{ value: 'domainShort', label: 'Website domain (short)', description: 'Domain without public suffix' },
-	{ value: 'phrase', label: 'First phrase', description: 'First few words of the reference text' },
-	{ value: 'year', label: 'Year', description: 'Year from date/year fields' },
-	{ value: 'fulldate', label: 'Full date (yyyymmdd)', description: 'Full date in yyyymmdd format when available' }
+type FieldOptionConfig = { value: NamingField; labelKey: string; descriptionKey?: string };
+
+const FIELD_OPTION_CONFIG: FieldOptionConfig[] = [
+	{ value: 'last', labelKey: 'ui.massRename.fields.last.label', descriptionKey: 'ui.massRename.fields.last.description' },
+	{ value: 'first', labelKey: 'ui.massRename.fields.first.label', descriptionKey: 'ui.massRename.fields.first.description' },
+	{ value: 'author', labelKey: 'ui.massRename.fields.author.label', descriptionKey: 'ui.massRename.fields.author.description' },
+	{ value: 'title', labelKey: 'ui.massRename.fields.title.label', descriptionKey: 'ui.massRename.fields.title.description' },
+	{ value: 'work', labelKey: 'ui.massRename.fields.work.label', descriptionKey: 'ui.massRename.fields.work.description' },
+	{ value: 'publisher', labelKey: 'ui.massRename.fields.publisher.label', descriptionKey: 'ui.massRename.fields.publisher.description' },
+	{ value: 'domain', labelKey: 'ui.massRename.fields.domain.label', descriptionKey: 'ui.massRename.fields.domain.description' },
+	{ value: 'domainShort', labelKey: 'ui.massRename.fields.domainShort.label', descriptionKey: 'ui.massRename.fields.domainShort.description' },
+	{ value: 'phrase', labelKey: 'ui.massRename.fields.phrase.label', descriptionKey: 'ui.massRename.fields.phrase.description' },
+	{ value: 'year', labelKey: 'ui.massRename.fields.year.label', descriptionKey: 'ui.massRename.fields.year.description' },
+	{ value: 'fulldate', labelKey: 'ui.massRename.fields.fulldate.label', descriptionKey: 'ui.massRename.fields.fulldate.description' }
 ];
 
 const FIELD_MENU_CONFIG = { visibleItemLimit: 8 };
+
+function buildFieldOptions(): Array<{ value: NamingField; label: string; description?: string }> {
+	return FIELD_OPTION_CONFIG.map((option) => ({
+		value: option.value,
+		label: t(option.labelKey),
+		description: option.descriptionKey ? t(option.descriptionKey) : undefined
+	}));
+}
+
+function findFieldOption(value: NamingField): FieldOptionConfig | undefined {
+	return FIELD_OPTION_CONFIG.find((option) => option.value === value);
+}
 
 /**
  * Convert a NamingField to a chip object for UI display.
@@ -103,8 +118,8 @@ const FIELD_MENU_CONFIG = { visibleItemLimit: 8 };
  * @returns Chip object with label and value.
  */
 function chipForField(field: NamingField): { label: string; value: NamingField } {
-	const option = FIELD_OPTIONS.find((o) => o.value === field);
-	return { label: option?.label || field, value: field };
+	const option = findFieldOption(field);
+	return { label: option ? t(option.labelKey) : field, value: field };
 }
 
 /**
@@ -158,19 +173,19 @@ function validateRows(rows: RenameRow[]): string[] {
 		if (!row.active) return;
 		const trimmed = (row.suggestion || '').trim();
 		if (!trimmed) {
-			row.error = 'Enter a name for this reference.';
+			row.error = t('ui.massRename.errors.empty');
 			return;
 		}
 		if (/^\d+$/.test(trimmed)) {
-			row.error = 'Names cannot be numbers only.';
+			row.error = t('ui.massRename.errors.numericOnly');
 			return;
 		}
 		if (/[<>{}\[\]|"]/.test(trimmed)) {
-			row.error = 'Contains invalid characters.';
+			row.error = t('ui.massRename.errors.invalidChars');
 			return;
 		}
 		if (conflicts.has(normalizeKey(trimmed))) {
-			row.error = 'Conflicts with another reference name.';
+			row.error = t('ui.massRename.errors.conflict');
 		}
 	});
 
@@ -375,7 +390,7 @@ export async function openMassRenameDialog(refs: Reference[], options?: MassRena
 				config: createDefaultConfig(),
 				conflictKeys: [],
 				applyBusy: false,
-				fieldMenuItems: FIELD_OPTIONS,
+				fieldMenuItems: buildFieldOptions(),
 				fieldMenuConfig: FIELD_MENU_CONFIG,
 				fieldInput: '',
 				fieldSelection: [...DEFAULT_FIELDS],
@@ -389,8 +404,8 @@ export async function openMassRenameDialog(refs: Reference[], options?: MassRena
 			 */
 			incrementOptions(): Array<{ label: string; value: IncrementStyle }> {
 				return [
-					{ label: 'Latin letters (a, b, c)', value: 'latin' },
-					{ label: 'Numbers (2, 3, 4)', value: 'numeric' }
+					{ label: t('ui.massRename.increment.latin'), value: 'latin' },
+					{ label: t('ui.massRename.increment.numeric'), value: 'numeric' }
 				];
 			},
 
@@ -490,6 +505,9 @@ export async function openMassRenameDialog(refs: Reference[], options?: MassRena
 			closeDialog(this: MassRenameCtx): void {
 				this.open = false;
 			},
+			t(key: MessageKey, params?: MessageParams): string {
+				return t(key, params);
+			},
 
 			/**
 			 * Set the references to rename and prepare rows.
@@ -526,9 +544,8 @@ export async function openMassRenameDialog(refs: Reference[], options?: MassRena
 			onFieldInput(this: MassRenameCtx, value: string): void {
 				this.fieldInput = value;
 				const lower = value.toLowerCase();
-				this.fieldMenuItems = lower
-					? FIELD_OPTIONS.filter((opt) => opt.label.toLowerCase().includes(lower))
-					: FIELD_OPTIONS;
+				const options = buildFieldOptions();
+				this.fieldMenuItems = lower ? options.filter((opt) => opt.label.toLowerCase().includes(lower)) : options;
 			},
 
 			/**
@@ -558,7 +575,7 @@ export async function openMassRenameDialog(refs: Reference[], options?: MassRena
 				this.config = createDefaultConfig();
 				this.fieldSelection = [...DEFAULT_FIELDS];
 				this.fieldChips = chipsFromSelection(DEFAULT_FIELDS);
-				this.fieldMenuItems = FIELD_OPTIONS;
+				this.fieldMenuItems = buildFieldOptions();
 				this.fieldInput = '';
 				this.rows.forEach((row) => {
 					row.locked = false;
@@ -636,7 +653,7 @@ export async function openMassRenameDialog(refs: Reference[], options?: MassRena
 				});
 
 				if (!Object.keys(renameMap).length && !Object.keys(renameNameless).length) {
-					mw.notify?.('No rename changes to apply.', { type: 'info', title: 'Cite Forge' });
+					mw.notify?.(t('ui.massRename.noChanges'), { type: 'info', title: 'Cite Forge' });
 					return;
 				}
 
@@ -644,20 +661,20 @@ export async function openMassRenameDialog(refs: Reference[], options?: MassRena
 					this.applyBusy = true;
 					if (onApplyMassRename) {
 						onApplyMassRename(renameMap, renameNameless);
-						mw.notify?.('Applied to inspector. Review and save there to preview diffs.', {
+						mw.notify?.(t('ui.massRename.appliedToInspector'), {
 							type: 'info',
 							title: 'Cite Forge'
 						});
 						this.open = false;
 					} else {
-						mw.notify?.('No inspector available to receive mass rename changes.', {
+						mw.notify?.(t('ui.massRename.noInspector'), {
 							type: 'warn',
 							title: 'Cite Forge'
 						});
 					}
 				} catch (err: unknown) {
 					console.error('[Cite Forge] Mass rename failed', err);
-					mw.notify?.('Mass rename could not apply changes. Please try again.', {
+					mw.notify?.(t('ui.massRename.applyFailed'), {
 						type: 'error',
 						title: 'Cite Forge'
 					});

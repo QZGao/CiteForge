@@ -1,4 +1,5 @@
 import { getSettings, loadSettings } from './settings';
+import { t } from '../i18n';
 
 const POPUP_ID = 'citeforge-ref-popup';
 const DATA_ATTACHED = 'citeforgeAttached';
@@ -19,7 +20,7 @@ export function initCitationPopup(): void {
 	popup.setAttribute('role', 'dialog');
 	popup.setAttribute('aria-hidden', 'true');
 	popup.style.display = 'none';
-	popup.innerHTML = '<a href="#" class="citeforge-ref-popup-copy">Copy</a>';
+	popup.innerHTML = `<a href="#" class="citeforge-ref-popup-copy">${t('ui.citations.copy')}</a>`;
 	document.body.appendChild(popup);
 
 	const popupLink = popup.querySelector<HTMLAnchorElement>('.citeforge-ref-popup-copy');
@@ -53,7 +54,7 @@ export function initCitationPopup(): void {
 		if (!sup || !popup) return;
 		if (hideTimer) clearTimeout(hideTimer);
 		popup.setAttribute('aria-hidden', 'false');
-		if (popupLink) popupLink.textContent = 'Copy permalink';
+		if (popupLink) popupLink.textContent = t('ui.citations.copyPermalink');
 
 		popup.style.display = 'block';
 		popup.classList.add('is-open');
@@ -102,7 +103,7 @@ export function initCitationPopup(): void {
 		});
 		if (popupLink) {
 			const originalText = popupLink.textContent;
-			popupLink.textContent = 'Copied!';
+			popupLink.textContent = t('ui.default.copied');
 			setTimeout(() => {
 				if (popupLink) popupLink.textContent = originalText;
 				scheduleHide(300);

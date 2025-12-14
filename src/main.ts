@@ -3,6 +3,7 @@ import { getWikitext } from './data/wikitext_fetch';
 import { openInspectorDialog, getPortletLinkId, isHubVisible, setHubVisible } from './ui/panel';
 import { addPortletTrigger } from './ui/portlet';
 import { namespaceAllowed } from './ui/settings';
+import { refreshLocale, t } from './i18n';
 
 /**
  * Fetch and parse references from the current page's wikitext.
@@ -34,7 +35,8 @@ async function loadCiteForgeData(): Promise<void> {
  * Loads dependencies, sets up the portlet link, and optionally opens the panel.
  */
 async function init(): Promise<void> {
-	await mw.loader.using(['mediawiki.util', 'mediawiki.api', '@wikimedia/codex']);
+	await mw.loader.using(['mediawiki.util', 'mediawiki.api', 'mediawiki.language', '@wikimedia/codex']);
+	refreshLocale();
 
 	const toggle = async () => {
 		if (isHubVisible()) {
@@ -43,7 +45,7 @@ async function init(): Promise<void> {
 			if (namespaceAllowed()) {
 				await loadCiteForgeData();
 			} else {
-				mw.notify?.('Cite Forge is disabled in this namespace or content model.', { type: 'warn', title: 'Cite Forge' });
+				mw.notify?.(t('main.namespaceMismatch'), { type: 'warn', title: 'Cite Forge' });
 			}
 			setHubVisible(true);
 		}
@@ -51,7 +53,7 @@ async function init(): Promise<void> {
 	};
 
 	const refreshPortletLabel = () => {
-		const label = isHubVisible() ? 'Hide Cite Forge' : 'Show Cite Forge';
+		const label = isHubVisible() ? t('ui.portlet.hideCiteForge') : t('ui.portlet.showCiteForge');
 		addPortletTrigger(getPortletLinkId(), label, () => {
 			void toggle();
 		});

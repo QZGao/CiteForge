@@ -1,4 +1,5 @@
 import { containsCJK } from '../core/string_utils';
+import { t } from '../i18n';
 import type { Reference } from '../types';
 
 type MarkerRecord = { marker: HTMLElement; host: Element };
@@ -119,7 +120,7 @@ function annotateHarvText(anchor: HTMLAnchorElement, parent: HTMLElement): void 
 			const snippet = segment.substring(pos, pos + 12);
 
 			if (snippet.includes('-')) {
-				appendAnnotation(parent, 'Hyphen in pg. range;');
+				appendAnnotation(parent, t('ui.checks.hyphenInPgRange'));
 			}
 
 			const shouldFlagPpError =
@@ -132,7 +133,7 @@ function annotateHarvText(anchor: HTMLAnchorElement, parent: HTMLElement): void 
 				segment.indexOf('&ndash;') < 0;
 
 			if (shouldFlagPpError) {
-				appendAnnotation(parent, `P/PP error? ${snippet};`);
+				appendAnnotation(parent, t('ui.checks.ppErrorSnippet', [snippet]));
 			}
 		} else if (href.startsWith('#CITEREF') && segment.includes(' p.')) {
 			const pos = segment.indexOf(' p.');
@@ -145,11 +146,11 @@ function annotateHarvText(anchor: HTMLAnchorElement, parent: HTMLElement): void 
 				snippet.indexOf(', not') >= 0 || snippet.indexOf(', n.') >= 0 || snippet.indexOf(', cit') >= 0;
 
 			if (hasRangeIndicators && !isCommonException) {
-				appendAnnotation(parent, `P/PP error? ${snippet};`);
+				appendAnnotation(parent, t('ui.checks.ppErrorSnippet', [snippet]));
 			}
 
 			if (snippet.indexOf('-') > 0) {
-				appendAnnotation(parent, 'Hyphen in pg. range;');
+				appendAnnotation(parent, t('ui.checks.hyphenInPgRange'));
 			}
 		}
 	});
@@ -167,7 +168,7 @@ function annotateHarvErrors(anchor: HTMLAnchorElement, id: string): boolean {
 	const target = document.getElementById(id);
 
 	if (!target) {
-		appendAnnotation(parent, `Link to ${id} has no target.`);
+		appendAnnotation(parent, t('ui.checks.linkHasNoTarget', [id]));
 	}
 
 	annotateHarvText(anchor, parent);
@@ -203,12 +204,12 @@ function annotateReferenceMetadata(): void {
 		const parentName = parent.nodeName;
 
 		if (parentName === 'I' || parentName === 'B') {
-			appendAnnotation(parent, 'Unexpected result – extra formatting in template?', 'warning');
+			appendAnnotation(parent, t('ui.checks.unexpectedFormatting'), 'warning');
 		}
 
 		if (title.includes('rft.atitle=') && title.includes('rft.btitle=')) {
 			if (!srctxt.includes(' pp.') && !srctxt.includes(' p.')) {
-				appendAnnotation(parent, 'Missing pagenums for book chapter?', 'warning');
+				appendAnnotation(parent, t('ui.checks.missingPagenumsChapter'), 'warning');
 			}
 		}
 
@@ -217,7 +218,7 @@ function annotateReferenceMetadata(): void {
 				if (!authorSegments[i].includes('+') && !authorSegments[i].includes('ctx_ver=')) {
 					const nameParts = authorSegments[i].split('&');
 					if (containsCJK(nameParts[0])) continue; // Skip CJK names
-					appendAnnotation(parent, `Missing first name for: ${nameParts[0]};`);
+					appendAnnotation(parent, t('ui.checks.missingFirstName', [nameParts[0]]));
 				}
 			}
 		}
@@ -228,7 +229,7 @@ function annotateReferenceMetadata(): void {
 		const isArticle = title.includes('rft.genre=article');
 		const hasJournalTitle = /rft\.jtitle=|rft\.stitle=/.test(title);
 		if (isArticle && hasJournalTitle && !hasId) {
-			appendAnnotation(parent, 'Missing identifier (ISSN, JSTOR, etc.);');
+			appendAnnotation(parent, t('ui.checks.missingIdentifier'));
 		}
 
 		const isBookItem = title.includes('rft.genre=bookitem');
@@ -247,27 +248,21 @@ function annotateReferenceMetadata(): void {
 					withoutLocsCnt += 1;
 					if (withLocs) contraryLocs = true;
 					if (contraryLocs) {
-						appendAnnotation(
-							parent,
-							`Inconsistent use of Publisher Location (${withLocsCnt} with; ${withoutLocsCnt} without);`
-						);
+						appendAnnotation(parent, t('ui.checks.inconsistentPublisherLocation', [withLocsCnt, withoutLocsCnt]));
 					}
 				} else {
 					withLocs = true;
 					withLocsCnt += 1;
 					if (withoutLocs) {
 						contraryLocs = true;
-						appendAnnotation(
-							parent,
-							`Inconsistent use of Publisher Location (${withLocsCnt} with; ${withoutLocsCnt} without);`
-						);
+						appendAnnotation(parent, t('ui.checks.inconsistentPublisherLocation', [withLocsCnt, withoutLocsCnt]));
 					}
 				}
 			}
 
 			const hasPublisher = title.indexOf('rft.pub') >= 0 || (isBookItem && hasBookTitle);
 			if (!hasPublisher) {
-				appendAnnotation(parent, 'Missing Publisher;');
+				appendAnnotation(parent, t('ui.checks.missingPublisher'));
 			}
 
 			if (title.indexOf('rft.date') > 0) {
@@ -277,18 +272,18 @@ function annotateReferenceMetadata(): void {
 
 				if (numericDate >= 1970) {
 					if (!hasId) {
-						appendAnnotation(parent, 'Missing ISBN;');
+						appendAnnotation(parent, t('ui.checks.missingIdentifier'));
 					}
 				} else {
 					if (title.indexOf('rft.isbn') > 0 && srctxt.indexOf(') [') < 0) {
-						appendAnnotation(parent, 'Pub. too early for ISBN, perhaps needs {{para|orig-year}};');
+						appendAnnotation(parent, t('ui.checks.pubTooEarlyForIsbn'));
 					}
 					if (!hasId) {
-						appendAnnotation(parent, 'Missing Identifier/control number, e.g. OCLC;');
+						appendAnnotation(parent, t('ui.checks.missingControlNumber'));
 					}
 				}
 			} else {
-				appendAnnotation(parent, 'Missing Year/Date;');
+				appendAnnotation(parent, t('ui.checks.missingYearDate'));
 			}
 		}
 
@@ -296,10 +291,10 @@ function annotateReferenceMetadata(): void {
 		if (isWebGenre) {
 			const hasArchive = /archiv|原始內容|原始内容|オリジナル|원본 문서/i.test(srctxtLower);
 			if (!hasArchive) {
-				appendAnnotation(parent, 'Missing archive link;');
+				appendAnnotation(parent, t('ui.checks.missingArchiveLink'));
 				const hasAccessDate = /retrieved|存檔於|存档于|よりアーカイブ|에서 보존된 문서/i.test(srctxtLower) || title.indexOf('rft.date') >= 0;
 				if (!hasAccessDate) {
-					appendAnnotation(parent, 'Missing access date;');
+					appendAnnotation(parent, t('ui.checks.missingAccessDate'));
 				}
 			}
 		}
@@ -367,7 +362,7 @@ function annotateReferenceSorting(): void {
 			if (grandparentId.includes('cite_note')) return;
 
 			if (!id || !id.startsWith('CITEREF')) {
-				appendAnnotation(cite, 'Missing ref= anchor?;', 'warning');
+				appendAnnotation(cite, t('ui.checks.missingRefAnchor'), 'warning');
 			}
 
 			let sortText = '';
@@ -420,7 +415,7 @@ function annotateReferenceSorting(): void {
 
 			sortedCites.push(sortText);
 			if (unsortedCites.includes(sortText)) {
-				appendAnnotation(cite, `Duplicate author/date: ${sortText};`, 'warning');
+				appendAnnotation(cite, t('ui.checks.duplicateAuthorDate', [sortText]), 'warning');
 			}
 			unsortedCites.push(sortText);
 			sortIndices.push(idx);
@@ -435,7 +430,7 @@ function annotateReferenceSorting(): void {
 				const expected = sortedCopy[i];
 				const target = citations[pos];
 				if (target) {
-					appendAnnotation(target, `Sort error, expected: ${expected};`, 'warning');
+					appendAnnotation(target, t('ui.checks.sortErrorExpected', [expected]), 'warning');
 				}
 			}
 		}
@@ -529,7 +524,7 @@ export function enableChecks(refs: Reference[]): void {
 		const id = citeNode.getAttribute('id') || '';
 		if (id.startsWith('CITEREF') && harvBacklinkCount > 0 && !harvInbound.get(id)) {
 			const host = citeNode.parentElement || citeNode;
-			appendAnnotation(host, `No link points to ${id}.`, 'warning');
+			appendAnnotation(host, t('ui.checks.noLinkPointsToId', [id]), 'warning');
 		}
 	});
 

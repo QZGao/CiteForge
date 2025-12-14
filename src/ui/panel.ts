@@ -20,6 +20,7 @@ import panelStyles from './panel.css';
 import PANEL_TEMPLATE from './panel.template.vue';
 
 import { alphaIndex, escapeAttr } from '../core/string_utils';
+import { MessageKey, MessageParams, t } from '../i18n';
 
 const PANEL_STYLE_ELEMENT_ID = 'citeforge-panel-styles';
 const HIGHLIGHT_CLASS = 'citeforge-ref-highlight';
@@ -86,7 +87,7 @@ function showCopiedBadge(ref: Reference): void {
 	const name = ref.name || ref.id || '';
 	const badge = document.createElement('span');
 	badge.className = 'citeforge-badge';
-	badge.textContent = 'Copied!';
+	badge.textContent = t('ui.default.copied');
 	const rows = document.querySelectorAll('.citeforge-row');
 	rows.forEach((row) => {
 		if (row.textContent?.includes(name)) {
@@ -159,7 +160,7 @@ function isInspectorRoot(val: unknown): val is InspectorRoot {
  */
 export async function openInspectorDialog(refs: Reference[], refreshFn?: () => Promise<void>): Promise<void> {
 	if (!namespaceAllowed()) {
-		console.warn('[Cite Forge] Cite Forge is disabled in this namespace or content model.');
+		console.warn('[Cite Forge]', t('main.namespaceMismatch'));
 		return;
 	}
 
@@ -243,9 +244,9 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			 */
 			copyFormatOptions(): Array<{ label: string; value: string }> {
 				return [
-					{ label: 'raw name', value: 'raw' },
-					{ label: '{{r|name}}', value: 'r' },
-					{ label: '<ref name="name" />', value: 'ref' }
+					{ label: t('ui.panel.copyOptions.raw'), value: 'raw' },
+					{ label: t('ui.panel.copyOptions.rTemplate'), value: 'r' },
+					{ label: t('ui.panel.copyOptions.refTag'), value: 'ref' }
 				];
 			},
 
@@ -255,11 +256,19 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			 */
 			placementOptions(): Array<{ label: string; value: 'keep' | 'threshold' | 'all_ldr' | 'all_inline' }> {
 				return [
-					{ label: 'Keep as is', value: 'keep' },
-					{ label: 'Refs with ≥ N uses to reflist', value: 'threshold' },
-					{ label: 'All refs to reflist', value: 'all_ldr' },
-					{ label: 'All refs inline', value: 'all_inline' }
+					{ label: t('ui.panel.placement.keep'), value: 'keep' },
+					{ label: t('ui.panel.placement.threshold'), value: 'threshold' },
+					{ label: t('ui.panel.placement.allLdr'), value: 'all_ldr' },
+					{ label: t('ui.panel.placement.allInline'), value: 'all_inline' }
 				];
+			},
+
+			/**
+			 * Get the label for the save button, including pending change count.
+			 * @returns Localized save button label string.
+			 */
+			saveButtonLabel(this: InspectorCtx): string {
+				return t('ui.panel.saveButton.label', [String(this.pendingChanges.length)]);
 			},
 
 			/**
@@ -307,13 +316,17 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			}
 		},
 		methods: {
+			t(key: MessageKey, params?: MessageParams): string {
+				return t(key, params);
+			},
+
 			/**
 			 * Get the display name of a reference.
 			 * @param ref - Reference object.
 			 * @returns The name of the reference or '(nameless)' if not named.
 			 */
 			refName(this: InspectorCtx, ref: Reference): string {
-				return ref?.name ?? '(nameless)';
+				return ref?.name ?? t('ui.default.nameless');
 			},
 
 			/**
@@ -490,7 +503,7 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			copyRefContent(this: InspectorCtx, ref?: Reference): void {
 				const targetRef = ref ?? this.selectedRef;
 				if (!targetRef) {
-					mw.notify?.('No reference selected to copy.', { type: 'warn', title: 'Cite Forge' });
+					mw.notify?.(t('ui.panel.noRefToCopy'), { type: 'warn', title: 'Cite Forge' });
 					return;
 				}
 				const name = targetRef.name ? ` name="${escapeAttr(targetRef.name)}"` : '';
@@ -608,9 +621,9 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					}
 				});
 				if (!this.pendingChanges.length) {
-					mw.notify?.('No rename changes were added from mass rename.', { type: 'info', title: 'Cite Forge' });
+					mw.notify?.(t('ui.panel.noMassRenameChanges'), { type: 'info', title: 'Cite Forge' });
 				} else {
-					mw.notify?.('Mass rename populated pending changes. Review and save to preview diffs.', {
+					mw.notify?.(t('ui.panel.massRenamePopulated'), {
 						type: 'info',
 						title: 'Cite Forge'
 					});
@@ -630,11 +643,11 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			 */
 			async saveChanges(this: InspectorCtx): Promise<void> {
 				if (this.hasConflicts) {
-					mw.notify?.('Resolve duplicate reference names before saving.', { type: 'error', title: 'Cite Forge' });
+					mw.notify?.(t('ui.panel.resolveDuplicates'), { type: 'error', title: 'Cite Forge' });
 					return;
 				}
 				if (!this.pendingChanges.length) {
-					mw.notify?.('No pending Cite Forge changes to apply.', { type: 'info' });
+					mw.notify?.(t('ui.panel.noPendingChanges'), { type: 'info' });
 					return;
 				}
 				try {
@@ -660,15 +673,15 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					const result = transformWikitext(base, transformOpts);
 
 					if (result.wikitext === base) {
-						mw.notify?.('No changes were generated.', { type: 'info' });
+						mw.notify?.(t('ui.panel.noChangesGenerated'), { type: 'info' });
 						return;
 					}
 
-					openDiffPreview(result.wikitext, 'Cite Forge: reference adjustments');
-					mw.notify?.('Opening diff view in a new tab...', { type: 'info' });
+					openDiffPreview(result.wikitext, t('ui.panel.diffSummary'));
+					mw.notify?.(t('ui.panel.openingDiff'), { type: 'info' });
 				} catch (err: unknown) {
 					console.error('[Cite Forge] Failed to apply changes', err);
-					mw.notify?.('Cite Forge could not prepare the diff. Please try again.', { type: 'error' });
+					mw.notify?.(t('ui.panel.diffFailed'), { type: 'error' });
 				}
 			},
 
