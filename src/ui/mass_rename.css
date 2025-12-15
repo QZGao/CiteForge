@@ -212,6 +212,10 @@
 	font-size: 12px;
 }
 
+.citeforge-mass-rename-toolbar .cdx-checkbox {
+	min-width: fit-content;
+}
+
 .citeforge-mass-rename-table {
 	overflow: auto;
 	max-height: 60vh;

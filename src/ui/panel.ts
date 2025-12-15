@@ -11,7 +11,7 @@ import {
 import { getSettings, namespaceAllowed, saveSettings, settingsToTransformOptions } from './settings';
 import { getWikitext } from '../data/wikitext_fetch';
 import { openDiffPreview } from '../data/diff_preview';
-import { initCitationPopup } from './citations';
+import { initCitationPopup, initReferencePopup } from './citations';
 import { formatCopy, groupKey, transformWikitext } from '../core/references';
 import { prefetchTemplateDataForWikitext } from '../data/templatedata_fetch';
 import { openMassRenameDialog } from './mass_rename';
@@ -177,6 +177,7 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 	const { Vue, Codex } = await loadCodexAndVue();
 	createDialogMountIfNeeded();
 	initCitationPopup();
+	initReferencePopup();
 
 	const appOptions = {
 		data(): InspectorState {
