@@ -185,7 +185,7 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				open: false,
 				visible: true,
 				refs,
-				selectedRef: refs[0] ?? null,
+				selectedRef: null,
 				query: '',
 				settings: getSettings(),
 				showSettings: false,
@@ -371,7 +371,7 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					enableChecks(this.refs);
 					this.checksOn = isChecksActive();
 				}
-				if (this.selectedRef) {
+				if (this.open && this.selectedRef) {
 					highlightRef(this.selectedRef);
 				} else {
 					clearHighlights();
@@ -725,7 +725,7 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			}
 		},
 		mounted(this: InspectorCtx) {
-			if (this.selectedRef) {
+			if (this.open && this.selectedRef) {
 				highlightRef(this.selectedRef, { blink: false, scroll: false });
 			}
 			const panelEl = document.querySelector<HTMLElement>('.citeforge-panel');
