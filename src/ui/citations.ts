@@ -2,6 +2,7 @@ import { getSettings, loadSettings } from './settings';
 import { t } from '../i18n';
 import popupStyles from './citations.css'
 import { ensureStyleElement } from './codex';
+import { commonPrefix, numberToAlpha, numberToRoman } from "../core/string_utils";
 
 const POPUP_STYLE_ELEMENT_ID = 'citeforge-ref-popup-styles';
 const POPUP_ID = 'citeforge-ref-popup';
@@ -77,6 +78,10 @@ export function initReferencePopup(): void {
 	referenceRootObserver.observe(document.body, { childList: true, subtree: true });
 }
 
+/**
+ * Create the popup DOM element if it does not already exist and wire up
+ * basic event listeners. This function also injects the required CSS.
+ */
 function ensurePopup(): void {
 	if (popupEl) return;
 
@@ -108,6 +113,12 @@ function ensurePopup(): void {
 	});
 }
 
+/**
+ * Click handler for the copy link inside the popup.
+ * Copies a wiki-style permalink (with anchor) for the targeted citation or
+ * reference into the clipboard and provides temporary UI feedback.
+ * @param event - The click (or keyboard) event from the popup link.
+ */
 function handlePopupLinkClick(event: Event): void {
 	event.preventDefault();
 	if (!popupEl) return;
@@ -122,7 +133,20 @@ function handlePopupLinkClick(event: Event): void {
 
 	void navigator.clipboard?.writeText(fullLink).catch(() => {
 		try {
+			// Legacy fallback for browsers without Clipboard API support
+			const ta = document.createElement('textarea');
+			ta.value = fullLink;
+			ta.setAttribute('readonly', '');
+			ta.style.position = 'fixed';
+			ta.style.left = '-9999px';
+			ta.style.top = '0';
+			document.body.appendChild(ta);
+
+			ta.focus();
+			ta.select();
+
 			document.execCommand('copy');
+			document.body.removeChild(ta);
 		} catch {
 			/* ignore */
 		}
@@ -137,6 +161,12 @@ function handlePopupLinkClick(event: Event): void {
 	}, 900);
 }
 
+/**
+ * Schedule hiding the popup after an optional delay (milliseconds).
+ * Clears any prior hide timer and transitions the popup out of the DOM
+ * (while preserving the element for reuse).
+ * @param delay - Milliseconds to wait before hiding the popup. Defaults to 150.
+ */
 function scheduleHide(delay = 150): void {
 	if (hideTimer) clearTimeout(hideTimer);
 	if (!popupEl) return;
@@ -154,6 +184,12 @@ function scheduleHide(delay = 150): void {
 	}, delay);
 }
 
+/**
+ * Open (show) the popup and attach metadata for the current target.
+ * @param targetId - The id of the DOM element the popup is targeting.
+ * @param linkText - The textual label (marker) to show/copy for the target.
+ * @returns The popup's bounding ClientRect when shown, or `null` on failure.
+ */
 function openPopup(targetId: string, linkText: string): DOMRect | null {
 	ensurePopup();
 	if (!popupEl) return null;
@@ -173,6 +209,12 @@ function openPopup(targetId: string, linkText: string): DOMRect | null {
 	return popupEl.getBoundingClientRect();
 }
 
+/**
+ * Attach mouse/keyboard handlers to a citation superscript element so the
+ * popup shows on hover/focus. Marks the element as attached to avoid
+ * duplicate listeners.
+ * @param sup - The superscript element representing a citation (e.g. `sup[id^="cite_ref-"]`).
+ */
 function attachCitationSup(sup: HTMLElement): void {
 	if (!sup || sup.dataset[DATA_ATTACHED]) return;
 
@@ -197,6 +239,14 @@ function attachCitationSup(sup: HTMLElement): void {
 	sup.dataset[DATA_ATTACHED] = '1';
 }
 
+/**
+ * Derive a concise link text for a citation popup by comparing the
+ * citation superscript id and the anchor href. Attempts to produce a
+ * shorter, human-friendly suffix when there are shared prefixes.
+ * @param sup - The superscript element for the citation.
+ * @param supLink - The anchor element inside the superscript linking to the note.
+ * @returns A concise string used as the popup label / permalink text.
+ */
 function computeCitationLinkText(sup: HTMLElement, supLink: HTMLAnchorElement): string {
 	let linkText = supLink.textContent?.replace(/^\[|]$/g, '') || '';
 	let citeNoteStr = supLink.getAttribute('href')?.substring(11) || '';
@@ -215,6 +265,13 @@ function computeCitationLinkText(sup: HTMLElement, supLink: HTMLAnchorElement): 
 	return linkText;
 }
 
+/**
+ * Position and display the citation popup for a given superscript element.
+ * Computes a screen-safe position that keeps the popup within the viewport
+ * and flips it below the element if necessary.
+ * @param sup - The citation superscript element to anchor the popup to.
+ * @param linkText - The textual label for the popup (used for copying).
+ */
 function showCitationPopup(sup: HTMLElement, linkText: string): void {
 	const targetId = sup.id;
 	if (!targetId) return;
@@ -241,6 +298,11 @@ function showCitationPopup(sup: HTMLElement, linkText: string): void {
 	popupEl.style.left = `${left}px`;
 }
 
+/**
+ * Walk a freshly-added DOM subtree and attach citation handlers to any
+ * matching `sup[id^="cite_ref-"]` elements found within it.
+ * @param node - Root node of the subtree that was added to the DOM.
+ */
 function scanCitationNodes(node: Node): void {
 	if (!node) return;
 	if (node.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
@@ -258,6 +320,11 @@ function scanCitationNodes(node: Node): void {
 		.forEach((sup) => attachCitationSup(sup as HTMLElement));
 }
 
+/**
+ * Attach processing and a MutationObserver to an `ol.references` list so
+ * that newly added/changed reference items are discovered and enhanced.
+ * @param list - The ordered list element containing reference `<li>` items.
+ */
 function attachReferenceList(list: HTMLOListElement): void {
 	processReferenceList(list);
 	if (observedReferenceLists.has(list)) return;
@@ -272,6 +339,12 @@ function attachReferenceList(list: HTMLOListElement): void {
 	observedReferenceLists.add(list);
 }
 
+/**
+ * Enumerate the direct <li> children of the reference list and attach the
+ * popup handlers. Also computes a textual marker for each list item based
+ * on the list style and any explicit numbering.
+ * @param list - The ordered list element to process.
+ */
 function processReferenceList(list: HTMLOListElement): void {
 	const items = getDirectReferenceItems(list);
 	if (!items.length) return;
@@ -298,6 +371,12 @@ function processReferenceList(list: HTMLOListElement): void {
 	});
 }
 
+/**
+ * Attach event handlers to an individual reference <li> so the popup shows
+ * when hovered or focused. Marks the element as attached to avoid double
+ * wiring.
+ * @param li - The list item element representing a reference.
+ */
 function attachReferenceItem(li: HTMLLIElement): void {
 	if (li.dataset[DATA_ATTACHED]) return;
 	if (!li.hasAttribute('tabindex')) li.setAttribute('tabindex', '0');
@@ -313,6 +392,10 @@ function attachReferenceItem(li: HTMLLIElement): void {
 	li.dataset[DATA_ATTACHED] = '1';
 }
 
+/**
+ * Show the popup for a reference list item and position it appropriately.
+ * @param li - The reference list item to anchor the popup to.
+ */
 function showReferencePopup(li: HTMLLIElement): void {
 	if (!li.id) return;
 	const marker = li.dataset.citeforgeMarker || '';
@@ -325,6 +408,13 @@ function showReferencePopup(li: HTMLLIElement): void {
 	popupEl.style.left = `${position.left}px`;
 }
 
+/**
+ * Compute a suitable top/left position for the reference popup so it stays
+ * within the viewport while aligning near the target list item.
+ * @param li - The reference list item used as the anchor.
+ * @param popupRect - The bounding rect of the popup element.
+ * @returns An object with `top` and `left` pixel values for positioning.
+ */
 function computeReferencePopupPosition(li: HTMLLIElement, popupRect: DOMRect): { top: number; left: number } {
 	const rect = li.getBoundingClientRect();
 
@@ -342,6 +432,12 @@ function computeReferencePopupPosition(li: HTMLLIElement, popupRect: DOMRect): {
 	return { top, left };
 }
 
+/**
+ * Return only the direct <li> children of the given <ol> element. This
+ * ignores nested lists and other descendant nodes.
+ * @param list - The ordered list element whose direct <li> children should be returned.
+ * @returns An array containing the direct `<li>` children of `list`.
+ */
 function getDirectReferenceItems(list: HTMLOListElement): HTMLLIElement[] {
 	const items: HTMLLIElement[] = [];
 	list.childNodes.forEach((node) => {
@@ -352,12 +448,25 @@ function getDirectReferenceItems(list: HTMLOListElement): HTMLLIElement[] {
 	return items;
 }
 
+/**
+ * Determine the starting numeric value for a list, respecting an explicit
+ * `start` attribute or the `reversed` attribute when present.
+ * @param list - The ordered list element to inspect.
+ * @param totalItems - The total number of direct items in the list.
+ * @param reversed - Whether the list is reversed.
+ * @returns The numeric start value for list numbering.
+ */
 function getListStartValue(list: HTMLOListElement, totalItems: number, reversed: boolean): number {
 	const attr = Number.parseInt(list.getAttribute('start') ?? '', 10);
 	if (!Number.isNaN(attr)) return attr;
 	return reversed ? totalItems : 1;
 }
 
+/**
+ * Walk a newly-added DOM subtree and attach reference-list handling to any
+ * `ol.references` elements found within it.
+ * @param node - Root node of the subtree that was added to the DOM.
+ */
 function scanReferenceNodes(node: Node): void {
 	if (!node) return;
 	if (node.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
@@ -375,6 +484,13 @@ function scanReferenceNodes(node: Node): void {
 		.forEach((list) => attachReferenceList(list as HTMLOListElement));
 }
 
+/**
+ * Format a numeric list marker according to `list-style-type` semantics.
+ * Supports decimal, leading-zero, alpha (upper/lower) and Roman numerals.
+ * @param value - Numeric value to format.
+ * @param listStyleType - The computed `list-style-type` string from CSS.
+ * @returns A textual representation of the list marker for `value`.
+ */
 function formatListMarker(value: number, listStyleType: string): string {
 	if (!Number.isFinite(value)) return String(value);
 	const normalized = (listStyleType || '').toLowerCase();
@@ -398,58 +514,4 @@ function formatListMarker(value: number, listStyleType: string): string {
 		default:
 			return String(value);
 	}
-}
-
-function numberToAlpha(value: number, uppercase: boolean): string {
-	if (value <= 0) return String(value);
-	let num = value;
-	let out = '';
-	while (num > 0) {
-		const remainder = (num - 1) % 26;
-		out = String.fromCharCode(97 + remainder) + out;
-		num = Math.floor((num - 1) / 26);
-	}
-	return uppercase ? out.toUpperCase() : out;
-}
-
-function numberToRoman(value: number): string {
-	if (value <= 0) return String(value);
-	const numerals: Array<[number, string]> = [
-		[1000, 'M'],
-		[900, 'CM'],
-		[500, 'D'],
-		[400, 'CD'],
-		[100, 'C'],
-		[90, 'XC'],
-		[50, 'L'],
-		[40, 'XL'],
-		[10, 'X'],
-		[9, 'IX'],
-		[5, 'V'],
-		[4, 'IV'],
-		[1, 'I']
-	];
-	let remaining = Math.min(value, 3999);
-	let result = '';
-	for (const [num, symbol] of numerals) {
-		while (remaining >= num) {
-			result += symbol;
-			remaining -= num;
-		}
-	}
-	return result;
-}
-
-/**
- * Find the common prefix of two strings.
- * Used to extract the shared portion of cite note and cite ref IDs.
- * @param a - First string to compare.
- * @param b - Second string to compare.
- * @returns The longest common prefix of both strings.
- */
-function commonPrefix(a: string, b: string): string {
-	const len = Math.min(a.length, b.length);
-	let i = 0;
-	while (i < len && a.charAt(i) === b.charAt(i)) i++;
-	return a.substring(0, i);
 }

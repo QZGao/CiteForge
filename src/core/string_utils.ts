@@ -151,3 +151,70 @@ const CJK_PATTERN = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Scr
 export function containsCJK(text: string): boolean {
 	return CJK_PATTERN.test(text);
 }
+
+/**
+ * Convert a positive integer into a base-26 alphabetic sequence (a, b, ..., z, aa, ab, ...).
+ * Returns the numeric value as a string when `value <= 0`.
+ * @param value - The integer value to convert.
+ * @param uppercase - Whether to return uppercase letters.
+ * @returns The alphabetic representation of `value`.
+ */
+export function numberToAlpha(value: number, uppercase: boolean): string {
+    if (value <= 0) return String(value);
+    let num = value;
+    let out = '';
+    while (num > 0) {
+        const remainder = (num - 1) % 26;
+        out = String.fromCharCode(97 + remainder) + out;
+        num = Math.floor((num - 1) / 26);
+    }
+    return uppercase ? out.toUpperCase() : out;
+}
+
+/**
+ * Convert a positive integer into a Roman numeral string (supports up to 3999).
+ * Returns the numeric value as a string when `value <= 0`.
+ * @param value - The integer to convert to Roman numerals.
+ * @returns The Roman numeral representation of `value`.
+ */
+export function numberToRoman(value: number): string {
+    if (value <= 0) return String(value);
+    const numerals: Array<[number, string]> = [
+        [1000, 'M'],
+        [900, 'CM'],
+        [500, 'D'],
+        [400, 'CD'],
+        [100, 'C'],
+        [90, 'XC'],
+        [50, 'L'],
+        [40, 'XL'],
+        [10, 'X'],
+        [9, 'IX'],
+        [5, 'V'],
+        [4, 'IV'],
+        [1, 'I']
+    ];
+    let remaining = Math.min(value, 3999);
+    let result = '';
+    for (const [num, symbol] of numerals) {
+        while (remaining >= num) {
+            result += symbol;
+            remaining -= num;
+        }
+    }
+    return result;
+}
+
+/**
+ * Find the common prefix of two strings.
+ * Used to extract the shared portion of cite note and cite ref IDs.
+ * @param a - First string to compare.
+ * @param b - Second string to compare.
+ * @returns The longest common prefix of both strings.
+ */
+export function commonPrefix(a: string, b: string): string {
+    const len = Math.min(a.length, b.length);
+    let i = 0;
+    while (i < len && a.charAt(i) === b.charAt(i)) i++;
+    return a.substring(0, i);
+}
