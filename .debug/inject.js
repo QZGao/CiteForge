@@ -1,6 +1,7 @@
 // Inject bundled.js into the page context after page loads
 (function () {
 	const bundleUrl = browser.runtime.getURL('bundled.js');
+	const SCRIPT_ID = 'citeforge-debug-userscript';
 
 	function inject() {
 		// Create inline script that waits for mw.loader then loads our bundle
@@ -8,8 +9,16 @@
 		waitScript.textContent = `
 			(function() {
 				function loadCiteForge() {
-					const script = document.createElement('script');
-					script.src = ${JSON.stringify(bundleUrl)};
+					// Remove any previously injected copy (prevents double-injection)
+					var old = document.getElementById(${JSON.stringify(SCRIPT_ID)});
+					if (old) old.remove();
+
+					var script = document.createElement('script');
+					script.id = ${JSON.stringify(SCRIPT_ID)};
+
+					// Cache-bust so Firefox won’t reuse an old bundled.js
+					script.src = ${JSON.stringify(bundleUrl)} + '?t=' + Date.now();
+
 					document.head.appendChild(script);
 				}
 				

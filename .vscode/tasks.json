@@ -2,11 +2,34 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "build-debug-extension",
+			"label": "watch-debug-extension",
 			"type": "shell",
-			"command": "npm run build:debug; Copy-Item -Path dist/bundled.js -Destination .debug/bundled.js -Force",
-			"group": "build",
-			"problemMatcher": []
+			"command": "npm run watch:debug",
+			"isBackground": true,
+			"problemMatcher": {
+				"owner": "citeforge-watch",
+				"fileLocation": [
+					"relative",
+					"${workspaceFolder}"
+				],
+				"pattern": [
+					{
+						// Matches esbuild's common error format:
+						// path/to/file.ts:12:34: ERROR: message...
+						"regexp": "^\\s*(.+):(\\d+):(\\d+):\\s+(ERROR|WARN|WARNING):\\s+(.*)$",
+						"file": 1,
+						"line": 2,
+						"column": 3,
+						"severity": 4,
+						"message": 5
+					}
+				],
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": "\\[Cite Forge build\\] Watching for changes\\.\\.\\.",
+					"endsPattern": "\\[Cite Forge build\\] Watching for changes\\.\\.\\."
+				}
+			}
 		}
 	]
 }

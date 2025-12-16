@@ -9,6 +9,7 @@ const __dirname = path.dirname(__filename);
 const watch = process.argv.includes('--watch');
 const debug = process.argv.includes('--debug');
 const pkgJson = JSON.parse(fs.readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
+const outFile = path.join(__dirname, debug ? '.debug' : 'dist', 'bundled.js');
 
 /**
  * esbuild plugin to extract <template> content from .vue files.
@@ -86,7 +87,7 @@ const createBuildOptions = () => {
 	const timestamp = new Date().toISOString();
 	return {
 		entryPoints: [path.join(__dirname, 'src', 'main.ts')],
-		outfile: path.join(__dirname, 'dist', 'bundled.js'),
+		outfile: outFile,
 		bundle: true,
 		external: ['vue', '@wikimedia/codex'],
 		format: 'iife',

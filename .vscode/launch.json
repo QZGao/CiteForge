@@ -5,10 +5,19 @@
 			"name": "Debug Cite Forge on Wikipedia",
 			"type": "firefox",
 			"request": "launch",
+			"reAttach": true,
 			"url": "https://en.wikipedia.org/wiki/Terraria",
 			"webRoot": "${workspaceFolder}",
 			"addonPath": "${workspaceFolder}/.debug",
-			"preLaunchTask": "build-debug-extension",
+			"preLaunchTask": "watch-debug-extension",
+			"reloadOnChange": {
+				"watch": [
+					"${workspaceFolder}/.debug/bundled.js",
+					"${workspaceFolder}/.debug/inject.js",
+					"${workspaceFolder}/.debug/manifest.json"
+				],
+				"debounce": 200
+			},
 			"skipFiles": [
 				"**/load.php*",
 				"**/ext.*.js"
