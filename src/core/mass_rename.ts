@@ -215,29 +215,39 @@ export function extractMetadata(ref: Reference, providedContent?: string): RefMe
 	}
 
 	// Apply template-specific overrides
-	switch (templateName) {
-		case 'cite tweet': {
-			const user = pick('user');
-			const userClean = user ? stripMarkup(user) : '';
-			if (userClean) {
-				if (!meta.author) meta.author = userClean;
-				if (!meta.last) meta.last = userClean;
-			}
-			if (!meta.work) meta.work = 'Twitter';
-			if (!meta.publisher) meta.publisher = 'Twitter';
-			if (!meta.domain) meta.domain = 'twitter.com';
-			if (!meta.domainShort) meta.domainShort = 'twitter';
-			break;
+	if (templateName === 'cite tweet') {
+		const user = pick('user');
+		const userClean = user ? stripMarkup(user) : '';
+		if (userClean) {
+			if (!meta.author) meta.author = userClean;
+			if (!meta.last) meta.last = userClean;
 		}
-		case 'cite arxiv': {
-			if (!meta.work) meta.work = 'arXiv';
-			if (!meta.publisher) meta.publisher = 'arXiv';
-			if (!meta.domain) meta.domain = 'arxiv.com';
-			if (!meta.domainShort) meta.domainShort = 'arxiv';
-			break;
-		}
-		default:
-			break;
+		if (!meta.work) meta.work = 'Twitter';
+		if (!meta.publisher) meta.publisher = 'Twitter';
+		if (!meta.domain) meta.domain = 'twitter.com';
+		if (!meta.domainShort) meta.domainShort = 'twitter';
+	} else if (templateName === 'cite arxiv') {
+		if (!meta.work) meta.work = 'arXiv';
+		if (!meta.publisher) meta.publisher = 'arXiv';
+		if (!meta.domain) meta.domain = 'arxiv.com';
+		if (!meta.domainShort) meta.domainShort = 'arxiv';
+	} else if (templateName === 'cite biorxiv') {
+		if (!meta.work) meta.work = 'bioRxiv';
+		if (!meta.publisher) meta.publisher = 'bioRxiv';
+		if (!meta.domain) meta.domain = 'biorxiv.org';
+		if (!meta.domainShort) meta.domainShort = 'biorxiv';
+	} else if (templateName === 'cite citeseerx') {
+		if (!meta.work) meta.work = 'CiteSeerX';
+		if (!meta.publisher) meta.publisher = 'CiteSeerX';
+		if (!meta.domain) meta.domain = 'citeseerx.ist.psu.edu';
+		if (!meta.domainShort) meta.domainShort = 'citeseerx';
+	} else if (templateName === 'cite ssrn') {
+		if (!meta.work) meta.work = 'SSRN';
+		if (!meta.publisher) meta.publisher = 'SSRN';
+		if (!meta.domain) meta.domain = 'ssrn.com';
+		if (!meta.domainShort) meta.domainShort = 'ssrn';
+	} else if (templateName) {
+		if (!meta.domainShort) meta.domainShort = templateName.replace('cite ', '').replace(' ', '_');
 	}
 
 	return meta;
