@@ -4,6 +4,9 @@ import { openInspectorDialog, getPortletLinkId, isHubVisible, setHubVisible } fr
 import { addPortletTrigger } from './ui/portlet';
 import { namespaceAllowed } from './ui/settings';
 import { refreshLocale, t } from './i18n';
+import { initColorSchemeSync } from './ui/color_scheme';
+
+initColorSchemeSync();
 
 /**
  * Fetch and parse references from the current page's wikitext.
