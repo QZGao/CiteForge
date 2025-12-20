@@ -23,6 +23,14 @@ afterEach(() => {
 });
 
 async function loadI18n(chain: string[]): Promise<typeof import('../src/i18n')> {
+	(globalThis as { mw?: unknown }).mw = {
+		config: {
+			get: () => undefined
+		},
+		language: {
+			getFallbackLanguageChain: () => chain
+		}
+	};
 	return import('../src/i18n');
 }
 
