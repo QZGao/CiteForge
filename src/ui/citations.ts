@@ -299,9 +299,37 @@ function computeCitationLinkText(sup: HTMLElement, supLink: HTMLAnchorElement): 
 }
 
 /**
- * Position and display the citation popup for a given superscript element.
- * Computes a screen-safe position that keeps the popup within the viewport
- * and flips it below the element if necessary.
+ * Compute the top/left coordinates for a citation popup anchored to a
+ * superscript element. The returned coordinates are clamped to the
+ * viewport and will flip the popup below the element if there is not
+ * enough space above.
+ * @param sup - The citation superscript element to anchor the popup to.
+ * @param popupRect - The bounding rect of the popup element.
+ * @returns Object with `top` and `left` pixel coordinates.
+ */
+function computeCitationPopupPosition(sup: HTMLElement, popupRect: DOMRect): { top: number; left: number } {
+	const rect = sup.getBoundingClientRect();
+	const viewportWidth = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+	const gap = 3;
+
+	let top = window.scrollY + rect.top - popupRect.height - gap;
+	let left = window.scrollX + rect.left - (popupRect.width - rect.width) / 2;
+
+	if (top < window.scrollY + 4) {
+		top = window.scrollY + rect.bottom + gap;
+	}
+	if (left + popupRect.width > window.scrollX + viewportWidth - 8) {
+		left = window.scrollX + viewportWidth - popupRect.width - 8;
+	}
+	if (left < window.scrollX + 4) left = window.scrollX + 4;
+
+	return { top, left };
+}
+
+/**
+ * Show the citation popup for a given superscript element. This opens the
+ * popup, populates its metadata, and positions it using
+ * `computeCitationPopupPosition`.
  * @param sup - The citation superscript element to anchor the popup to.
  * @param linkText - The textual label for the popup (used for copying).
  */
@@ -313,23 +341,9 @@ function showCitationPopup(sup: HTMLElement, linkText: string): void {
 	const popupRect = openPopup(targetId, linkText, canJump);
 	if (!popupEl || !popupRect) return;
 
-	const rect = sup.getBoundingClientRect();
-	const viewportWidth = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-	const gap = 3;
-
-	let top = window.scrollY + rect.top - popupRect.height - gap;
-	let left = window.scrollX + rect.left;
-
-	if (top < window.scrollY + 4) {
-		top = window.scrollY + rect.bottom + gap;
-	}
-	if (left + popupRect.width > window.scrollX + viewportWidth - 8) {
-		left = window.scrollX + viewportWidth - popupRect.width - 8;
-	}
-	if (left < window.scrollX + 4) left = window.scrollX + 4;
-
-	popupEl.style.top = `${top}px`;
-	popupEl.style.left = `${left}px`;
+	const position = computeCitationPopupPosition(sup, popupRect);
+	popupEl.style.top = `${position.top}px`;
+	popupEl.style.left = `${position.left}px`;
 }
 
 /**
