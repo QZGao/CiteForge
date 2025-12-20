@@ -27,3 +27,19 @@
 	text-decoration: underline;
 	color: #e2eaf7 !important;
 }
+
+.citeforge-ref-popup__actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.citeforge-ref-popup__divider {
+	opacity: 0.7;
+	margin: 0 2px;
+}
+
+.citeforge-ref-popup:not(.has-jump) .citeforge-ref-popup-jump,
+.citeforge-ref-popup:not(.has-jump) .citeforge-ref-popup__divider {
+	display: none;
+}

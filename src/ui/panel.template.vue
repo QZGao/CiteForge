@@ -27,8 +27,8 @@
 					<div class="citeforge-list-topbar">
 						<input class="citeforge-search" type="search" :placeholder="t('ui.panel.search.placeholder')"
 							:aria-label="t('ui.panel.search.ariaLabel')" :value="query" @input="onQueryInput" />
-						<cdx-button weight="quiet" size="small" :title="t('ui.panel.refresh')" :aria-label="t('ui.panel.refresh')"
-							@click.prevent="refreshList">
+						<cdx-button weight="quiet" size="small" :title="t('ui.panel.refresh')"
+							:aria-label="t('ui.panel.refresh')" @click.prevent="refreshList">
 							<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
 								<path fill="currentColor"
 									d="M15.65 4.35A8 8 0 1 0 17.4 13h-2.22a6 6 0 1 1-1-7.22L11 9h7V2z" />
@@ -38,12 +38,13 @@
 					<div v-if="hasRefs" class="citeforge-list-wrap">
 						<div v-for="(reference, idx) in filteredRefs" :key="reference.id || idx"
 							:id="idx === 0 || bucketFor(filteredRefs[idx - 1]) !== bucketFor(reference) ? 'citeforge-anchor-' + bucketFor(reference) : undefined"
-							class="citeforge-row"
+							class="citeforge-row" :data-ref-id="reference.id"
 							:class="{ 'is-selected': selectedRef && selectedRef.id === reference.id, 'has-conflict': refHasConflict(reference) }"
 							@click.prevent="selectRef(reference)">
 							<div class="citeforge-row__title">
-								<input v-if="editingRefId === reference.id" class="citeforge-row__name-input" type="text"
-									:value="reference.name || ''" @blur="commitRefNameFromEvent(reference, $event)"
+								<input v-if="editingRefId === reference.id" class="citeforge-row__name-input"
+									type="text" :value="reference.name || ''"
+									@blur="commitRefNameFromEvent(reference, $event)"
 									@keydown.enter.prevent="commitRefNameFromEvent(reference, $event)"
 									@keydown.escape.prevent="cancelEditRefName(reference)" @click.stop />
 								<span v-else class="citeforge-row__name">
@@ -54,7 +55,7 @@
 								<span class="citeforge-row__name-actions" v-if="editingRefId !== reference.id">
 									<button class="citeforge-icon-btn" type="button"
 										@click.stop.prevent="editRefName(reference)"
-											:title="reference.name ? t('ui.panel.editRefName') : t('ui.panel.nameReference')">
+										:title="reference.name ? t('ui.panel.editRefName') : t('ui.panel.nameReference')">
 										<svg viewBox="0 0 20 20" width="12" height="12" aria-hidden="true">
 											<path fill="currentColor"
 												d="m16.77 8 1.94-2a1 1 0 0 0 0-1.41l-3.34-3.3a1 1 0 0 0-1.41 0L12 3.23zM1 14.25V19h4.75l9.96-9.96-4.75-4.75z" />
@@ -70,20 +71,18 @@
 										</svg>
 									</button>
 								</span>
-								<span class="citeforge-row__meta">{{ t('ui.panel.usesPrefix') }} {{ refUses(reference) }} <span v-if="reference.group">· {{
-								reference.group }}</span></span>
+								<span class="citeforge-row__meta">{{ t('ui.panel.usesPrefix') }} {{ refUses(reference)
+								}} <span v-if="reference.group">· {{
+										reference.group }}</span></span>
 							</div>
-								<div v-if="!isEditingContent(reference)" class="citeforge-row__snippet">{{ reference.contentWikitext || t('ui.panel.noContent') }}</div>
-								<div v-else class="citeforge-row__editor">
-									<cdx-text-area
-										:rows="6"
-										:aria-label="t('ui.panel.editContent.fieldLabel')"
-										:model-value="contentDrafts[reference.id]"
-										@update:model-value="onContentInput(reference, $event)"
-										@click.stop
-										@mousedown.stop
-									/>
-								</div>
+							<div v-if="!isEditingContent(reference)" class="citeforge-row__snippet">{{
+								reference.contentWikitext || t('ui.panel.noContent') }}</div>
+							<div v-else class="citeforge-row__editor">
+								<cdx-text-area :rows="6" :aria-label="t('ui.panel.editContent.fieldLabel')"
+									:model-value="contentDrafts[reference.id]"
+									@update:model-value="onContentInput(reference, $event)" @click.stop
+									@mousedown.stop />
+							</div>
 							<div class="citeforge-row__actions">
 								<button class="citeforge-copy-btn citeforge-edit-btn" type="button"
 									:class="{ 'is-active': isEditingContent(reference) }"
@@ -93,10 +92,12 @@
 										<path fill="currentColor"
 											d="m16.77 8 1.94-2a1 1 0 0 0 0-1.41l-3.34-3.3a1 1 0 0 0-1.41 0L12 3.23zM1 14.25V19h4.75l9.96-9.96-4.75-4.75z" />
 									</svg>
-									<span>{{ isEditingContent(reference) ? t('ui.panel.editContent.closeLabel') : t('ui.panel.editContent.openLabel') }}</span>
+									<span>{{ isEditingContent(reference) ? t('ui.panel.editContent.closeLabel') :
+										t('ui.panel.editContent.openLabel') }}</span>
 								</button>
 								<button class="citeforge-copy-btn" type="button"
-									@click.stop.prevent="copyRefContent(reference)" :title="t('ui.panel.copyRaw.title')">
+									@click.stop.prevent="copyRefContent(reference)"
+									:title="t('ui.panel.copyRaw.title')">
 									<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
 										<path fill="currentColor"
 											d="M3 3h8v2h2V3c0-1.1-.895-2-2-2H3c-1.1 0-2 .895-2 2v8c0 1.1.895 2 2 2h2v-2H3z" />
@@ -105,10 +106,30 @@
 									</svg>
 									<span>{{ t('ui.panel.copyRaw.label') }}</span>
 								</button>
+								<button v-if="hasCitations(reference)" class="citeforge-copy-btn" type="button"
+									@click.stop.prevent="jumpToCitations(reference)"
+									:title="t('ui.panel.jumpToCitations.title')">
+									<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+										<path fill="currentColor"
+											d="m15 10-2.78-2.78L9.44 10V1H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2z" />
+									</svg>
+									<span>{{ t('ui.panel.jumpToCitations.label') }}</span>
+								</button>
+								<button v-if="hasReferenceEntry(reference)" class="citeforge-copy-btn" type="button"
+									@click.stop.prevent="jumpToReference(reference)"
+									:title="t('ui.panel.jumpToReference.title')">
+									<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+										<path fill="currentColor"
+											d="M7 0a2 2 0 0 0-2 2h9a2 2 0 0 1 2 2v12a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z" />
+										<path fill="currentColor"
+											d="m13 12-2.8-2.8L7.4 12V3H4c-1.1 0-2 .9-2 2v13c0 1.1.9 2 2 2h9c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z" />
+									</svg>
+									<span>{{ t('ui.panel.jumpToReference.label') }}</span>
+								</button>
 							</div>
 						</div>
 					</div>
-						<div v-else class="citeforge-empty">{{ t('ui.panel.emptyState') }}</div>
+					<div v-else class="citeforge-empty">{{ t('ui.panel.emptyState') }}</div>
 				</div>
 				<div class="citeforge-panel__toolbar">
 					<button v-if="hasPendingChanges" class="citeforge-tool-btn citeforge-tool-btn--primary"
@@ -121,7 +142,8 @@
 						</span>
 						<span class="citeforge-tool-label">{{ saveButtonLabel }}</span>
 					</button>
-					<button class="citeforge-tool-btn" type="button" :title="t('ui.panel.settingsButton.title')" @click.prevent="toggleSettings">
+					<button class="citeforge-tool-btn" type="button" :title="t('ui.panel.settingsButton.title')"
+						@click.prevent="toggleSettings">
 						<span class="citeforge-tool-icon" aria-hidden="true">
 							<svg viewBox="0 0 20 20" width="16" height="16" xmlns:xlink="http://www.w3.org/1999/xlink">
 								<g transform="translate(10 10)">
@@ -146,8 +168,8 @@
 						</span>
 						<span class="citeforge-tool-label">{{ t('ui.panel.massRenameButton.label') }}</span>
 					</button>
-					<button class="citeforge-tool-btn" :class="{ 'is-active': checksOn }" type="button" :title="t('ui.panel.checksButton.title')"
-						@click.prevent="toggleChecks">
+					<button class="citeforge-tool-btn" :class="{ 'is-active': checksOn }" type="button"
+						:title="t('ui.panel.checksButton.title')" @click.prevent="toggleChecks">
 						<span class="citeforge-tool-icon" aria-hidden="true">
 							<svg viewBox="0 0 20 20" width="16" height="16">
 								<path fill="currentColor"
@@ -156,13 +178,9 @@
 						</span>
 						<span class="citeforge-tool-label">{{ t('ui.panel.checksButton.label') }}</span>
 					</button>
-					<a
-						v-if="checksOn"
-						class="citeforge-tool-note"
+					<a v-if="checksOn" class="citeforge-tool-note"
 						href="https://en.wikipedia.org/wiki/User:Lingzhi2/reviewsourcecheck#Descriptive_table"
-						target="_blank"
-						rel="noreferrer"
-					>
+						target="_blank" rel="noreferrer">
 						{{ t('ui.panel.harvLink') }}
 					</a>
 				</div>

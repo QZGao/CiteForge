@@ -1,12 +1,14 @@
 import { getSettings, loadSettings } from './settings';
 import { t } from '../i18n';
-import popupStyles from './citations.css'
+import popupStyles from './citations.css';
 import { ensureStyleElement } from './codex';
-import { commonPrefix, numberToAlpha, numberToRoman } from "../core/string_utils";
+import { commonPrefix, numberToAlpha, numberToRoman } from '../core/string_utils';
+import { jumpToInspectorTarget } from './inspector_loader';
 
 const POPUP_STYLE_ELEMENT_ID = 'citeforge-ref-popup-styles';
 const POPUP_ID = 'citeforge-ref-popup';
 const DATA_ATTACHED = 'citeforgeAttached';
+const POPUP_HAS_JUMP_CLASS = 'has-jump';
 
 let popupStylesInjected = false;
 
@@ -20,7 +22,8 @@ function injectPopupStyles(): void {
 }
 
 let popupEl: HTMLDivElement | null = null;
-let popupLink: HTMLAnchorElement | null = null;
+let popupCopyLink: HTMLAnchorElement | null = null;
+let popupJumpLink: HTMLAnchorElement | null = null;
 let hideTimer: ReturnType<typeof setTimeout> | null = null;
 let citationObserver: MutationObserver | null = null;
 let referenceRootObserver: MutationObserver | null = null;
@@ -93,22 +96,35 @@ function ensurePopup(): void {
 	popup.setAttribute('role', 'dialog');
 	popup.setAttribute('aria-hidden', 'true');
 	popup.style.display = 'none';
-	popup.innerHTML = `<a href="#" class="citeforge-ref-popup-copy">${t('ui.citations.copy')}</a>`;
+	popup.innerHTML = `
+		<div class="citeforge-ref-popup__actions">
+			<a href="#" class="citeforge-ref-popup-copy">${t('ui.citations.copy')}</a>
+			<span class="citeforge-ref-popup__divider" aria-hidden="true">|</span>
+			<a href="#" class="citeforge-ref-popup-jump">${t('ui.citations.jumpToInspector')}</a>
+		</div>`;
 	document.body.appendChild(popup);
 
 	popupEl = popup;
-	popupLink = popup.querySelector<HTMLAnchorElement>('.citeforge-ref-popup-copy');
+	popupCopyLink = popup.querySelector<HTMLAnchorElement>('.citeforge-ref-popup-copy');
+	popupJumpLink = popup.querySelector<HTMLAnchorElement>('.citeforge-ref-popup-jump');
 
 	popup.addEventListener('mouseenter', () => {
 		if (hideTimer) clearTimeout(hideTimer);
 	});
 	popup.addEventListener('mouseleave', () => scheduleHide(120));
 
-	popupLink?.addEventListener('click', handlePopupLinkClick);
-	popupLink?.addEventListener('keydown', (e) => {
+	popupCopyLink?.addEventListener('click', handlePopupCopyClick);
+	popupCopyLink?.addEventListener('keydown', (e) => {
 		if (e.key === 'Enter' || e.key === ' ') {
 			e.preventDefault();
-			handlePopupLinkClick(e);
+			handlePopupCopyClick(e);
+		}
+	});
+	popupJumpLink?.addEventListener('click', handleJumpLinkActivate);
+	popupJumpLink?.addEventListener('keydown', (e) => {
+		if (e.key === 'Enter' || e.key === ' ') {
+			e.preventDefault();
+			handleJumpLinkActivate(e);
 		}
 	});
 }
@@ -119,7 +135,7 @@ function ensurePopup(): void {
  * reference into the clipboard and provides temporary UI feedback.
  * @param event - The click (or keyboard) event from the popup link.
  */
-function handlePopupLinkClick(event: Event): void {
+function handlePopupCopyClick(event: Event): void {
 	event.preventDefault();
 	if (!popupEl) return;
 
@@ -152,13 +168,23 @@ function handlePopupLinkClick(event: Event): void {
 		}
 	});
 
-	if (!popupLink) return;
-	const originalText = popupLink.textContent || '';
-	popupLink.textContent = t('ui.default.copied');
+	if (!popupCopyLink) return;
+	const originalText = popupCopyLink.textContent || '';
+	popupCopyLink.textContent = t('ui.default.copied');
 	setTimeout(() => {
-		if (popupLink) popupLink.textContent = originalText;
+		if (popupCopyLink) popupCopyLink.textContent = originalText;
 		scheduleHide(300);
 	}, 900);
+}
+
+function handleJumpLinkActivate(event: Event): void {
+	event.preventDefault();
+	if (!popupEl) return;
+	if (popupEl.dataset.qeecJumpEnabled !== '1') return;
+	const targetId = popupEl.dataset.qeecTargetId;
+	if (!targetId) return;
+	void jumpToInspectorTarget(targetId);
+	scheduleHide(150);
 }
 
 /**
@@ -174,12 +200,14 @@ function scheduleHide(delay = 150): void {
 	hideTimer = setTimeout(() => {
 		if (!popupEl) return;
 		popupEl.classList.remove('is-open');
+		popupEl.classList.remove(POPUP_HAS_JUMP_CLASS);
 		popupEl.setAttribute('aria-hidden', 'true');
 		setTimeout(() => {
 			if (!popupEl || popupEl.classList.contains('is-open')) return;
 			popupEl.style.display = 'none';
 			delete popupEl.dataset.qeecTargetId;
 			delete popupEl.dataset.qeecLinkText;
+			delete popupEl.dataset.qeecJumpEnabled;
 		}, 180);
 	}, delay);
 }
@@ -190,7 +218,7 @@ function scheduleHide(delay = 150): void {
  * @param linkText - The textual label (marker) to show/copy for the target.
  * @returns The popup's bounding ClientRect when shown, or `null` on failure.
  */
-function openPopup(targetId: string, linkText: string): DOMRect | null {
+function openPopup(targetId: string, linkText: string, enableJump: boolean): DOMRect | null {
 	ensurePopup();
 	if (!popupEl) return null;
 
@@ -200,11 +228,16 @@ function openPopup(targetId: string, linkText: string): DOMRect | null {
 	}
 
 	popupEl.setAttribute('aria-hidden', 'false');
-	if (popupLink) popupLink.textContent = t('ui.citations.copyPermalink');
+	if (popupCopyLink) popupCopyLink.textContent = t('ui.citations.copyPermalink');
 	popupEl.style.display = 'block';
 	popupEl.classList.add('is-open');
+	popupEl.classList.toggle(POPUP_HAS_JUMP_CLASS, enableJump);
 	popupEl.dataset.qeecTargetId = targetId;
 	popupEl.dataset.qeecLinkText = linkText;
+	popupEl.dataset.qeecJumpEnabled = enableJump ? '1' : '0';
+	if (popupJumpLink) {
+		popupJumpLink.tabIndex = enableJump ? 0 : -1;
+	}
 
 	return popupEl.getBoundingClientRect();
 }
@@ -276,7 +309,8 @@ function showCitationPopup(sup: HTMLElement, linkText: string): void {
 	const targetId = sup.id;
 	if (!targetId) return;
 
-	const popupRect = openPopup(targetId, linkText);
+	const canJump = Boolean(sup.dataset?.citeforgeRefId);
+	const popupRect = openPopup(targetId, linkText, canJump);
 	if (!popupEl || !popupRect) return;
 
 	const rect = sup.getBoundingClientRect();
@@ -399,8 +433,9 @@ function attachReferenceItem(li: HTMLLIElement): void {
 function showReferencePopup(li: HTMLLIElement): void {
 	if (!li.id) return;
 	const marker = li.dataset.citeforgeMarker || '';
+	const canJump = Boolean(li.dataset.citeforgeRefId);
 
-	const popupRect = openPopup(li.id, marker);
+	const popupRect = openPopup(li.id, marker, canJump);
 	if (!popupEl || !popupRect) return;
 
 	const position = computeReferencePopupPosition(li, popupRect);

@@ -11,7 +11,6 @@ import {
 import { getSettings, namespaceAllowed, saveSettings, settingsToTransformOptions } from './settings';
 import { getWikitext } from '../data/wikitext_fetch';
 import { openDiffPreview } from '../data/diff_preview';
-import { initCitationPopup, initReferencePopup } from './citations';
 import { formatCopy, groupKey, transformWikitext } from '../core/references';
 import { prefetchTemplateDataForWikitext } from '../data/templatedata_fetch';
 import { openMassRenameDialog } from './mass_rename';
@@ -32,6 +31,70 @@ const safeAlphaIndex = (char: string): number => alphaIndex(char);
 const safeFormatCopy = (name: string, fmt: 'raw' | 'r' | 'ref'): string => formatCopy(name, fmt);
 
 let panelStylesInjected = false;
+
+const escapeSelector = (value: string): string => {
+	if (typeof window !== 'undefined' && window.CSS && typeof window.CSS.escape === 'function') {
+		return window.CSS.escape(value);
+	}
+	return value.replace(/["\\]/g, '\\$&');
+};
+
+function scrollRowIntoView(refId: string): void {
+	const selector = `.citeforge-row[data-ref-id="${escapeSelector(refId)}"]`;
+	const row = document.querySelector<HTMLElement>(selector);
+	if (row) {
+		row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+	}
+}
+
+function highlightReferenceEntry(refId: string): boolean {
+	const selector = `li[data-citeforge-ref-id="${escapeSelector(refId)}"]`;
+	const entry = document.querySelector<HTMLElement>(selector);
+	if (!entry) return false;
+	entry.classList.add(HIGHLIGHT_CLASS, 'citeforge-ref-blink');
+	entry.scrollIntoView({ behavior: 'smooth', block: 'center' });
+	setTimeout(() => {
+		entry.classList.remove('citeforge-ref-blink');
+		entry.classList.remove(HIGHLIGHT_CLASS);
+	}, 1200);
+	return true;
+}
+
+function getRefIdFromElement(el: Element | null): string | null {
+	if (!el || !(el instanceof HTMLElement)) return null;
+	if (el.dataset?.citeforgeRefId) return el.dataset.citeforgeRefId;
+	const parent = el.closest<HTMLElement>('[data-citeforge-ref-id]');
+	return parent?.dataset?.citeforgeRefId ?? null;
+}
+
+function collectAnchorTargets(anchor: Element): string[] {
+	if (!(anchor instanceof HTMLElement)) return [];
+	const ids = new Set<string>();
+	if (anchor.id) ids.add(anchor.id);
+	const href = anchor.getAttribute('href');
+	if (href?.startsWith('#')) ids.add(href.slice(1));
+	const sup = anchor.closest('sup[id]');
+	if (sup?.id) ids.add(sup.id);
+	const li = anchor.closest('li[id]');
+	if (li?.id) ids.add(li.id);
+	return Array.from(ids);
+}
+
+function resolveRefByTargetId(refs: Reference[], targetId: string): Reference | null {
+	if (!targetId) return null;
+	const targetEl = document.getElementById(targetId);
+	const refId = getRefIdFromElement(targetEl);
+	if (refId) {
+		return refs.find((ref) => ref.id === refId) ?? null;
+	}
+	return refs.find((ref) =>
+		ref.uses.some((use) => {
+			const anchor = use.anchor;
+			if (!anchor) return false;
+			return collectAnchorTargets(anchor).includes(targetId);
+		})
+	) ?? null;
+}
 
 /**
  * Inject panel styles into the document once.
@@ -136,7 +199,14 @@ function performClose(state: InspectorState): void {
 }
 
 /** Interface for the inspector root component's public methods. */
-type InspectorRoot = { setRefs: (nextRefs: Reference[]) => void; setVisible: (flag: boolean) => void; getVisible: () => boolean };
+type InspectorRoot = {
+	setRefs: (nextRefs: Reference[]) => void;
+	setVisible: (flag: boolean) => void;
+	getVisible: () => boolean;
+	jumpToAnchor: (targetId: string) => boolean;
+	/** Set the open/collapsed state of the panel. True = open. */
+	setOpen: (flag: boolean) => void;
+};
 
 /**
  * Type guard to check if a value is an InspectorRoot instance.
@@ -148,7 +218,9 @@ function isInspectorRoot(val: unknown): val is InspectorRoot {
 		val &&
 		typeof (val as InspectorRoot).setRefs === 'function' &&
 		typeof (val as InspectorRoot).setVisible === 'function' &&
-		typeof (val as InspectorRoot).getVisible === 'function'
+		typeof (val as InspectorRoot).getVisible === 'function' &&
+		typeof (val as InspectorRoot).jumpToAnchor === 'function' &&
+		typeof (val as InspectorRoot).setOpen === 'function'
 	);
 }
 
@@ -176,31 +248,29 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 	const refreshCallback = refreshFn;
 	const { Vue, Codex } = await loadCodexAndVue();
 	createDialogMountIfNeeded();
-	initCitationPopup();
-	initReferencePopup();
 
-const appOptions = {
-	data(): InspectorState {
-		const originalContent: Record<string, string> = {};
-		refs.forEach((ref) => {
-			originalContent[ref.id] = ref.contentWikitext || '';
-		});
-		return {
-			open: false,
-			visible: true,
-			refs,
-			selectedRef: null,
-			query: '',
-			settings: getSettings(),
-			showSettings: false,
-			minHeight: 300,
-			pendingChanges: [],
-			editingRefId: null,
-			originalContent,
-			contentDrafts: {},
-			checksOn: false
-		};
-	},
+	const appOptions = {
+		data(): InspectorState {
+			const originalContent: Record<string, string> = {};
+			refs.forEach((ref) => {
+				originalContent[ref.id] = ref.contentWikitext || '';
+			});
+			return {
+				open: false,
+				visible: true,
+				refs,
+				selectedRef: null,
+				query: '',
+				settings: getSettings(),
+				showSettings: false,
+				minHeight: 300,
+				pendingChanges: [],
+				editingRefId: null,
+				originalContent,
+				contentDrafts: {},
+				checksOn: false
+			};
+		},
 		computed: {
 			/**
 			 * Check if there are any references loaded.
@@ -435,7 +505,58 @@ const appOptions = {
 			 */
 			selectRef(this: InspectorCtx, ref: Reference): void {
 				this.selectedRef = ref;
-				highlightRef(ref);
+				clearHighlights();
+			},
+
+			/**
+			 * Whether the given reference has any inline citation anchors found in the document.
+			 * @param ref - Reference to check.
+			 */
+			hasCitations(this: InspectorCtx, ref: Reference): boolean {
+				if (!ref) return false;
+				return Array.isArray(ref.uses) && ref.uses.some((use) => Boolean(use.anchor));
+			},
+
+			/**
+			 * Whether the given reference has a corresponding entry in the references list.
+			 * @param ref - Reference to check.
+			 */
+			hasReferenceEntry(this: InspectorCtx, ref: Reference): boolean {
+				if (!ref) return false;
+				try {
+					const sel = `li[data-citeforge-ref-id="${escapeSelector(ref.id)}"]`;
+					return Boolean(document.querySelector(sel));
+				} catch {
+					return false;
+				}
+			},
+
+			jumpToCitations(this: InspectorCtx, ref?: Reference): void {
+				const target = ref ?? this.selectedRef;
+				if (!target) return;
+				clearHighlights();
+				highlightRef(target);
+			},
+
+			jumpToReference(this: InspectorCtx, ref?: Reference): void {
+				const target = ref ?? this.selectedRef;
+				if (!target) return;
+				clearHighlights();
+				if (!highlightReferenceEntry(target.id)) {
+					mw.notify?.(t('ui.panel.referenceJumpUnavailable'), { type: 'warn', title: 'Cite Forge' });
+				}
+			},
+
+			jumpToAnchor(this: InspectorCtx, targetId: string): boolean {
+				const ref = resolveRefByTargetId(this.refs, targetId);
+				if (!ref) return false;
+				this.visible = true;
+				this.open = true;
+				this.selectedRef = ref;
+				setTimeout(() => {
+					scrollRowIntoView(ref.id);
+				}, 0);
+				return true;
 			},
 
 			/**
@@ -483,6 +604,19 @@ const appOptions = {
 					clearHighlights();
 					disableChecks();
 					this.checksOn = false;
+				}
+			},
+
+			/**
+			 * Set the open/collapsed state of the panel. True = open.
+			 */
+			setOpen(this: InspectorCtx, flag: boolean): void {
+				this.open = Boolean(flag);
+				if (this.open && this.selectedRef) {
+					highlightRef(this.selectedRef);
+				}
+				if (!this.open) {
+					performClose(this);
 				}
 			},
 
@@ -896,6 +1030,17 @@ export function isHubVisible(): boolean {
 	} catch {
 		return false;
 	}
+}
+
+export function getInspectorRoot(): InspectorRoot | null {
+	const root = getMountedRoot();
+	return isInspectorRoot(root) ? root : null;
+}
+
+export function jumpToInspectorAnchor(targetId: string): boolean {
+	const root = getInspectorRoot();
+	if (!root) return false;
+	return root.jumpToAnchor(targetId);
 }
 
 /**

@@ -208,8 +208,8 @@ export function attachDomUses(refs: Reference[]): void {
 	anchors.forEach((anchor) => {
 		const href = anchor.getAttribute('href') || '';
 		byName.forEach((ref, name) => {
-			const encodedName = encodeURIComponent(name);
-			if (href.includes(`cite_note-${name}`) || href.includes(`cite_note-${encodedName}`) || href.includes(`cite_ref-${name}`) || href.includes(`cite_ref-${encodedName}`)) {
+			const variants = buildRefIdVariants(name);
+			if (variants.some((variant) => hrefMatchesReference(href, variant))) {
 				const cursor = attachCursor.get(name) ?? 0;
 				if (cursor < ref.uses.length) {
 					ref.uses[cursor].anchor = anchor;
@@ -217,9 +217,60 @@ export function attachDomUses(refs: Reference[]): void {
 				} else {
 					ref.uses.push({ index: ref.uses.length, anchor });
 				}
+				const sup = anchor.closest('sup.reference');
+				if (sup instanceof HTMLElement) {
+					sup.dataset.citeforgeRefId = ref.id;
+				}
+				if (anchor instanceof HTMLElement) {
+					anchor.dataset.citeforgeRefId = ref.id;
+				}
+				applyRefIdToReferenceEntry(anchor, ref.id);
 			}
 		});
 	});
+}
+
+function escapeRegex(value: string): string {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function mwEscapeId(value: string): string {
+	if (typeof mw !== 'undefined' && mw.util && typeof (mw.util as { escapeIdReference?: (input: string) => string }).escapeIdReference === 'function') {
+		try {
+			return (mw.util as { escapeIdReference: (input: string) => string }).escapeIdReference(value);
+		} catch {
+			/* ignore */
+		}
+	}
+	return value.replace(/ /g, '_');
+}
+
+function buildRefIdVariants(name: string): string[] {
+	const variants = new Set<string>();
+	variants.add(name);
+	variants.add(name.replace(/ /g, '_'));
+	variants.add(encodeURIComponent(name));
+	variants.add(mwEscapeId(name));
+	return Array.from(variants).filter((variant) => Boolean(variant));
+}
+
+function hrefMatchesReference(href: string, variant: string): boolean {
+	if (!variant) return false;
+	const target = href.replace(/^#/, '');
+	if (!target) return false;
+	const pattern = new RegExp(`^cite_(?:note|ref)-${escapeRegex(variant)}(?:-[0-9]+(?:-[0-9]+)?)?$`, 'i');
+	return pattern.test(target);
+}
+
+function applyRefIdToReferenceEntry(anchor: Element, refId: string): void {
+	const href = anchor.getAttribute('href');
+	if (!href) return;
+	const targetId = href.replace(/^#/, '');
+	if (!targetId) return;
+	const target = document.getElementById(targetId);
+	if (target instanceof HTMLElement) {
+		target.dataset.citeforgeRefId = refId;
+	}
 }
 
 /**
