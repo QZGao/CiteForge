@@ -75,8 +75,15 @@
 								}} <span v-if="reference.group">· {{
 										reference.group }}</span></span>
 							</div>
-							<div v-if="!isEditingContent(reference)" class="citeforge-row__snippet">{{
-								reference.contentWikitext || t('ui.panel.noContent') }}</div>
+							<div v-if="!isEditingContent(reference)" class="citeforge-row__snippet">
+								<template
+									v-for="(segment, segmentIdx) in linkifyOrFallback(reference.contentWikitext, t('ui.panel.noContent'))"
+									:key="`panel-snippet-${reference.id || segmentIdx}-${segmentIdx}`">
+									<a v-if="segment.type === 'link'" :href="segment.href" target="_blank"
+										rel="noopener noreferrer">{{ segment.text }}</a>
+									<span v-else>{{ segment.text }}</span>
+								</template>
+							</div>
 							<div v-else class="citeforge-row__editor">
 								<cdx-text-area :rows="6" :aria-label="t('ui.panel.editContent.fieldLabel')"
 									:model-value="contentDrafts[reference.id]"

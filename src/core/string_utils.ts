@@ -1,4 +1,4 @@
-import {parse as parseDomain} from 'tldts';
+import { parse as parseDomain } from 'tldts';
 
 /**
  * Convert any Unicode digit to its ASCII counterpart.
@@ -64,6 +64,10 @@ export function extractUrl(content: string): string | null {
 	const match = content.match(/https?:\/\/[^\s|<>"]+/i);
 	return match ? match[0] : null;
 }
+
+export type LinkifiedSegment =
+	| { type: 'text'; text: string }
+	| { type: 'link'; text: string; href: string };
 
 /**
  * Get domain (without public suffix) from a URL.
@@ -149,10 +153,10 @@ export function escapeAttr(value: string): string {
  * @returns The attribute value, or null if not found.
  */
 export function extractAttr(attrs: string, attrName: string): string | null {
-    const regex = new RegExp(`${attrName}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, 'i');
-    const match = attrs.match(regex);
-    if (!match) return null;
-    return match[1] ?? match[2] ?? match[3] ?? null;
+	const regex = new RegExp(`${attrName}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, 'i');
+	const match = attrs.match(regex);
+	if (!match) return null;
+	return match[1] ?? match[2] ?? match[3] ?? null;
 }
 
 const CJK_PATTERN = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
@@ -244,4 +248,35 @@ export function escapeRegex(value: string): string {
 	} catch {
 		return value;
 	}
+}
+
+/**
+ * Convert URLs in text content to clickable HTML links.
+ * @param content - The text content to linkify.
+ * @returns Array of segments with URLs separated for safe rendering.
+ */
+export function linkifyContent(content: string): LinkifiedSegment[] {
+	if (!content) return [];
+
+	const segments: LinkifiedSegment[] = [];
+	const pushText = (text: string): void => {
+		if (!text) return;
+		segments.push({ type: 'text', text });
+	};
+
+	const urlRegex = /(https?:\/\/\S*?)(?=\s|\||}}|$)/g;
+	let lastIndex = 0;
+	let match: RegExpExecArray | null;
+	while ((match = urlRegex.exec(content)) !== null) {
+		const url = match[1];
+		if (match.index > lastIndex) {
+			pushText(content.slice(lastIndex, match.index));
+		}
+		segments.push({ type: 'link', text: url, href: url });
+		lastIndex = match.index + url.length;
+	}
+	if (lastIndex < content.length) {
+		pushText(content.slice(lastIndex));
+	}
+	return segments;
 }

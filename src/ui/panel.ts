@@ -18,10 +18,10 @@ import { disableChecks, enableChecks, isChecksActive } from './checks';
 import panelStyles from './panel.css';
 import PANEL_TEMPLATE from './panel.template.vue';
 
-import { alphaIndex, escapeAttr } from '../core/string_utils';
+import { alphaIndex, escapeAttr, linkifyContent, LinkifiedSegment } from '../core/string_utils';
 import { MessageKey, MessageParams, t } from '../i18n';
 
-import {formatCopy, transformWikitext} from "../core/build_wikitext";
+import { formatCopy, transformWikitext } from "../core/build_wikitext";
 
 const PANEL_STYLE_ELEMENT_ID = 'citeforge-panel-styles';
 const HIGHLIGHT_CLASS = 'citeforge-ref-highlight';
@@ -391,10 +391,33 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			}
 		},
 		methods: {
+			/**
+			 * Check if a reference is currently being edited for content.
+			 * @param ref - Reference object.
+			 * @returns True if editing, false otherwise.
+			 */
 			isEditingContent(this: InspectorCtx, ref: Reference): boolean {
 				return this.contentDrafts[ref.id] !== undefined;
 			},
 
+			/**
+			 * Convert wikitext content into link segments, with optional fallback text.
+			 * @param content - Content to linkify.
+			 * @param fallback - Text to display when there is no content.
+			 * @returns Array of segments for safe rendering.
+			 */
+			linkifyOrFallback(this: InspectorCtx, content: string, fallback: string): LinkifiedSegment[] {
+				const segments = linkifyContent(content);
+				if (!segments.length && fallback) {
+					return [{ type: 'text', text: fallback }];
+				}
+				return segments;
+			},
+
+			/**
+			 * Toggle the content editor for a reference.
+			 * @param ref - Reference object.
+			 */
 			toggleContentEditor(this: InspectorCtx, ref: Reference): void {
 				if (this.contentDrafts[ref.id] !== undefined) {
 					const drafts = { ...this.contentDrafts };
@@ -408,6 +431,11 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				};
 			},
 
+			/**
+			 * Handle input events in the content editor for a reference.
+			 * @param ref - Reference object.
+			 * @param value - New content value from the editor.
+			 */
 			onContentInput(this: InspectorCtx, ref: Reference, value: string): void {
 				this.contentDrafts = {
 					...this.contentDrafts,
@@ -417,6 +445,11 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				this.queueContentChange(ref, value);
 			},
 
+			/**
+			 * Queue a content change for a reference.
+			 * @param ref - Reference object.
+			 * @param nextContent - The new content to set.
+			 */
 			queueContentChange(this: InspectorCtx, ref: Reference, nextContent: string): void {
 				const original = this.originalContent[ref.id] ?? '';
 				const existing = this.pendingChanges.find((c) => c.refId === ref.id);
@@ -432,6 +465,12 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				entry.newContent = nextContent;
 			},
 
+			/**
+			 * Ensure there is a pending change entry for a reference.
+			 * @param ref - Reference object.
+			 * @param originalNameOverride - Optional original name override.
+			 * @returns The existing or newly created PendingChange entry.
+			 */
 			ensurePendingEntry(this: InspectorCtx, ref: Reference, originalNameOverride?: string): PendingChange {
 				let entry = this.pendingChanges.find((c) => c.refId === ref.id);
 				if (!entry) {
@@ -452,6 +491,10 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				return entry;
 			},
 
+			/**
+			 * Clean up a pending change entry if there are no actual changes.
+			 * @param entry - The PendingChange entry to check and possibly remove.
+			 */
 			cleanupPendingEntry(this: InspectorCtx, entry: PendingChange): void {
 				const nameChanged = entry.newName !== undefined && entry.newName !== entry.oldName;
 				const contentChanged =
@@ -466,6 +509,12 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				}
 			},
 
+			/**
+			 * Localized message retrieval function.
+			 * @param key - Message key.
+			 * @param params - Optional parameters for message formatting.
+			 * @returns Localized message string.
+			 */
 			t(key: MessageKey, params?: MessageParams): string {
 				return t(key, params);
 			},
