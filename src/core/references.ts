@@ -332,6 +332,7 @@ export interface TransformOptions {
 	useTemplateR?: boolean;
 	reflistTemplates?: string[];
 	normalizeAll?: boolean;
+	contentOverrides?: Record<string, string>;
 }
 
 export interface TransformResult {
@@ -411,6 +412,17 @@ export function transformWikitext(wikitext: string, options: TransformOptions = 
 	const normalizeAll = options.normalizeAll === undefined ? false : options.normalizeAll !== false;
 	const reflistNames = (options.reflistTemplates && options.reflistTemplates.length > 0 ? options.reflistTemplates : DEFAULT_REFLIST_TEMPLATES).map((n) => n.toLowerCase());
 	const targetMode = normalizeLocationMode(options.locationMode);
+	const contentOverrides = options.contentOverrides || {};
+	const contentOverrideLookup = (ref: RefRecord): string | undefined => {
+		const candidates = [ref.id, ref.key];
+		for (const key of candidates) {
+			if (!key) continue;
+			if (Object.prototype.hasOwnProperty.call(contentOverrides, key)) {
+				return contentOverrides[key];
+			}
+		}
+		return undefined;
+	};
 
 	const ctx = parseWikitext(wikitext, reflistNames);
 	ctx.refs = normalizeRefKeys(ctx.refs);
@@ -425,7 +437,8 @@ export function transformWikitext(wikitext: string, options: TransformOptions = 
 		sortRefs,
 		normalizeAll,
 		locationModeKeep: targetMode === 'keep',
-		renameLookup: (name: string) => renameMap[name]
+		renameLookup: (name: string) => renameMap[name],
+		contentOverrideLookup
 	});
 
 	const replaced = applyReplacements(wikitext, plan.replacements);
@@ -852,6 +865,7 @@ function buildReplacementPlan(ctx: {
 	normalizeAll: boolean;
 	locationModeKeep: boolean;
 	renameLookup?: (name: string) => string | null | undefined;
+	contentOverrideLookup?: (ref: RefRecord) => string | undefined;
 }): { replacements: Replacement[]; movedInline: string[]; movedLdr: string[] } {
 	const replacements: Replacement[] = [];
 	const movedInline: string[] = [];
@@ -876,7 +890,8 @@ function buildReplacementPlan(ctx: {
 		const canonical = canonicalMap.get(ref) ?? ref;
 		const targetName = canonical.name ?? ref.name;
 		const targetLocation = canonical.targetLocation;
-		const content = firstContent(canonical);
+		const overrideContent = opts.contentOverrideLookup?.(canonical);
+		const content = overrideContent !== undefined ? overrideContent : firstContent(canonical);
 
 		// Uses (including ones tied to definitions)
 		ref.uses.forEach((use, useIdx) => {
@@ -912,10 +927,13 @@ function buildReplacementPlan(ctx: {
 
 		if (opts.locationModeKeep && ref.ldrDefinitions.length > 0) {
 			ref.ldrDefinitions.forEach((def) => {
-				const content = def.content ?? '';
+				const override = opts.contentOverrideLookup?.(canonical);
+				const content = override !== undefined ? override : def.content ?? '';
 				const targetGroup = def.group ?? ref.group;
 				if (!opts.useTemplateR && !opts.normalizeAll && targetName === def.name && targetGroup === def.group) {
-					return;
+					if (override === undefined) {
+						return;
+					}
 				}
 				const rendered = content
 					? renderRefTag(targetName, targetGroup, content, opts.normalizeAll)
@@ -928,7 +946,7 @@ function buildReplacementPlan(ctx: {
 
 	// Rebuild reflist templates
 	if (!opts.locationModeKeep) {
-		const ldrEntries = buildLdrEntries(ctx.refs);
+		const ldrEntries = buildLdrEntries(ctx.refs, opts.contentOverrideLookup);
 		const hasContainer = ctx.templates.length > 0 || ctx.referencesTags.length > 0;
 		ctx.templates.forEach((tpl) => {
 			const updated = updateReflistTemplate(tpl, ldrEntries, opts.sortRefs);
@@ -961,14 +979,18 @@ function buildReplacementPlan(ctx: {
  * @param refs - Map of reference records.
  * @returns Array of LDR entries with name, group, and content.
  */
-function buildLdrEntries(refs: Map<RefKey, RefRecord>): Array<{ name: string; group: string | null; content: string }> {
+function buildLdrEntries(
+	refs: Map<RefKey, RefRecord>,
+	contentOverrideLookup?: (ref: RefRecord) => string | undefined
+): Array<{ name: string; group: string | null; content: string }> {
 	const list: Array<{ name: string; group: string | null; content: string }> = [];
 	refIterator(refs).forEach((ref) => {
 		const canonical = ref.canonical ?? ref;
 		if (canonical !== ref) return;
 		if (canonical.targetLocation !== 'ldr') return;
 		if (!canonical.name) return;
-		const content = firstContent(canonical);
+		const override = contentOverrideLookup?.(canonical);
+		const content = override !== undefined ? override : firstContent(canonical);
 		if (!content) return;
 		list.push({ name: canonical.name, group: canonical.group, content });
 	});

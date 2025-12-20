@@ -32,8 +32,12 @@ export interface PendingChange {
 	refId: string;
 	/** Original name before the change. */
 	oldName: string;
-	/** New name after the change. */
-	newName: string;
+	/** New name after the change, if renamed. */
+	newName?: string;
+	/** Original content before edits, if edited. */
+	oldContent?: string;
+	/** New content after edits, if edited. */
+	newContent?: string;
 }
 
 /**
@@ -60,6 +64,10 @@ export interface InspectorState {
 	pendingChanges: PendingChange[];
 	/** ID of the reference currently being edited inline, or null if none. */
 	editingRefId: string | null;
+	/** Map of reference IDs to their original content snapshot. */
+	originalContent: Record<string, string>;
+	/** Draft content being edited per reference ID. */
+	contentDrafts: Record<string, string | undefined>;
 	/** Whether the on-page checks overlay is active. */
 	checksOn: boolean;
 }
@@ -75,4 +83,7 @@ export type InspectorCtx = InspectorState & {
 	hasRefs: boolean;
 	nameConflicts: Set<string>;
 	hasConflicts: boolean;
+	queueContentChange: (ref: Reference, nextContent: string) => void;
+	ensurePendingEntry: (ref: Reference, originalNameOverride?: string) => PendingChange;
+	cleanupPendingEntry: (entry: PendingChange) => void;
 };

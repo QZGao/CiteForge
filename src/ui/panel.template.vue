@@ -73,8 +73,28 @@
 								<span class="citeforge-row__meta">{{ t('ui.panel.usesPrefix') }} {{ refUses(reference) }} <span v-if="reference.group">· {{
 								reference.group }}</span></span>
 							</div>
-								<div class="citeforge-row__snippet">{{ reference.contentWikitext || t('ui.panel.noContent') }}</div>
+								<div v-if="!isEditingContent(reference)" class="citeforge-row__snippet">{{ reference.contentWikitext || t('ui.panel.noContent') }}</div>
+								<div v-else class="citeforge-row__editor">
+									<cdx-text-area
+										:rows="6"
+										:aria-label="t('ui.panel.editContent.fieldLabel')"
+										:model-value="contentDrafts[reference.id]"
+										@update:model-value="onContentInput(reference, $event)"
+										@click.stop
+										@mousedown.stop
+									/>
+								</div>
 							<div class="citeforge-row__actions">
+								<button class="citeforge-copy-btn citeforge-edit-btn" type="button"
+									:class="{ 'is-active': isEditingContent(reference) }"
+									@click.stop.prevent="toggleContentEditor(reference)"
+									:title="isEditingContent(reference) ? t('ui.panel.editContent.closeTitle') : t('ui.panel.editContent.openTitle')">
+									<svg viewBox="0 0 20 20" width="12" height="12" aria-hidden="true">
+										<path fill="currentColor"
+											d="m16.77 8 1.94-2a1 1 0 0 0 0-1.41l-3.34-3.3a1 1 0 0 0-1.41 0L12 3.23zM1 14.25V19h4.75l9.96-9.96-4.75-4.75z" />
+									</svg>
+									<span>{{ isEditingContent(reference) ? t('ui.panel.editContent.closeLabel') : t('ui.panel.editContent.openLabel') }}</span>
+								</button>
 								<button class="citeforge-copy-btn" type="button"
 									@click.stop.prevent="copyRefContent(reference)" :title="t('ui.panel.copyRaw.title')">
 									<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">

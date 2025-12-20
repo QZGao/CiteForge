@@ -418,6 +418,32 @@ Intro <ref name="d" /> mid {{r|d}}
 		expect(result.wikitext).not.toContain('|refs=');
 	});
 
+	it('applies content overrides when rewriting inline definitions', () => {
+		const source = `
+Body <ref name="foo">Original</ref> tail
+`;
+		const result = transformWikitext(source, {
+			locationMode: 'keep',
+			contentOverrides: { '::foo': 'Updated content' }
+		});
+		expect(result.wikitext).toContain('<ref name="foo">Updated content</ref>');
+	});
+
+	it('applies content overrides to list-defined references', () => {
+		const source = `
+Text <ref name="foo" />
+
+{{reflist|refs=
+<ref name="foo">Original</ref>
+}}
+`;
+		const result = transformWikitext(source, {
+			locationMode: 'all_ldr',
+			contentOverrides: { '::foo': 'Updated LDR content' }
+		});
+		expect(result.wikitext).toContain('<ref name="foo">Updated LDR content</ref>');
+	});
+
 	it('moves <references> LDR definitions back inline and collapses the tag when empty', () => {
 		const source = `
 Intro <ref name="alpha" /> tail <ref name="beta" />

@@ -15,6 +15,7 @@ type CodexModule = Partial<{
 	CdxCheckbox: unknown;
 	CdxField: unknown;
 	CdxMultiselectLookup: unknown;
+	CdxTextArea: unknown;
 }>;
 
 let mountedApp: VueApp | null = null;
@@ -167,6 +168,7 @@ export function registerCodexComponents(app: VueApp, Codex: CodexModule): void {
 		if (Codex.CdxButton) app.component('cdx-button', Codex.CdxButton);
 		if (Codex.CdxSelect) app.component('cdx-select', Codex.CdxSelect);
 		if (Codex.CdxTextInput) app.component('cdx-text-input', Codex.CdxTextInput);
+		if (Codex.CdxTextArea) app.component('cdx-text-area', Codex.CdxTextArea);
 		if (Codex.CdxCheckbox) app.component('cdx-checkbox', Codex.CdxCheckbox);
 		if (Codex.CdxField) app.component('cdx-field', Codex.CdxField);
 		if (Codex.CdxMultiselectLookup) app.component('cdx-multiselect-lookup', Codex.CdxMultiselectLookup);

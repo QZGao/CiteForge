@@ -424,6 +424,37 @@
 	word-break: break-word;
 }
 
+.citeforge-row__editor {
+	margin-top: 6px;
+}
+
+.citeforge-row__editor .cdx-text-area,
+.citeforge-row__editor textarea {
+	width: 100%;
+	min-height: 120px;
+	font-size: 12px;
+	font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, Monaco, monospace;
+}
+
+.citeforge-edit-btn.is-active {
+	border-color: #7da4f7;
+	background: #e8f0ff;
+	color: #1d3a6c;
+}
+
+html.citeforge-theme-night .citeforge-row__editor textarea,
+html.citeforge-theme-night .citeforge-row__editor .cdx-text-area textarea {
+	background: #1f2229;
+	color: #f5f6f7;
+	border-color: #3f4a5a;
+}
+
+html.citeforge-theme-night .citeforge-row__editor textarea:focus,
+html.citeforge-theme-night .citeforge-row__editor .cdx-text-area textarea:focus {
+	border-color: #5f7dd3;
+	box-shadow: 0 0 0 2px rgba(95, 125, 211, 0.25);
+}
+
 .citeforge-empty {
 	color: var(--cdx-color-base--subtle, #54595d);
 	padding: 8px 0;

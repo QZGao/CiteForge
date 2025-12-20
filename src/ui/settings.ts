@@ -91,7 +91,8 @@ export function getSettings(): Settings {
 export function settingsToTransformOptions(
 	settings: Settings,
 	renameMap: Record<string, string | null>,
-	renameNameless: Record<string, string | null>
+	renameNameless: Record<string, string | null>,
+	contentOverrides?: Record<string, string>
 ): TransformOptions {
 	const placementMode = (() => {
 		if (settings.placementMode === 'keep') return 'keep' as const;
@@ -109,7 +110,8 @@ export function settingsToTransformOptions(
 		useTemplateR: Boolean(settings.useTemplateR),
 		locationMode: placementMode,
 		dedupe: !settings.makeCopies,
-		normalizeAll: Boolean(settings.normalizeAll)
+		normalizeAll: Boolean(settings.normalizeAll),
+		contentOverrides
 	};
 }
 

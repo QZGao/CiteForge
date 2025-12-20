@@ -1,4 +1,4 @@
-import { Reference, InspectorState, InspectorCtx } from '../types';
+import { Reference, InspectorState, InspectorCtx, PendingChange } from '../types';
 import {
 	createDialogMountIfNeeded,
 	getMountedApp,
@@ -179,22 +179,28 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 	initCitationPopup();
 	initReferencePopup();
 
-	const appOptions = {
-		data(): InspectorState {
-			return {
-				open: false,
-				visible: true,
-				refs,
-				selectedRef: null,
-				query: '',
-				settings: getSettings(),
-				showSettings: false,
-				minHeight: 300,
-				pendingChanges: [],
-				editingRefId: null,
-				checksOn: false
-			};
-		},
+const appOptions = {
+	data(): InspectorState {
+		const originalContent: Record<string, string> = {};
+		refs.forEach((ref) => {
+			originalContent[ref.id] = ref.contentWikitext || '';
+		});
+		return {
+			open: false,
+			visible: true,
+			refs,
+			selectedRef: null,
+			query: '',
+			settings: getSettings(),
+			showSettings: false,
+			minHeight: 300,
+			pendingChanges: [],
+			editingRefId: null,
+			originalContent,
+			contentDrafts: {},
+			checksOn: false
+		};
+	},
 		computed: {
 			/**
 			 * Check if there are any references loaded.
@@ -317,6 +323,81 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			}
 		},
 		methods: {
+			isEditingContent(this: InspectorCtx, ref: Reference): boolean {
+				return this.contentDrafts[ref.id] !== undefined;
+			},
+
+			toggleContentEditor(this: InspectorCtx, ref: Reference): void {
+				if (this.contentDrafts[ref.id] !== undefined) {
+					const drafts = { ...this.contentDrafts };
+					delete drafts[ref.id];
+					this.contentDrafts = drafts;
+					return;
+				}
+				this.contentDrafts = {
+					...this.contentDrafts,
+					[ref.id]: ref.contentWikitext || ''
+				};
+			},
+
+			onContentInput(this: InspectorCtx, ref: Reference, value: string): void {
+				this.contentDrafts = {
+					...this.contentDrafts,
+					[ref.id]: value
+				};
+				ref.contentWikitext = value;
+				this.queueContentChange(ref, value);
+			},
+
+			queueContentChange(this: InspectorCtx, ref: Reference, nextContent: string): void {
+				const original = this.originalContent[ref.id] ?? '';
+				const existing = this.pendingChanges.find((c) => c.refId === ref.id);
+				if (nextContent === original) {
+					if (existing) {
+						existing.newContent = undefined;
+						this.cleanupPendingEntry(existing);
+					}
+					return;
+				}
+				const entry = this.ensurePendingEntry(ref);
+				entry.oldContent = entry.oldContent ?? original;
+				entry.newContent = nextContent;
+			},
+
+			ensurePendingEntry(this: InspectorCtx, ref: Reference, originalNameOverride?: string): PendingChange {
+				let entry = this.pendingChanges.find((c) => c.refId === ref.id);
+				if (!entry) {
+					entry = {
+						refId: ref.id,
+						oldName: originalNameOverride ?? ref.name ?? '',
+						oldContent: this.originalContent[ref.id] ?? ref.contentWikitext ?? ''
+					};
+					this.pendingChanges.push(entry);
+				} else {
+					if (!entry.oldName && (originalNameOverride || ref.name)) {
+						entry.oldName = originalNameOverride ?? ref.name ?? '';
+					}
+					if (entry.oldContent === undefined) {
+						entry.oldContent = this.originalContent[ref.id] ?? ref.contentWikitext ?? '';
+					}
+				}
+				return entry;
+			},
+
+			cleanupPendingEntry(this: InspectorCtx, entry: PendingChange): void {
+				const nameChanged = entry.newName !== undefined && entry.newName !== entry.oldName;
+				const contentChanged =
+					entry.newContent !== undefined &&
+					entry.oldContent !== undefined &&
+					entry.newContent !== entry.oldContent;
+				if (!nameChanged && !contentChanged) {
+					const idx = this.pendingChanges.indexOf(entry);
+					if (idx >= 0) {
+						this.pendingChanges.splice(idx, 1);
+					}
+				}
+			},
+
 			t(key: MessageKey, params?: MessageParams): string {
 				return t(key, params);
 			},
@@ -366,6 +447,19 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				this.refs = nextRefs;
 				const nextSelected = prevId ? nextRefs.find((r) => r.id === prevId) ?? nextRefs[0] : nextRefs[0];
 				this.selectedRef = nextSelected ?? null;
+				const nextOriginal: Record<string, string> = {};
+				nextRefs.forEach((ref) => {
+					nextOriginal[ref.id] = ref.contentWikitext || '';
+				});
+				this.originalContent = nextOriginal;
+				const preservedDrafts: Record<string, string | undefined> = {};
+				Object.keys(this.contentDrafts).forEach((key) => {
+					if (nextOriginal[key] !== undefined) {
+						preservedDrafts[key] = this.contentDrafts[key];
+					}
+				});
+				this.contentDrafts = preservedDrafts;
+				this.pendingChanges = this.pendingChanges.filter((change) => nextOriginal[change.refId] !== undefined);
 				this.visible = true;
 				if (this.checksOn) {
 					enableChecks(this.refs);
@@ -555,25 +649,19 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			 */
 			commitRefName(this: InspectorCtx, ref: Reference, newName: string): void {
 				const nextName = newName.trim();
-				const oldName = this.pendingChanges.find((c) => c.refId === ref.id)?.oldName ?? ref.name ?? '';
+				const pending = this.pendingChanges.find((c) => c.refId === ref.id);
+				const originalName = pending?.oldName ?? ref.name ?? '';
 				this.editingRefId = null;
-				if (nextName === oldName) {
-					// Reverted to original - remove from queue if exists
-					const idx = this.pendingChanges.findIndex((c) => c.refId === ref.id);
-					if (idx >= 0) {
-						this.pendingChanges.splice(idx, 1);
-						ref.name = oldName;
+				ref.name = nextName;
+				if (nextName === originalName) {
+					if (pending) {
+						pending.newName = undefined;
+						this.cleanupPendingEntry(pending);
 					}
 					return;
 				}
-				ref.name = nextName;
-				// Queue the change
-				const existingIdx = this.pendingChanges.findIndex((c) => c.refId === ref.id);
-				if (existingIdx >= 0) {
-					this.pendingChanges[existingIdx].newName = nextName;
-				} else {
-					this.pendingChanges.push({ refId: ref.id, oldName, newName: nextName });
-				}
+				const entry = pending ?? this.ensurePendingEntry(ref, originalName);
+				entry.newName = nextName;
 			},
 
 			/**
@@ -586,8 +674,8 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				const pending = this.pendingChanges.find((c) => c.refId === ref.id);
 				if (pending) {
 					ref.name = pending.oldName;
-					const idx = this.pendingChanges.indexOf(pending);
-					this.pendingChanges.splice(idx, 1);
+					pending.newName = undefined;
+					this.cleanupPendingEntry(pending);
 				}
 				this.editingRefId = null;
 			},
@@ -606,20 +694,16 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					if (proposed === undefined || proposed === null) return;
 					const existing = this.pendingChanges.find((c) => c.refId === ref.id);
 					const originalName = existing ? existing.oldName : currentName;
+					ref.name = proposed;
 					if (proposed === originalName) {
 						if (existing) {
-							const idx = this.pendingChanges.indexOf(existing);
-							if (idx >= 0) this.pendingChanges.splice(idx, 1);
+							existing.newName = undefined;
+							this.cleanupPendingEntry(existing);
 						}
-						ref.name = originalName;
 						return;
 					}
-					ref.name = proposed;
-					if (existing) {
-						existing.newName = proposed;
-					} else {
-						this.pendingChanges.push({ refId: ref.id, oldName: originalName, newName: proposed });
-					}
+					const entry = existing ?? this.ensurePendingEntry(ref, originalName);
+					entry.newName = proposed;
 				});
 				if (!this.pendingChanges.length) {
 					mw.notify?.(t('ui.panel.noMassRenameChanges'), { type: 'info', title: 'Cite Forge' });
@@ -655,6 +739,7 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					const base = await getWikitext();
 					const renameMap: Record<string, string | null> = {};
 					const renameNameless: Record<string, string | null> = {};
+					const contentOverrides: Record<string, string> = {};
 					this.pendingChanges.forEach((c) => {
 						if (c.newName && c.oldName !== c.newName) {
 							if (c.oldName) {
@@ -663,9 +748,31 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 								renameNameless[c.refId] = c.newName;
 							}
 						}
+						const newContent = c.newContent;
+						const oldContent = c.oldContent;
+						if (
+							newContent !== undefined &&
+							oldContent !== undefined &&
+							newContent !== oldContent
+						) {
+							contentOverrides[c.refId] = newContent;
+							const ref = this.refs.find((r) => r.id === c.refId);
+							if (ref) {
+								const names = Array.from(
+									new Set(
+										[c.newName, ref.name, c.oldName]
+											.filter((name): name is string => Boolean(name && name.trim()))
+									)
+								);
+								names.forEach((name) => {
+									const key = `${ref.group ?? ''}::${name}`;
+									contentOverrides[key] = newContent;
+								});
+							}
+						}
 					});
 
-					const transformOpts = settingsToTransformOptions(this.settings, renameMap, renameNameless);
+					const transformOpts = settingsToTransformOptions(this.settings, renameMap, renameNameless, contentOverrides);
 
 					if (transformOpts.normalizeAll) {
 						await prefetchTemplateDataForWikitext(base);
