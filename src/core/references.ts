@@ -230,30 +230,45 @@ export function attachDomUses(refs: Reference[]): void {
 	});
 }
 
+/**
+ * Escape special characters in a string for use in a regular expression.
+ * @param value - The string to escape.
+ * @returns The escaped string.
+ */
 function escapeRegex(value: string): string {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function mwEscapeId(value: string): string {
-	if (typeof mw !== 'undefined' && mw.util && typeof (mw.util as { escapeIdReference?: (input: string) => string }).escapeIdReference === 'function') {
-		try {
-			return (mw.util as { escapeIdReference: (input: string) => string }).escapeIdReference(value);
-		} catch {
-			/* ignore */
-		}
-	}
+/**
+ * Escape a string for safe use in HTML attribute values.
+ * @param value - The string to escape.
+ * @returns The escaped string.
+ */
+function escapeId(value: string): string {
 	return value.replace(/ /g, '_');
 }
 
+/**
+ * Build possible ID variants for a reference name.
+ * Generates different forms to match against hrefs.
+ * @param name - The reference name.
+ * @returns Array of variant strings.
+ */
 function buildRefIdVariants(name: string): string[] {
 	const variants = new Set<string>();
 	variants.add(name);
 	variants.add(name.replace(/ /g, '_'));
 	variants.add(encodeURIComponent(name));
-	variants.add(mwEscapeId(name));
+	variants.add(escapeId(name));
 	return Array.from(variants).filter((variant) => Boolean(variant));
 }
 
+/**
+ * Check if an href matches a reference variant.
+ * @param href - The href attribute value from an anchor.
+ * @param variant - The reference variant to match against.
+ * @returns True if it matches, false otherwise.
+ */
 function hrefMatchesReference(href: string, variant: string): boolean {
 	if (!variant) return false;
 	const target = href.replace(/^#/, '');
@@ -262,6 +277,11 @@ function hrefMatchesReference(href: string, variant: string): boolean {
 	return pattern.test(target);
 }
 
+/**
+ * Apply the citeforgeRefId data attribute to the reference entry element.
+ * @param anchor - The anchor element linking to the reference.
+ * @param refId - The reference ID to apply.
+ */
 function applyRefIdToReferenceEntry(anchor: Element, refId: string): void {
 	const href = anchor.getAttribute('href');
 	if (!href) return;
