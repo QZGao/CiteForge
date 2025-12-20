@@ -87,3 +87,4 @@ export type InspectorCtx = InspectorState & {
 	ensurePendingEntry: (ref: Reference, originalNameOverride?: string) => PendingChange;
 	cleanupPendingEntry: (entry: PendingChange) => void;
 };
+

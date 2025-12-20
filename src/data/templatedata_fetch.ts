@@ -122,20 +122,6 @@ export async function prefetchTemplateDataForWikitext(wikitext: string): Promise
 }
 
 /**
- * Get the parameter order for a template, fetching and caching if needed.
- * @param name - Template name.
- * @returns Parameter order array.
- */
-export async function getTemplateParamOrderAsync(name: string): Promise<string[]> {
-	loadCache();
-	const key = normalizeTemplateName(name);
-	const cached = templateDataOrderCache.get(key);
-	if (cached) return cached;
-	await fetchAndStoreTemplateData(key);
-	return getTemplateParamOrder(key);
-}
-
-/**
  * Fetch TemplateData for a template and store in cache.
  * @param templateName - Template name.
  */
@@ -193,7 +179,7 @@ async function fetchAndStoreTemplateData(templateName: string): Promise<void> {
 			const paramsPage = pages.find((p) => p.params && Object.keys(p.params).length);
 			const orderFromParams = paramsPage?.params ? Object.keys(paramsPage.params) : [];
 			let order: string[] = (orderFromParamOrder && orderFromParamOrder.length ? orderFromParamOrder : orderFromParams || []).filter(
-				(p) => typeof p === 'string' && p.trim().length > 0
+				(p) => p.trim().length > 0
 			);
 			const aliasMap: Record<string, string> = {};
 			if (paramsPage?.params) {

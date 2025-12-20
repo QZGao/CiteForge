@@ -1,4 +1,4 @@
-import { parse as parseDomain } from 'tldts';
+import {parse as parseDomain} from 'tldts';
 
 /**
  * Convert any Unicode digit to its ASCII counterpart.
@@ -141,6 +141,20 @@ export function escapeAttr(value: string): string {
 	return value.replace(/"/g, '&quot;');
 }
 
+/**
+ * Extract an attribute value from an HTML/XML attribute string.
+ * Supports quoted (single/double) and unquoted attribute values.
+ * @param attrs - The attribute string to search (e.g., 'name="foo" group="bar"').
+ * @param attrName - The name of the attribute to extract.
+ * @returns The attribute value, or null if not found.
+ */
+export function extractAttr(attrs: string, attrName: string): string | null {
+    const regex = new RegExp(`${attrName}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, 'i');
+    const match = attrs.match(regex);
+    if (!match) return null;
+    return match[1] ?? match[2] ?? match[3] ?? null;
+}
+
 const CJK_PATTERN = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
 
 /**
@@ -160,15 +174,15 @@ export function containsCJK(text: string): boolean {
  * @returns The alphabetic representation of `value`.
  */
 export function numberToAlpha(value: number, uppercase: boolean): string {
-    if (value <= 0) return String(value);
-    let num = value;
-    let out = '';
-    while (num > 0) {
-        const remainder = (num - 1) % 26;
-        out = String.fromCharCode(97 + remainder) + out;
-        num = Math.floor((num - 1) / 26);
-    }
-    return uppercase ? out.toUpperCase() : out;
+	if (value <= 0) return String(value);
+	let num = value;
+	let out = '';
+	while (num > 0) {
+		const remainder = (num - 1) % 26;
+		out = String.fromCharCode(97 + remainder) + out;
+		num = Math.floor((num - 1) / 26);
+	}
+	return uppercase ? out.toUpperCase() : out;
 }
 
 /**
@@ -178,31 +192,31 @@ export function numberToAlpha(value: number, uppercase: boolean): string {
  * @returns The Roman numeral representation of `value`.
  */
 export function numberToRoman(value: number): string {
-    if (value <= 0) return String(value);
-    const numerals: Array<[number, string]> = [
-        [1000, 'M'],
-        [900, 'CM'],
-        [500, 'D'],
-        [400, 'CD'],
-        [100, 'C'],
-        [90, 'XC'],
-        [50, 'L'],
-        [40, 'XL'],
-        [10, 'X'],
-        [9, 'IX'],
-        [5, 'V'],
-        [4, 'IV'],
-        [1, 'I']
-    ];
-    let remaining = Math.min(value, 3999);
-    let result = '';
-    for (const [num, symbol] of numerals) {
-        while (remaining >= num) {
-            result += symbol;
-            remaining -= num;
-        }
-    }
-    return result;
+	if (value <= 0) return String(value);
+	const numerals: Array<[number, string]> = [
+		[1000, 'M'],
+		[900, 'CM'],
+		[500, 'D'],
+		[400, 'CD'],
+		[100, 'C'],
+		[90, 'XC'],
+		[50, 'L'],
+		[40, 'XL'],
+		[10, 'X'],
+		[9, 'IX'],
+		[5, 'V'],
+		[4, 'IV'],
+		[1, 'I']
+	];
+	let remaining = Math.min(value, 3999);
+	let result = '';
+	for (const [num, symbol] of numerals) {
+		while (remaining >= num) {
+			result += symbol;
+			remaining -= num;
+		}
+	}
+	return result;
 }
 
 /**
@@ -213,8 +227,21 @@ export function numberToRoman(value: number): string {
  * @returns The longest common prefix of both strings.
  */
 export function commonPrefix(a: string, b: string): string {
-    const len = Math.min(a.length, b.length);
-    let i = 0;
-    while (i < len && a.charAt(i) === b.charAt(i)) i++;
-    return a.substring(0, i);
+	const len = Math.min(a.length, b.length);
+	let i = 0;
+	while (i < len && a.charAt(i) === b.charAt(i)) i++;
+	return a.substring(0, i);
+}
+
+/**
+ * Escape special characters in a string for use in a regular expression.
+ * @param value - The string to escape.
+ * @returns The escaped string.
+ */
+export function escapeRegex(value: string): string {
+	try {
+		return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	} catch {
+		return value;
+	}
 }

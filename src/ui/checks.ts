@@ -194,7 +194,7 @@ function annotateReferenceMetadata(): void {
 		const srctxt = parent.textContent || '';
 		const srctxtLower = srctxt.toLowerCase();
 		const rawTitle = span.getAttribute('title') || '';
-		let title = rawTitle;
+		let title: string;
 		try {
 			title = decodeURIComponent(rawTitle);
 		} catch {
@@ -365,7 +365,7 @@ function annotateReferenceSorting(): void {
 				appendAnnotation(cite, t('ui.checks.missingRefAnchor'), 'warning');
 			}
 
-			let sortText = '';
+			let sortText: string;
 			if (!id) {
 				sortText = (cite.innerText || '').replace(/"/g, '');
 				if (!sortText.trim()) return;

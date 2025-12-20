@@ -210,27 +210,9 @@ export function refreshLocale(): void {
 }
 
 /**
- * Set the active locale.
- * @param locale - Locale code to set.
- */
-export function setLocale(locale: LocaleCode): void {
-	activeLocale = locale;
-}
-
-/**
  * Get the current active locale.
  * @returns The active locale code.
  */
 export function getLocale(): LocaleCode {
 	return activeLocale;
 }
-
-/**
- * Get the list of available/supported locales.
- * @returns Array of locale codes.
- */
-export function getAvailableLocales(): LocaleCode[] {
-	return Object.keys(catalogues).filter(isSupportedLocale);
-}
-
-export const messages: CatalogueMap = catalogues;

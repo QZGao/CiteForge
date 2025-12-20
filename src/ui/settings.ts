@@ -1,4 +1,4 @@
-import { TransformOptions } from "../core/references";
+import {TransformOptions} from "../core/build_wikitext";
 
 /** User-configurable settings for Cite Forge. */
 export type Settings = {
@@ -86,6 +86,7 @@ export function getSettings(): Settings {
  * @param settings - Cite Forge user settings.
  * @param renameMap - Mapping of existing ref names to their replacements (null to drop a name).
  * @param renameNameless - Mapping of ref IDs for unnamed refs to the names they should receive.
+ * @param contentOverrides - Optional mapping of ref names to content overrides.
  * @returns A populated TransformOptions object.
  */
 export function settingsToTransformOptions(
@@ -131,6 +132,5 @@ export function namespaceAllowed(): boolean {
 		if (!s.showInUserNs) return false;
 	}
 	const cm = mw.config?.get('wgPageContentModel');
-	if (cm && cm !== 'wikitext') return false;
-	return true;
+	return Boolean(cm && cm === 'wikitext');
 }

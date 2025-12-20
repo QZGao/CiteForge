@@ -1,5 +1,5 @@
 import { Reference } from '../types';
-import { pickTemplateParams, parseTemplateParams } from './references';
+import { pickTemplateParams, parseTemplateParams } from './parse_wikitext';
 import {
 	convertDigitsToAscii,
 	domainFromUrl,
@@ -283,9 +283,7 @@ function sanitizeToken(token: string, config: MassRenameConfig): string {
 		text = text.toLowerCase();
 	}
 	const spaceReplacement = config.replaceSpaceWith;
-	if (typeof spaceReplacement === 'string') {
-		text = text.replace(/\s+/g, spaceReplacement);
-	}
+    text = text.replace(/\s+/g, spaceReplacement);
 	text = text.replace(/_{2,}/g, '_').replace(/\s{2,}/g, ' ');
 	return text.trim();
 }

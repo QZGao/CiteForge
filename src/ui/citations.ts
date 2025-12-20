@@ -216,6 +216,7 @@ function scheduleHide(delay = 150): void {
  * Open (show) the popup and attach metadata for the current target.
  * @param targetId - The id of the DOM element the popup is targeting.
  * @param linkText - The textual label (marker) to show/copy for the target.
+ * @param enableJump - Whether to enable the "jump to inspector" link.
  * @returns The popup's bounding ClientRect when shown, or `null` on failure.
  */
 function openPopup(targetId: string, linkText: string, enableJump: boolean): DOMRect | null {

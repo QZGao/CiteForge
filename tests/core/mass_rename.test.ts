@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
 	DEFAULT_CONFIG,
-	DEFAULT_FIELDS,
 	IncrementStyle,
 	NAMING_FIELDS,
 	type NamingField,

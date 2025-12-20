@@ -53,10 +53,3 @@ export async function getWikitext(): Promise<string> {
 		return wikitextCache;
 	}
 }
-
-/**
- * Reset cached wikitext (e.g., when page changes or after edit).
- */
-export function clearWikitextCache(): void {
-	wikitextCache = null;
-}

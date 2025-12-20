@@ -11,7 +11,7 @@ import {
 import { getSettings, namespaceAllowed, saveSettings, settingsToTransformOptions } from './settings';
 import { getWikitext } from '../data/wikitext_fetch';
 import { openDiffPreview } from '../data/diff_preview';
-import { formatCopy, groupKey, transformWikitext } from '../core/references';
+import { groupKey } from '../core/parse_wikitext';
 import { prefetchTemplateDataForWikitext } from '../data/templatedata_fetch';
 import { openMassRenameDialog } from './mass_rename';
 import { disableChecks, enableChecks, isChecksActive } from './checks';
@@ -21,14 +21,12 @@ import PANEL_TEMPLATE from './panel.template.vue';
 import { alphaIndex, escapeAttr } from '../core/string_utils';
 import { MessageKey, MessageParams, t } from '../i18n';
 
+import {formatCopy, transformWikitext} from "../core/build_wikitext";
+
 const PANEL_STYLE_ELEMENT_ID = 'citeforge-panel-styles';
 const HIGHLIGHT_CLASS = 'citeforge-ref-highlight';
 const PORTLET_LINK_ID = 'citeforge-portlet-link';
 const PANEL_SIZE_KEY = 'citeforge-panel-size';
-
-const safeGroupKey = (name: string | null | undefined): string => groupKey(name);
-const safeAlphaIndex = (char: string): number => alphaIndex(char);
-const safeFormatCopy = (name: string, fmt: 'raw' | 'r' | 'ref'): string => formatCopy(name, fmt);
 
 let panelStylesInjected = false;
 
@@ -355,9 +353,9 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			sortedRefs(this: InspectorCtx): Reference[] {
 				const arr = Array.isArray(this.refs) ? this.refs.slice() : [];
 				arr.sort((a, b) => {
-					const ga = safeGroupKey(a.name);
-					const gb = safeGroupKey(b.name);
-					if (ga !== gb) return safeAlphaIndex(ga) - safeAlphaIndex(gb);
+					const ga = groupKey(a.name);
+					const gb = groupKey(b.name);
+					if (ga !== gb) return alphaIndex(ga) - alphaIndex(gb);
 					return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true });
 				});
 				return arr;
@@ -384,7 +382,7 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			firstByBucket(this: InspectorCtx): Record<string, string> {
 				const map: Record<string, string> = {};
 				this.filteredRefs.forEach((ref) => {
-					const bucket = safeGroupKey(ref.name);
+					const bucket = groupKey(ref.name);
 					if (!map[bucket]) {
 						map[bucket] = `citeforge-anchor-${bucket}`;
 					}
@@ -496,7 +494,7 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			 * @returns The group key for the reference.
 			 */
 			bucketFor(this: InspectorCtx, ref: Reference): string {
-				return safeGroupKey(ref?.name);
+				return groupKey(ref?.name);
 			},
 
 			/**
@@ -719,7 +717,7 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 				if (!targetRef) return;
 				const name = targetRef.name || '';
 				if (!name) return;
-				const formatted = safeFormatCopy(name, this.settings.copyFormat);
+				const formatted = formatCopy(name, this.settings.copyFormat);
 				void navigator.clipboard?.writeText(formatted).catch(() => {
 					/* ignore */
 				});
