@@ -6,19 +6,17 @@ A citation management workbench for Wikipedia. Inspect, search, edit, and copy r
 
 ## Features
 
-### Panel and navigation
+### Navigation, copying, and export
 
-Floating bottom-left panel with a portlet toggle; remembers visibility and size. Browse citations with an alphabetical index, search filter, and refresh. Selecting a reference highlights its uses in the article and can scroll to them. Based on the existing UI from [QuickEditExt-Citations](https://github.com/QZGao/QuickEditExt-Citations).
+Floating bottom-left panel with a portlet toggle; remembers visibility and size. Browse citations with an alphabetical index, search filter, and refresh. Highlight the uses of a citation in the article and can scroll to them. Copy ref names (raw, `{{r|name}}`, or `<ref name="..." />`) or raw citation content.
 
-### Editing and transforms
+Hover popup offers quick copy on superscripts and references, and jumping between named citations and their inspector entries.
 
-Inline ref renaming (including nameless refs) with conflict detection and batch-queued saves. Optional wikitext transforms: rename, dedupe, normalize ref markup, prefer `{{r}}` or `<ref>`, move refs inline↔LDR (all-inline, all-LDR, or threshold), sort reflist entries, keep copies vs dedupe, and rename nameless refs. Template support covers `<ref>`, self-closing `<ref />`, `{{r}}` (including chains), and reflist `refs=` blocks.
+### Editing, transforms, and mass rename
 
-### Copying and export
+Inline ref renaming (including nameless refs) with conflict detection and batch-queued saves.
 
-Copy ref names (raw, `{{r|name}}`, or `<ref name="..." />`) or raw citation content. Hover popup offers quick copy on superscripts. “Save to diff” applies transforms and opens the standard MediaWiki diff (no direct API saves).
-
-### Mass renamer
+Optional wikitext transforms: rename, dedupe, normalize ref markup, prefer `{{r}}` or `<ref>`, move refs inline↔LDR (all-inline, all-LDR, or threshold), sort reflist entries, keep copies vs dedupe, and rename nameless refs. Template support covers `<ref>`, self-closing `<ref />`, `{{r}}` (including chains), and reflist `refs=` blocks.
 
 Pick multiple naming parts (author/title/work/domain/year/full date/etc.), choose collision suffix styles, and control punctuation/diacritic handling. Generated renames feed back into the inspector’s pending changes for diff preview. Inspired by [RefRenamer](https://en.wikipedia.org/wiki/User:Nardog/RefRenamer).
 
