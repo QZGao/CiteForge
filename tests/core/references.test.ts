@@ -418,6 +418,24 @@ Intro <ref name="d" /> mid {{r|d}}
 		expect(result.wikitext).not.toContain('|refs=');
 	});
 
+	it('moves <references> LDR definitions back inline and collapses the tag when empty', () => {
+		const source = `
+Intro <ref name="alpha" /> tail <ref name="beta" />
+
+<references>
+<ref name="alpha">Alpha content</ref>
+<ref name="beta">Beta content</ref>
+</references>
+`;
+		const result = transformWikitext(source, {
+			locationMode: 'all_inline'
+		});
+
+		expect(result.wikitext).toContain('<ref name="alpha">Alpha content</ref>');
+		expect(result.wikitext).toContain('<ref name="beta">Beta content</ref>');
+		expect(result.wikitext).toContain('<references />');
+	});
+
 	it('deduplicates identical reference content and unifies names', () => {
 		const source = `
 <ref name="x">Same content</ref> text <ref name="y">Same content</ref>
@@ -457,6 +475,23 @@ Repeat <ref name="common">Common content</ref> and again <ref name="common" />
 		expect(result.wikitext).toContain('<ref name="common">Common content</ref>');
 		// "rare" should stay inline
 		expect(result.wikitext).toContain('<ref name="rare">Only once</ref>');
+	});
+
+	it('populates existing <references /> blocks with generated LDR entries', () => {
+		const source = `
+Lead <ref name="a">Alpha</ref> tail <ref name="b">Beta</ref>
+
+<references />
+`;
+
+		const result = transformWikitext(source, {
+			locationMode: 'all_ldr',
+			sortRefs: false
+		});
+
+		expect(result.wikitext).toContain('<ref name="a" />');
+		expect(result.wikitext).toContain('<ref name="b" />');
+		expect(result.wikitext).toContain('<references>\n<ref name="a">Alpha</ref>\n<ref name="b">Beta</ref>\n</references>');
 	});
 
 	it('handles chained r templates when renaming', () => {

@@ -378,6 +378,15 @@ interface TemplateMatch {
 	params: TemplateParam[];
 }
 
+interface ReferencesTagMatch {
+	start: number;
+	end: number;
+	content: string;
+	attrs: string;
+	inner: string;
+	innerStart: number;
+}
+
 interface TemplateParam {
 	name: string | null;
 	value: string;
@@ -696,10 +705,12 @@ function normalizeRefKeys(refs: Map<RefKey, RefRecord>): Map<RefKey, RefRecord> 
 function parseWikitext(wikitext: string, reflistNames: string[]): {
 	refs: Map<RefKey, RefRecord>;
 	templates: TemplateMatch[];
+	referencesTags: ReferencesTagMatch[];
 	rTemplates: Array<{ id: number; start: number; end: number; entries: RTemplateEntry[] }>
 } {
 	const refs = new Map<RefKey, RefRecord>();
 	const templates = findTemplates(wikitext, reflistNames);
+	const referencesTags = findReferencesTags(wikitext);
 	const rTemplates: Array<{ id: number; start: number; end: number; entries: RTemplateEntry[] }> = [];
 	let namelessCounter = 0;
 
@@ -719,7 +730,7 @@ function parseWikitext(wikitext: string, reflistNames: string[]): {
 	const refFull = /<ref\b([^>/]*?)>([\s\S]*?)<\/ref>/gi;
 	for (const match of wikitext.matchAll(refFull)) {
 		const idx = match.index ?? 0;
-		if (inTemplateRange(idx, templates)) continue;
+		if (inTemplateRange(idx, templates, referencesTags)) continue;
 		const attrs = match[1] ?? '';
 		const content = match[2] ?? '';
 		const name = extractAttr(attrs, 'name');
@@ -736,7 +747,7 @@ function parseWikitext(wikitext: string, reflistNames: string[]): {
 	const refSelf = /<ref\b([^>]*?)\/\s*>/gi;
 	for (const match of wikitext.matchAll(refSelf)) {
 		const idx = match.index ?? 0;
-		if (inTemplateRange(idx, templates)) continue;
+		if (inTemplateRange(idx, templates, referencesTags)) continue;
 		const attrs = match[1] ?? '';
 		const name = extractAttr(attrs, 'name');
 		const group = extractAttr(attrs, 'group');
@@ -751,7 +762,7 @@ function parseWikitext(wikitext: string, reflistNames: string[]): {
 	const rTemplate = /\{\{\s*r\s*(\|[\s\S]*?)\}\}/gi;
 	for (const match of wikitext.matchAll(rTemplate)) {
 		const idx = match.index ?? 0;
-		if (inTemplateRange(idx, templates)) continue;
+		if (inTemplateRange(idx, templates, referencesTags)) continue;
 		const params = match[1] ?? '';
 		const entries = parseRTemplateEntries(params);
 		const tplId = rTemplates.length;
@@ -791,7 +802,26 @@ function parseWikitext(wikitext: string, reflistNames: string[]): {
 		}
 	});
 
-	return { refs, templates, rTemplates };
+	// Parse list-defined refs inside <references> tags
+	referencesTags.forEach((tag) => {
+		if (!tag.inner) return;
+		let innerMatch: RegExpExecArray | null;
+		const innerFull = /<ref\b([^>/]*?)>([\s\S]*?)<\/ref>/gi;
+		while ((innerMatch = innerFull.exec(tag.inner)) !== null) {
+			const attrs = innerMatch[1] ?? '';
+			const content = innerMatch[2] ?? '';
+			const name = extractAttr(attrs, 'name');
+			const group = extractAttr(attrs, 'group');
+			const ref = getRef(name, group);
+			const posStart = tag.innerStart + (innerMatch.index ?? 0);
+			const use: RefUseInternal = {
+				name, group, start: posStart, end: posStart + innerMatch[0].length, kind: 'full', content
+			};
+			ref.ldrDefinitions.push(use);
+		}
+	});
+
+	return { refs, templates, referencesTags, rTemplates };
 }
 
 /**
@@ -800,8 +830,9 @@ function parseWikitext(wikitext: string, reflistNames: string[]): {
  * @param templates - Array of template matches with start and end positions.
  * @returns True if index is within any template range, false otherwise.
  */
-function inTemplateRange(idx: number, templates: TemplateMatch[]): boolean {
-	return templates.some((tpl) => idx >= tpl.start && idx <= tpl.end);
+function inTemplateRange(idx: number, templates: TemplateMatch[], referencesTags: ReferencesTagMatch[] = []): boolean {
+	if (templates.some((tpl) => idx >= tpl.start && idx <= tpl.end)) return true;
+	return referencesTags.some((tag) => idx >= tag.start && idx <= tag.end);
 }
 
 /**
@@ -813,6 +844,7 @@ function inTemplateRange(idx: number, templates: TemplateMatch[]): boolean {
 function buildReplacementPlan(ctx: {
 	refs: Map<RefKey, RefRecord>;
 	templates: TemplateMatch[];
+	referencesTags: ReferencesTagMatch[];
 	rTemplates: Array<{ id: number; start: number; end: number; entries: RTemplateEntry[] }>
 }, opts: {
 	useTemplateR: boolean;
@@ -897,15 +929,22 @@ function buildReplacementPlan(ctx: {
 	// Rebuild reflist templates
 	if (!opts.locationModeKeep) {
 		const ldrEntries = buildLdrEntries(ctx.refs);
+		const hasContainer = ctx.templates.length > 0 || ctx.referencesTags.length > 0;
 		ctx.templates.forEach((tpl) => {
 			const updated = updateReflistTemplate(tpl, ldrEntries, opts.sortRefs);
 			if (updated !== tpl.content) {
 				replacements.push({ start: tpl.start, end: tpl.end, text: updated });
 			}
 		});
+		ctx.referencesTags.forEach((tag) => {
+			const updated = updateReferencesTag(tag, ldrEntries, opts.sortRefs);
+			if (updated !== tag.content) {
+				replacements.push({ start: tag.start, end: tag.end, text: updated });
+			}
+		});
 
 		// If no reflist but we have LDR entries, append one
-		if (ldrEntries.length > 0 && ctx.templates.length === 0) {
+		if (ldrEntries.length > 0 && !hasContainer) {
 			const appendText = buildStandaloneReflist(ldrEntries, opts.sortRefs);
 			replacements.push({ start: Number.MAX_SAFE_INTEGER, end: Number.MAX_SAFE_INTEGER, text: appendText });
 		}
@@ -1375,6 +1414,24 @@ function updateReflistTemplate(tpl: TemplateMatch, ldrEntries: Array<{
 }
 
 /**
+ * Update a <references> tag with new refs parameter value.
+ * @param tag - References tag match to update.
+ * @param ldrEntries - List-defined reference entries.
+ * @param sort - Whether to sort entries by name.
+ * @returns Updated references tag string.
+ */
+function updateReferencesTag(tag: ReferencesTagMatch, ldrEntries: Array<{
+	name: string; group: string | null; content: string
+}>, sort: boolean): string {
+	const attrText = tag.attrs ? ` ${tag.attrs}` : '';
+	if (ldrEntries.length === 0) {
+		return `<references${attrText} />`;
+	}
+	const refsValue = renderRefsValue(ldrEntries, sort);
+	return `<references${attrText}>${refsValue}</references>`;
+}
+
+/**
  * Render the value for a refs parameter from entries.
  * @param entries - List-defined reference entries.
  * @param sort - Whether to sort entries by name.
@@ -1589,6 +1646,52 @@ function findTemplates(source: string, names: string[]): TemplateMatch[] {
 		matches.push({ start: idx, end, name, content, params });
 		i = end;
 	}
+	return matches;
+}
+
+/**
+ * Find <references> tags in source wikitext.
+ * @param source - Source wikitext to search.
+ * @returns Array of found references tag matches.
+ */
+function findReferencesTags(source: string): ReferencesTagMatch[] {
+	const matches: ReferencesTagMatch[] = [];
+	const blockRe = /<references\b([^>]*)>([\s\S]*?)<\/references\s*>/gi;
+	let m: RegExpExecArray | null;
+	while ((m = blockRe.exec(source)) !== null) {
+		const start = m.index ?? 0;
+		const content = m[0];
+		const attrs = (m[1] ?? '').trim();
+		const inner = m[2] ?? '';
+		const openTagMatch = content.match(/^<references\b[^>]*>/i);
+		const innerOffset = openTagMatch ? openTagMatch[0].length : 0;
+		const innerStart = start + innerOffset;
+		matches.push({
+			start,
+			end: start + content.length,
+			content,
+			attrs,
+			inner,
+			innerStart
+		});
+	}
+
+	const selfClosingRe = /<references\b([^>]*)\/\s*>/gi;
+	while ((m = selfClosingRe.exec(source)) !== null) {
+		const start = m.index ?? 0;
+		const content = m[0];
+		const attrs = (m[1] ?? '').trim();
+		const innerStart = start + content.length;
+		matches.push({
+			start,
+			end: start + content.length,
+			content,
+			attrs,
+			inner: '',
+			innerStart
+		});
+	}
+
 	return matches;
 }
 
