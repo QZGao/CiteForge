@@ -7,6 +7,28 @@ on:
     branches: [ main ]
 
 jobs:
+  lint-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run lint
+      run: npm run lint
+
+    - name: Run build
+      run: npm run build
+
   test:
     runs-on: ubuntu-latest
 
@@ -23,143 +45,5 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
-    - name: Start Lint Check
-      id: lint_check
-      uses: actions/github-script@v7
-      with:
-        result-encoding: string
-        script: |
-          const { data } = await github.rest.checks.create({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            name: 'Lint',
-            head_sha: context.payload.pull_request?.head.sha ?? context.sha,
-            status: 'in_progress'
-          });
-          core.setOutput('id', String(data.id));
-
-    - name: Run lint
-      id: run_lint
-      continue-on-error: true
-      run: npm run lint
-
-    - name: Complete Lint Check
-      if: always()
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const outcome = '${{ steps.run_lint.outcome }}';
-          const map = { success: 'success', failure: 'failure', cancelled: 'cancelled', skipped: 'skipped' };
-          const conclusion = map[outcome] || 'neutral';
-          await github.rest.checks.update({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            check_run_id: Number('${{ steps.lint_check.outputs.id }}'),
-            status: 'completed',
-            conclusion,
-            completed_at: new Date().toISOString(),
-            output: {
-              title: 'Lint',
-              summary: conclusion === 'success' ? 'npm run lint passed' : 'npm run lint did not pass. See logs for details.'
-            }
-          });
-
-    - name: Flag lint failure
-      if: steps.run_lint.outcome != 'success'
-      run: echo "HAS_FAILURE=true" >> $GITHUB_ENV
-
-    - name: Start Build Check
-      id: build_check
-      uses: actions/github-script@v7
-      with:
-        result-encoding: string
-        script: |
-          const { data } = await github.rest.checks.create({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            name: 'Build',
-            head_sha: context.payload.pull_request?.head.sha ?? context.sha,
-            status: 'in_progress'
-          });
-          core.setOutput('id', String(data.id));
-
-    - name: Run build
-      id: run_build
-      continue-on-error: true
-      run: npm run build
-
-    - name: Complete Build Check
-      if: always()
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const outcome = '${{ steps.run_build.outcome }}';
-          const map = { success: 'success', failure: 'failure', cancelled: 'cancelled', skipped: 'skipped' };
-          const conclusion = map[outcome] || 'neutral';
-          await github.rest.checks.update({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            check_run_id: Number('${{ steps.build_check.outputs.id }}'),
-            status: 'completed',
-            conclusion,
-            completed_at: new Date().toISOString(),
-            output: {
-              title: 'Build',
-              summary: conclusion === 'success' ? 'npm run build passed' : 'npm run build did not pass. See logs for details.'
-            }
-          });
-
-    - name: Flag build failure
-      if: steps.run_build.outcome != 'success'
-      run: echo "HAS_FAILURE=true" >> $GITHUB_ENV
-
-    - name: Start Tests Check
-      id: tests_check
-      uses: actions/github-script@v7
-      with:
-        result-encoding: string
-        script: |
-          const { data } = await github.rest.checks.create({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            name: 'Tests',
-            head_sha: context.payload.pull_request?.head.sha ?? context.sha,
-            status: 'in_progress'
-          });
-          core.setOutput('id', String(data.id));
-
     - name: Run tests
-      id: run_tests
-      continue-on-error: true
       run: npm run test
-
-    - name: Complete Tests Check
-      if: always()
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const outcome = '${{ steps.run_tests.outcome }}';
-          const map = { success: 'success', failure: 'failure', cancelled: 'cancelled', skipped: 'skipped' };
-          const conclusion = map[outcome] || 'neutral';
-          await github.rest.checks.update({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            check_run_id: Number('${{ steps.tests_check.outputs.id }}'),
-            status: 'completed',
-            conclusion,
-            completed_at: new Date().toISOString(),
-            output: {
-              title: 'Tests',
-              summary: conclusion === 'success' ? 'npm run test passed' : 'npm run test did not pass. See logs for details.'
-            }
-          });
-
-    - name: Flag tests failure
-      if: steps.run_tests.outcome != 'success'
-      run: echo "HAS_FAILURE=true" >> $GITHUB_ENV
-
-    - name: Fail if any check failed
-      if: env.HAS_FAILURE == 'true'
-      run: |
-        echo "One or more checks failed."
-        exit 1
