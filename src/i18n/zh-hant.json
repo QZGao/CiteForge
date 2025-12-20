@@ -38,7 +38,7 @@
 	"ui.panel.resolveDuplicates": "儲存前請先處理重複的引用名稱。",
 	"ui.panel.noPendingChanges": "沒有待處理的 Cite Forge 變更。",
 	"ui.panel.noChangesGenerated": "未產生任何變更。",
-	"ui.panel.diffSummary": "Cite Forge：引用調整",
+	"ui.panel.diffSummary": "引用調整",
 	"ui.panel.openingDiff": "正在新分頁開啟差異視圖…",
 	"ui.panel.diffFailed": "無法準備差異，請再試一次。",
 	"ui.panel.emptyState": "此頁面未找到引用。",

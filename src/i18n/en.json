@@ -38,7 +38,7 @@
 	"ui.panel.resolveDuplicates": "Resolve duplicate reference names before saving.",
 	"ui.panel.noPendingChanges": "No pending Cite Forge changes to apply.",
 	"ui.panel.noChangesGenerated": "No changes were generated.",
-	"ui.panel.diffSummary": "Cite Forge: reference adjustments",
+	"ui.panel.diffSummary": "reference adjustments",
 	"ui.panel.openingDiff": "Opening diff view in a new tab...",
 	"ui.panel.diffFailed": "Cite Forge could not prepare the diff. Please try again.",
 	"ui.panel.emptyState": "No references found on this page.",

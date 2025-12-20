@@ -6,7 +6,7 @@ import { t } from '../i18n';
  * @param newText - New wikitext to compare.
  * @param summary - Edit summary for the diff preview.
  */
-export function openDiffPreview(newText: string, summary = '[[meta:Cite Forge|Cite Forge]]: ' + t('data.diffPreview.summary')): void {
+export function openDiffPreview(newText: string, summary = t('data.diffPreview.summary')): void {
 	const title = mw.config.get('wgPageName');
 	const action = mw.util.getUrl(title, { action: 'submit' });
 	const token = mw.user.tokens.get('csrfToken') || '+\\';
@@ -22,7 +22,7 @@ export function openDiffPreview(newText: string, summary = '[[meta:Cite Forge|Ci
 	textarea.value = newText;
 	form.appendChild(textarea);
 
-	appendHidden(form, 'wpSummary', summary);
+	appendHidden(form, 'wpSummary', '[[meta:Cite Forge|Cite Forge]]: ' + summary);
 	appendHidden(form, 'wpDiff', '1');
 	appendHidden(form, 'wpEditToken', token);
 	appendHidden(form, 'model', model);

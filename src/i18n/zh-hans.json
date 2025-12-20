@@ -38,7 +38,7 @@
 	"ui.panel.resolveDuplicates": "保存前请解决重复引用名称。",
 	"ui.panel.noPendingChanges": "没有待处理的 Cite Forge 更改。",
 	"ui.panel.noChangesGenerated": "未生成任何更改。",
-	"ui.panel.diffSummary": "Cite Forge：引用调整",
+	"ui.panel.diffSummary": "引用调整",
 	"ui.panel.openingDiff": "正在新标签页中打开差异视图…",
 	"ui.panel.diffFailed": "无法准备差异，请重试。",
 	"ui.panel.emptyState": "此页面未找到引用。",
