@@ -1,3 +1,4 @@
+import { getCitationTemplateName } from '../core/parse_wikitext';
 import { containsCJK } from '../core/string_utils';
 import { t } from '../i18n';
 import type { Reference } from '../types';
@@ -191,6 +192,9 @@ function annotateReferenceMetadata(): void {
 		const parent = span.parentElement;
 		if (!parent) return;
 
+		const templateName = getCitationTemplateName(parent);
+		const skipMissingIdentifier = templateName === 'cite news';
+
 		const srctxt = parent.textContent || '';
 		const srctxtLower = srctxt.toLowerCase();
 		const rawTitle = span.getAttribute('title') || '';
@@ -228,7 +232,7 @@ function annotateReferenceMetadata(): void {
 
 		const isArticle = title.includes('rft.genre=article');
 		const hasJournalTitle = /rft\.jtitle=|rft\.stitle=/.test(title);
-		if (isArticle && hasJournalTitle && !hasId) {
+		if (isArticle && hasJournalTitle && !hasId && !skipMissingIdentifier) {
 			appendAnnotation(parent, t('ui.checks.missingIdentifier'));
 		}
 
@@ -271,7 +275,7 @@ function annotateReferenceMetadata(): void {
 				const numericDate = Number.parseInt(myDate, 10);
 
 				if (numericDate >= 1970) {
-					if (!hasId) {
+					if (!hasId && !skipMissingIdentifier) {
 						appendAnnotation(parent, t('ui.checks.missingIdentifier'));
 					}
 				} else {

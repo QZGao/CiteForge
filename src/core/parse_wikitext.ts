@@ -1,5 +1,5 @@
-import {Reference} from '../types';
-import {extractAttr} from './string_utils';
+import { Reference } from '../types';
+import { extractAttr } from './string_utils';
 
 /**
  * Parse wikitext for basic ref usages.
@@ -79,11 +79,11 @@ export function parseReferences(wikitext: string): Reference[] {
  * Keeps order and whether the param is treated as a ref name.
  */
 export type RTemplateEntry = {
-    key: string | null;
-    value: string;
-    kind: 'name' | 'group' | 'page' | 'pages' | 'at' | 'other';
-    index: number;
-    isName: boolean;
+	key: string | null;
+	value: string;
+	kind: 'name' | 'group' | 'page' | 'pages' | 'at' | 'other';
+	index: number;
+	isName: boolean;
 };
 
 /**
@@ -641,4 +641,22 @@ function splitParams(text: string): string[] {
 	}
 	if (current) parts.push(current);
 	return parts.map((p) => p.trim());
+}
+
+/**
+ * Infer citation template name from class list, e.g. "citation web cs1" -> "cite web".
+ * @param node - DOM node inside a citation container.
+ * @returns Template name like 'cite news' or null if unknown.
+ */
+export function getCitationTemplateName(node: Element | null): string | null {
+	if (!node) return null;
+	const citeNode = node.closest<HTMLElement>('.citation');
+	if (!citeNode) return null;
+	const tokens = Array.from(citeNode.classList)
+		.map((cls) => cls.trim().toLowerCase())
+		.filter(Boolean);
+	if (!tokens.length) return null;
+	const filtered = tokens.filter((cls) => cls !== 'citation' && cls !== 'cs1' && cls !== 'cs2' && cls !== 'csblue');
+	if (!filtered.length) return null;
+	return `cite ${filtered.join(' ')}`.replace(/\s+/g, ' ').trim();
 }
