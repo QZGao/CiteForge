@@ -287,6 +287,14 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			},
 
 			/**
+			 * Determine whether the Save button should be available.
+			 * @returns True when there are pending changes or cosmetic saves are enabled.
+			 */
+			canSaveChanges(this: InspectorCtx): boolean {
+				return this.hasPendingChanges || Boolean(this.settings.allowCosmeticSaves);
+			},
+
+			/**
 			 * Get a set of reference names that have conflicts (duplicates).
 			 * @returns Set of conflicting reference names.
 			 */
@@ -912,7 +920,8 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					mw.notify?.(t('ui.panel.resolveDuplicates'), { type: 'error', title: 'Cite Forge' });
 					return;
 				}
-				if (!this.pendingChanges.length) {
+				const allowCosmetic = Boolean(this.settings.allowCosmeticSaves);
+				if (!this.pendingChanges.length && !allowCosmetic) {
 					mw.notify?.(t('ui.panel.noPendingChanges'), { type: 'info' });
 					return;
 				}

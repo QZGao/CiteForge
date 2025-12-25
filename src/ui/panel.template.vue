@@ -139,7 +139,7 @@
 					<div v-else class="citeforge-empty">{{ t('ui.panel.emptyState') }}</div>
 				</div>
 				<div class="citeforge-panel__toolbar">
-					<button v-if="hasPendingChanges" class="citeforge-tool-btn citeforge-tool-btn--primary"
+					<button v-if="canSaveChanges" class="citeforge-tool-btn citeforge-tool-btn--primary"
 						type="button" :title="t('ui.panel.saveButton.title')" @click.prevent="saveChanges">
 						<span class="citeforge-tool-icon" aria-hidden="true">
 							<svg viewBox="0 0 16 16" width="16" height="16">
@@ -225,6 +225,9 @@
 					</cdx-checkbox>
 					<cdx-checkbox v-model="settings.normalizeAll">
 						{{ t('ui.panel.settings.normalize') }}
+					</cdx-checkbox>
+					<cdx-checkbox v-model="settings.allowCosmeticSaves">
+						{{ t('ui.panel.settings.cosmeticSaves') }}
 					</cdx-checkbox>
 					<div class="citeforge-settings__actions">
 						<cdx-button weight="quiet" size="small" @click.prevent="saveSettings">

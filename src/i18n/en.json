@@ -71,6 +71,7 @@
 	"ui.panel.settings.preferTemplateR": "Prefer {{r}} for uses",
 	"ui.panel.settings.keepCopies": "Keep separate copies (no dedupe)",
 	"ui.panel.settings.normalize": "Normalize reference markup",
+	"ui.panel.settings.cosmeticSaves": "Allow cosmetic-only saves (see [[WP:COSMETICBOT]])",
 	"ui.massRename.fields.last.label": "Author last name",
 	"ui.massRename.fields.last.description": "Uses last or author field",
 	"ui.massRename.fields.first.label": "Author first name",

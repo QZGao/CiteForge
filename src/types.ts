@@ -58,6 +58,7 @@ export interface InspectorState {
 		useTemplateR: boolean;
 		makeCopies: boolean;
 		normalizeAll: boolean;
+		allowCosmeticSaves: boolean;
 	};
 	showSettings: boolean;
 	minHeight: number;
@@ -80,6 +81,7 @@ export type InspectorCtx = InspectorState & {
 	filteredRefs: Reference[];
 	firstByBucket: Record<string, string>;
 	hasPendingChanges: boolean;
+	canSaveChanges: boolean;
 	hasRefs: boolean;
 	nameConflicts: Set<string>;
 	hasConflicts: boolean;

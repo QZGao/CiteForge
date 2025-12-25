@@ -18,6 +18,8 @@ export type Settings = {
 	makeCopies: boolean;
 	/** Normalize generated ref markup (trim/compact whitespace). */
 	normalizeAll: boolean;
+	/** Allow running saves even if only cosmetic changes would occur. */
+	allowCosmeticSaves: boolean;
 };
 
 const SETTINGS_KEY = 'citeforge-settings';
@@ -32,7 +34,8 @@ const DEFAULT_SETTINGS: Settings = {
 	minUsesForLdr: 2,
 	useTemplateR: false,
 	makeCopies: false,
-	normalizeAll: false
+	normalizeAll: false,
+	allowCosmeticSaves: false
 };
 
 /**
