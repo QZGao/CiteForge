@@ -19,7 +19,7 @@ import panelStyles from './panel.css';
 import PANEL_TEMPLATE from './panel.template.vue';
 
 import { alphaIndex, escapeAttr, linkifyContent, LinkifiedSegment } from '../core/string_utils';
-import { MessageKey, MessageParams, t } from '../i18n';
+import { MessageKey, MessageParams, RichMessageSegment, t, tRich as translateRich } from '../i18n';
 
 import { formatCopy, transformWikitext } from "../core/build_wikitext";
 
@@ -525,6 +525,16 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			 */
 			t(key: MessageKey, params?: MessageParams): string {
 				return t(key, params);
+			},
+
+			/**
+			 * Localized message retrieval with wiki link segments.
+			 * @param key - Message key.
+			 * @param params - Optional parameters for message formatting.
+			 * @returns Array of rich message segments.
+			 */
+			tRich(this: InspectorCtx, key: MessageKey, params?: MessageParams): RichMessageSegment[] {
+				return translateRich(key, params);
 			},
 
 			/**

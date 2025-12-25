@@ -146,6 +146,39 @@ export function escapeAttr(value: string): string {
 }
 
 /**
+ * Escape HTML special characters in arbitrary text content.
+ * @param value - Text to escape.
+ * @returns HTML-safe text.
+ */
+export function escapeHtml(value: string): string {
+	return String(value ?? '').replace(/[&<>"']/g, (ch) => {
+		switch (ch) {
+			case '&':
+				return '&amp;';
+			case '<':
+				return '&lt;';
+			case '>':
+				return '&gt;';
+			case '"':
+				return '&quot;';
+			case '\'':
+				return '&#39;';
+			default:
+				return ch;
+		}
+	});
+}
+
+/**
+ * Escape text for HTML attribute usage.
+ * @param value - Attribute value to escape.
+ * @returns Escaped attribute string.
+ */
+export function escapeAttribute(value: string): string {
+	return escapeHtml(value);
+}
+
+/**
  * Extract an attribute value from an HTML/XML attribute string.
  * Supports quoted (single/double) and unquoted attribute values.
  * @param attrs - The attribute string to search (e.g., 'name="foo" group="bar"').

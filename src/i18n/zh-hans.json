@@ -71,6 +71,7 @@
 	"ui.panel.settings.preferTemplateR": "优先使用 {{r}}",
 	"ui.panel.settings.keepCopies": "保留独立副本（不去重）",
 	"ui.panel.settings.normalize": "规范化引用标记",
+	"ui.panel.settings.cosmeticSaves": "允许只保存[[WP:COSMETICBOT|美观性更改]]",
 	"ui.massRename.fields.last.label": "作者姓氏",
 	"ui.massRename.fields.last.description": "使用 last 或 author 字段",
 	"ui.massRename.fields.first.label": "作者名字",

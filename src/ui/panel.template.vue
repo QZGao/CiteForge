@@ -139,8 +139,8 @@
 					<div v-else class="citeforge-empty">{{ t('ui.panel.emptyState') }}</div>
 				</div>
 				<div class="citeforge-panel__toolbar">
-					<button v-if="canSaveChanges" class="citeforge-tool-btn citeforge-tool-btn--primary"
-						type="button" :title="t('ui.panel.saveButton.title')" @click.prevent="saveChanges">
+					<button v-if="canSaveChanges" class="citeforge-tool-btn citeforge-tool-btn--primary" type="button"
+						:title="t('ui.panel.saveButton.title')" @click.prevent="saveChanges">
 						<span class="citeforge-tool-icon" aria-hidden="true">
 							<svg viewBox="0 0 16 16" width="16" height="16">
 								<path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd"
@@ -227,7 +227,14 @@
 						{{ t('ui.panel.settings.normalize') }}
 					</cdx-checkbox>
 					<cdx-checkbox v-model="settings.allowCosmeticSaves">
-						{{ t('ui.panel.settings.cosmeticSaves') }}
+						<span>
+							<template v-for="(segment, idx) in tRich('ui.panel.settings.cosmeticSaves')" :key="`cosmetic-label-${idx}`">
+								<a v-if="segment.type === 'link'" :href="segment.href" target="_blank" rel="noreferrer">
+									{{ segment.text }}
+								</a>
+								<span v-else>{{ segment.text }}</span>
+							</template>
+						</span>
 					</cdx-checkbox>
 					<div class="citeforge-settings__actions">
 						<cdx-button weight="quiet" size="small" @click.prevent="saveSettings">
