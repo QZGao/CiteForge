@@ -92,9 +92,7 @@ Tip: Update `url` in `.vscode/launch.json` if you want the debug session to star
 
 The first launch will create the profile folder if it does not exist; afterwards your cookies, localStorage, and other profile data persist automatically. Delete `.debug/firefox-profile` whenever you want a clean slate.
 
-### Disable the Meta-hosted loader while debugging
-
-If your user `common.js` (or `global.js`) loads the Meta-hosted script, add a guard to skip it when you are running the local debug extension:
+**Disable the Meta-hosted loader while debugging.** If your user `common.js` (or `global.js`) loads the Meta-hosted script, add a guard to skip it when you are running the local debug extension:
 
 ```js
 (() => {
