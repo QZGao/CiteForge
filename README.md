@@ -92,6 +92,26 @@ Tip: Update `url` in `.vscode/launch.json` if you want the debug session to star
 
 The first launch will create the profile folder if it does not exist; afterwards your cookies, localStorage, and other profile data persist automatically. Delete `.debug/firefox-profile` whenever you want a clean slate.
 
+### Disable the Meta-hosted loader while debugging
+
+If your user `common.js` (or `global.js`) loads the Meta-hosted script, add a guard to skip it when you are running the local debug extension:
+
+```js
+(() => {
+  const isDev = localStorage.getItem('citeforge-dev') === '1';
+  if (isDev) return;
+
+  mw.loader.load("//meta.wikimedia.org/w/index.php?title=User:SuperGrey/gadgets/CiteForge.js&action=raw&ctype=text/javascript");
+})();
+```
+
+The debug extension sets `localStorage["citeforge-dev"] = "1"` at `document_start`, so the remote loader is disabled for the debug profile. To restore the online version:
+
+```js
+localStorage.removeItem('citeforge-dev');
+location.reload();
+```
+
 ## Credits
 
 - Icons and assets from:
