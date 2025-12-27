@@ -58,6 +58,27 @@ npm run lint          # ESLint check
 npm test              # Run Vitest tests
 ```
 
+### Manual debugging from the browser console
+
+You can test Cite Forge by pasting the bundle directly into a wiki tab:
+
+1. Run `npm run build:debug`. The output appears at `.debug/bundled.js`.
+2. Open that file, copy its entire contents, and switch to the wiki article you want to test.
+3. Open the browser DevTools console (`F12`/`Ctrl+Shift+I`) on that page and paste the bundle. It bootstraps itself the same way the gadget loader does, so Cite Forge immediately mounts in the current tab.
+4. When you rebuild, reload the wiki page and repeat the paste to pick up the changes. Keeping `npm run build:debug --watch` in another terminal helps rebuild automatically; you only need to re-paste after each build.
+
+### VS Code debugging
+
+The repository ships with a ready-to-run Firefox debugging workflow for VS Code. The `.debug/manifest.json` web extension installs a content script (`inject.js`) that injects the freshly built `.debug/bundled.js` bundle into any `*.wikipedia.org` page, letting you test Cite Forge like a normal gadget while still using VS Code breakpoints and sourcemaps.
+
+1. Install the **Debugger for Firefox** extension in VS Code (it provides the `"firefox"` debug type).
+2. Open the *Run and Debug* panel and select **Debug Cite Forge on Wikipedia**.
+3. Press ▶️. The pre-launch task defined in `.vscode/tasks.json` runs `npm run watch:debug`, which keeps rebuilding `.debug/bundled.js` with inline sourcemaps.
+4. VS Code launches Firefox to the URL from `launch.json` (default: `https://en.wikipedia.org/wiki/Terraria`) and sideloads the `.debug` extension. The debugger auto-reloads the page whenever `bundled.js`, `inject.js`, or `manifest.json` change, so edits + saves immediately refresh the gadget.
+5. Set breakpoints anywhere in the TypeScript source; Firefox hits them against the rebuilt bundle thanks to the sourcemaps produced by the debug build.
+
+Tip: Update `url` in `.vscode/launch.json` if you want the debug session to start on another article or wiki. Stop the debug session to terminate the `watch:debug` background task.
+
 ## Credits
 
 - Icons and assets from:
