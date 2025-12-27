@@ -79,6 +79,19 @@ The repository ships with a ready-to-run Firefox debugging workflow for VS Code.
 
 Tip: Update `url` in `.vscode/launch.json` if you want the debug session to start on another article or wiki. Stop the debug session to terminate the `watch:debug` background task.
 
+**Persisting cookies between sessions.** The Firefox debugger spins up a temporary profile every time, so your wiki login cookies disappear at the end of each run. To keep them, point the `.vscode/launch.json` at a reusable profile directory and tell the debugger to save changes:
+
+```jsonc
+{
+ "name": "Debug Cite Forge on Wikipedia",
+ // …
+ "profileDir": "${workspaceFolder}/.debug/firefox-profile",
+ "keepProfileChanges": true
+}
+```
+
+The first launch will create the profile folder if it does not exist; afterwards your cookies, localStorage, and other profile data persist automatically. Delete `.debug/firefox-profile` whenever you want a clean slate.
+
 ## Credits
 
 - Icons and assets from:
