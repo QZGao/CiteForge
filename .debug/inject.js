@@ -2,6 +2,15 @@
 (function () {
 	const bundleUrl = browser.runtime.getURL('bundled.js');
 	const SCRIPT_ID = 'citeforge-debug-userscript';
+	const DEV_STORAGE_KEY = 'citeforge-dev';
+
+	function markDevMode() {
+		if (localStorage.getItem(DEV_STORAGE_KEY) !== '1') {
+			localStorage.setItem(DEV_STORAGE_KEY, '1');
+		}
+	}
+
+	markDevMode();
 
 	function inject() {
 		// Create inline script that waits for mw.loader then loads our bundle
@@ -21,7 +30,7 @@
 
 					document.head.appendChild(script);
 				}
-				
+
 				if (typeof mw !== 'undefined' && mw.loader && typeof mw.loader.using === 'function') {
 					loadCiteForge();
 				} else {
