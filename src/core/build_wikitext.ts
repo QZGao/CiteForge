@@ -1065,6 +1065,11 @@ const SUPPLEMENTARY_PARAM_ALIASES = new Map<string, string>([
 	['archivedate', 'archive-date'],
 ]);
 
+/**
+ * Build a fingerprint for a template content block.
+ * @param content - Template content string.
+ * @returns Template fingerprint or null if not a single template.
+ */
 function buildTemplateFingerprint(content: string): TemplateFingerprint | null {
 	if (!content) return null;
 	const leadingWhitespace = content.match(/^\s*/)?.[0] ?? '';
@@ -1112,6 +1117,11 @@ function buildTemplateFingerprint(content: string): TemplateFingerprint | null {
 	};
 }
 
+/**
+ * Check if a text block is a single well-formed template.
+ * @param text - Text block to check.
+ * @returns True if the text is a single template, false otherwise.
+ */
 function isSingleTemplate(text: string): boolean {
 	if (!text.startsWith('{{') || !text.endsWith('}}')) return false;
 	let depth = 0;
@@ -1138,10 +1148,20 @@ function isSingleTemplate(text: string): boolean {
 	return depth === 0;
 }
 
+/**
+ * Normalize a template name by replacing underscores, trimming, and lowercasing.
+ * @param name - Template name to normalize.
+ * @returns Normalized template name.
+ */
 function normalizeTemplateName(name: string): string {
 	return name.replace(/_/g, ' ').trim().toLowerCase();
 }
 
+/**
+ * Normalize a template parameter key.
+ * @param name - Parameter name to normalize.
+ * @returns Normalized parameter key or null if invalid.
+ */
 function normalizeParamKey(name?: string | null): string | null {
 	if (name === undefined || name === null) return null;
 	const trimmed = name.trim();
@@ -1150,16 +1170,31 @@ function normalizeParamKey(name?: string | null): string | null {
 	return trimmed.toLowerCase();
 }
 
+/**
+ * Get the canonical supplementary parameter key for a normalized name.
+ * @param normalizedName - Normalized parameter name.
+ * @returns Canonical supplementary key or null if not a supplementary param.
+ */
 function canonicalSupplementaryKey(normalizedName: string | null): string | null {
 	if (!normalizedName) return null;
 	const collapsed = normalizedName.replace(/[_-]+/g, '-');
 	return SUPPLEMENTARY_PARAM_ALIASES.get(collapsed) ?? null;
 }
 
+/**
+ * Canonicalize a template parameter value by collapsing whitespace and trimming.
+ * @param value - Parameter value to canonicalize.
+ * @returns Canonicalized parameter value.
+ */
 function canonicalizeParamValue(value: string): string {
 	return value.replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * Build a signature string from non-supplementary template parameters.
+ * @param map - Map of non-supplementary parameter keys to their values.
+ * @returns Signature string.
+ */
 function buildNonSupplementarySignature(map: Map<string, string[]>): string {
 	const entries = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
 	return entries
@@ -1167,10 +1202,21 @@ function buildNonSupplementarySignature(map: Map<string, string[]>): string {
 		.join('\u0002');
 }
 
+/**
+ * Build a base key for a template fingerprint.
+ * @param fp - Template fingerprint.
+ * @returns Base key string.
+ */
 function buildTemplateBaseKey(fp: TemplateFingerprint): string {
 	return `${fp.normalizedName}::${fp.signature}`;
 }
 
+/**
+ * Check if two template fingerprints are compatible for deduplication.
+ * @param a - First template fingerprint.
+ * @param b - Second template fingerprint.
+ * @returns True if compatible, false otherwise.
+ */
 function templatesCompatible(a: TemplateFingerprint, b: TemplateFingerprint): boolean {
 	if (a.normalizedName !== b.normalizedName) return false;
 	if (a.signature !== b.signature) return false;
@@ -1185,6 +1231,12 @@ function templatesCompatible(a: TemplateFingerprint, b: TemplateFingerprint): bo
 	return true;
 }
 
+/**
+ * Insert a supplementary parameter into a template text block.
+ * @param text - Original template text.
+ * @param addition - Supplementary parameter entry to insert.
+ * @returns Updated template text with the supplementary parameter inserted.
+ */
 function insertSupplementaryParam(text: string, addition: TemplateSupplementaryEntry): string {
 	const closingIndex = findTemplateCloseIndex(text);
 	if (closingIndex === -1) return text;
@@ -1201,6 +1253,11 @@ function insertSupplementaryParam(text: string, addition: TemplateSupplementaryE
 	return `${updatedBefore}${afterClose}`;
 }
 
+/**
+ * Format a supplementary parameter entry into a template parameter string.
+ * @param entry - Supplementary parameter entry.
+ * @returns Formatted parameter string.
+ */
 function formatSupplementaryParam(entry: TemplateSupplementaryEntry): string {
 	const value = entry.paramValue || '';
 	if (entry.paramName) {
@@ -1209,6 +1266,11 @@ function formatSupplementaryParam(entry: TemplateSupplementaryEntry): string {
 	return value;
 }
 
+/**
+ * Find the index of the closing braces of a template in text.
+ * @param text - Template text block.
+ * @returns Index of the first closing brace of the template or -1 if not found.
+ */
 function findTemplateCloseIndex(text: string): number {
 	let depth = 0;
 	for (let i = 0; i < text.length - 1; i++) {
@@ -1228,6 +1290,12 @@ function findTemplateCloseIndex(text: string): number {
 	return -1;
 }
 
+/**
+ * Merge supplementary parameters from an incoming template fingerprint into a canonical entry.
+ * Updates the template text and content override if changes are made.
+ * @param entry - Canonical template entry to update.
+ * @param incoming - Incoming template fingerprint with supplementary parameters.
+ */
 function mergeTemplateSupplementary(entry: TemplateCanonicalEntry, incoming: TemplateFingerprint): void {
 	let templateText = entry.fingerprint.templateText;
 	let changed = false;
@@ -1243,6 +1311,11 @@ function mergeTemplateSupplementary(entry: TemplateCanonicalEntry, incoming: Tem
 	}
 }
 
+/**
+ * Inherit definition content from source reference to target reference if target lacks definitions.
+ * @param target - Target reference record to inherit definitions into.
+ * @param source - Source reference record to inherit definitions from.
+ */
 function inheritDefinitionContent(target: RefRecord, source: RefRecord): void {
 	if (target.definitions.length === 0 && source.definitions.length > 0) {
 		target.definitions.push(...source.definitions);
