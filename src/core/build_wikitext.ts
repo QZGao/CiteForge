@@ -22,6 +22,9 @@ import {
  * @returns The first non-empty content string or null if none found.
  */
 function firstContent(ref: RefRecord): string | null {
+	if (typeof ref.contentOverride === 'string') {
+		return ref.contentOverride;
+	}
 	const def = ref.definitions.find((d) => (d.content || '').trim().length > 0) || ref.ldrDefinitions.find((d) => (d.content || '').trim().length > 0);
 	return def?.content ?? null;
 }
@@ -1025,6 +1028,230 @@ function normalizeContent(content: string): string {
 	return content.replace(/\s+/g, ' ').trim();
 }
 
+type TemplateSupplementaryEntry = {
+	key: string;
+	value: string;
+	paramName: string;
+	paramValue: string;
+};
+
+type TemplateFingerprint = {
+	normalizedName: string;
+	originalName: string;
+	nonSupplementary: Map<string, string[]>;
+	supplementary: Map<string, TemplateSupplementaryEntry>;
+	signature: string;
+	templateText: string;
+	leadingWhitespace: string;
+	trailingWhitespace: string;
+};
+
+type TemplateCanonicalEntry = {
+	canonical: RefRecord;
+	fingerprint: TemplateFingerprint;
+};
+
+const SUPPLEMENTARY_PARAM_ALIASES = new Map<string, string>([
+	['access-date', 'access-date'],
+	['archive-url', 'archive-url'],
+	['archive-date', 'archive-date'],
+	['archive-format', 'archive-format'],
+	['url-status', 'url-status'],
+	['dead-url', 'dead-url'],
+
+	// Aliases -> standard name mapping
+	['accessdate', 'access-date'],
+	['archiveurl', 'archive-url'],
+	['archivedate', 'archive-date'],
+]);
+
+function buildTemplateFingerprint(content: string): TemplateFingerprint | null {
+	if (!content) return null;
+	const leadingWhitespace = content.match(/^\s*/)?.[0] ?? '';
+	const trailingWhitespace = content.match(/\s*$/)?.[0] ?? '';
+	const core = content.slice(leadingWhitespace.length, content.length - trailingWhitespace.length);
+	const trimmed = core.trim();
+	if (!trimmed || !isSingleTemplate(trimmed)) return null;
+	const nameMatch = trimmed.match(/^\{\{\s*([^{|}]+?)(?=\s*\||\s*}})/);
+	if (!nameMatch) return null;
+	const originalName = nameMatch[1].trim();
+	const normalizedName = normalizeTemplateName(originalName);
+	const params = parseTemplateParams(trimmed);
+	const nonSupplementary = new Map<string, string[]>();
+	const supplementary = new Map<string, TemplateSupplementaryEntry>();
+	params.forEach((param) => {
+		const normalizedKey = normalizeParamKey(param.name);
+		if (!normalizedKey) return;
+		const supplementaryKey = canonicalSupplementaryKey(normalizedKey);
+		const normalizedValue = canonicalizeParamValue(param.value);
+		if (supplementaryKey) {
+			if (!supplementary.has(supplementaryKey)) {
+				supplementary.set(supplementaryKey, {
+					key: supplementaryKey,
+					value: normalizedValue,
+					paramName: param.name || supplementaryKey,
+					paramValue: param.value.trim()
+				});
+			}
+			return;
+		}
+		const bucket = nonSupplementary.get(normalizedKey) ?? [];
+		bucket.push(normalizedValue);
+		nonSupplementary.set(normalizedKey, bucket);
+	});
+	const signature = buildNonSupplementarySignature(nonSupplementary);
+	return {
+		normalizedName,
+		originalName,
+		nonSupplementary,
+		supplementary,
+		signature,
+		templateText: trimmed,
+		leadingWhitespace,
+		trailingWhitespace
+	};
+}
+
+function isSingleTemplate(text: string): boolean {
+	if (!text.startsWith('{{') || !text.endsWith('}}')) return false;
+	let depth = 0;
+	for (let i = 0; i < text.length - 1; i++) {
+		const pair = text[i] + text[i + 1];
+		if (pair === '{{') {
+			depth++;
+			i++;
+			continue;
+		}
+		if (pair === '}}') {
+			depth--;
+			if (depth === 0) {
+				const remainder = text.slice(i + 2).trim();
+				if (remainder.length > 0) return false;
+			}
+			i++;
+			continue;
+		}
+		if (depth === 0 && !/\s/.test(text[i])) {
+			return false;
+		}
+	}
+	return depth === 0;
+}
+
+function normalizeTemplateName(name: string): string {
+	return name.replace(/_/g, ' ').trim().toLowerCase();
+}
+
+function normalizeParamKey(name?: string | null): string | null {
+	if (name === undefined || name === null) return null;
+	const trimmed = name.trim();
+	if (!trimmed) return null;
+	if (/^\d+$/.test(trimmed)) return trimmed;
+	return trimmed.toLowerCase();
+}
+
+function canonicalSupplementaryKey(normalizedName: string | null): string | null {
+	if (!normalizedName) return null;
+	const collapsed = normalizedName.replace(/[_-]+/g, '-');
+	return SUPPLEMENTARY_PARAM_ALIASES.get(collapsed) ?? null;
+}
+
+function canonicalizeParamValue(value: string): string {
+	return value.replace(/\s+/g, ' ').trim();
+}
+
+function buildNonSupplementarySignature(map: Map<string, string[]>): string {
+	const entries = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+	return entries
+		.map(([key, values]) => `${key}=${values.join('\u0001')}`)
+		.join('\u0002');
+}
+
+function buildTemplateBaseKey(fp: TemplateFingerprint): string {
+	return `${fp.normalizedName}::${fp.signature}`;
+}
+
+function templatesCompatible(a: TemplateFingerprint, b: TemplateFingerprint): boolean {
+	if (a.normalizedName !== b.normalizedName) return false;
+	if (a.signature !== b.signature) return false;
+	for (const [key, existing] of a.supplementary.entries()) {
+		const incoming = b.supplementary.get(key);
+		if (incoming && incoming.value !== existing.value) return false;
+	}
+	for (const [key, incoming] of b.supplementary.entries()) {
+		const existing = a.supplementary.get(key);
+		if (existing && existing.value !== incoming.value) return false;
+	}
+	return true;
+}
+
+function insertSupplementaryParam(text: string, addition: TemplateSupplementaryEntry): string {
+	const closingIndex = findTemplateCloseIndex(text);
+	if (closingIndex === -1) return text;
+	const beforeClose = text.slice(0, closingIndex);
+	const afterClose = text.slice(closingIndex);
+	const trailingWhitespaceMatch = beforeClose.match(/\s*$/);
+	const trailingWhitespace = trailingWhitespaceMatch ? trailingWhitespaceMatch[0] : '';
+	const withoutTrailing = beforeClose.slice(0, beforeClose.length - trailingWhitespace.length);
+	const newlineIdx = withoutTrailing.lastIndexOf('\n');
+	const indent = newlineIdx >= 0 ? (withoutTrailing.slice(newlineIdx + 1).match(/^\s*/)?.[0] ?? '') : '';
+	const prefix = newlineIdx >= 0 ? `\n${indent}|` : '|';
+	const paramText = formatSupplementaryParam(addition);
+	const updatedBefore = `${withoutTrailing}${prefix}${paramText}${trailingWhitespace}`;
+	return `${updatedBefore}${afterClose}`;
+}
+
+function formatSupplementaryParam(entry: TemplateSupplementaryEntry): string {
+	const value = entry.paramValue || '';
+	if (entry.paramName) {
+		return `${entry.paramName}=${value}`;
+	}
+	return value;
+}
+
+function findTemplateCloseIndex(text: string): number {
+	let depth = 0;
+	for (let i = 0; i < text.length - 1; i++) {
+		if (text[i] === '{' && text[i + 1] === '{') {
+			depth++;
+			i++;
+			continue;
+		}
+		if (text[i] === '}' && text[i + 1] === '}') {
+			depth--;
+			if (depth === 0) {
+				return i;
+			}
+			i++;
+		}
+	}
+	return -1;
+}
+
+function mergeTemplateSupplementary(entry: TemplateCanonicalEntry, incoming: TemplateFingerprint): void {
+	let templateText = entry.fingerprint.templateText;
+	let changed = false;
+	incoming.supplementary.forEach((addition, key) => {
+		if (entry.fingerprint.supplementary.has(key)) return;
+		entry.fingerprint.supplementary.set(key, addition);
+		templateText = insertSupplementaryParam(templateText, addition);
+		changed = true;
+	});
+	if (changed) {
+		entry.fingerprint.templateText = templateText;
+		entry.canonical.contentOverride = `${entry.fingerprint.leadingWhitespace}${templateText}${entry.fingerprint.trailingWhitespace}`;
+	}
+}
+
+function inheritDefinitionContent(target: RefRecord, source: RefRecord): void {
+	if (target.definitions.length === 0 && source.definitions.length > 0) {
+		target.definitions.push(...source.definitions);
+	}
+	if (target.ldrDefinitions.length === 0 && source.ldrDefinitions.length > 0) {
+		target.ldrDefinitions.push(...source.ldrDefinitions);
+	}
+}
+
 /**
  * Deduplicate references based on their content.
  * References with identical content are merged, with one canonical reference retained.
@@ -1033,22 +1260,40 @@ function normalizeContent(content: string): string {
  */
 function applyDedupe(refs: Map<RefKey, RefRecord>): Array<{ from: string; to: string }> {
 	const canonicalByContent = new Map<string, RefRecord>();
+	const templateCanonicals = new Map<string, TemplateCanonicalEntry[]>();
 	const changes: Array<{ from: string; to: string }> = [];
 
 	refIterator(refs).forEach((ref) => {
 		const content = firstContent(ref);
 		if (!content || !ref.name) return;
+		const templateInfo = buildTemplateFingerprint(content);
+		if (templateInfo) {
+			const baseKey = buildTemplateBaseKey(templateInfo);
+			const bucket = templateCanonicals.get(baseKey);
+			if (bucket) {
+				const match = bucket.find((entry) => templatesCompatible(entry.fingerprint, templateInfo));
+				if (match && match.canonical.name) {
+					ref.canonical = match.canonical;
+					inheritDefinitionContent(match.canonical, ref);
+					mergeTemplateSupplementary(match, templateInfo);
+					changes.push({ from: ref.name, to: match.canonical.name });
+					return;
+				}
+			}
+			const entry: TemplateCanonicalEntry = { canonical: ref, fingerprint: templateInfo };
+			if (bucket) {
+				bucket.push(entry);
+			} else {
+				templateCanonicals.set(baseKey, [entry]);
+			}
+			ref.canonical = ref;
+			return;
+		}
 		const norm = normalizeContent(content);
 		const existing = canonicalByContent.get(norm);
 		if (existing && existing.name) {
 			ref.canonical = existing;
-			// Preserve content if canonical lacked it
-			if (existing.definitions.length === 0 && ref.definitions.length > 0) {
-				existing.definitions.push(...ref.definitions);
-			}
-			if (existing.ldrDefinitions.length === 0 && ref.ldrDefinitions.length > 0) {
-				existing.ldrDefinitions.push(...ref.ldrDefinitions);
-			}
+			inheritDefinitionContent(existing, ref);
 			changes.push({ from: ref.name, to: existing.name });
 		} else {
 			canonicalByContent.set(norm, ref);

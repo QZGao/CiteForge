@@ -265,6 +265,7 @@ export interface RefRecord {
 	ldrDefinitions: RefUseInternal[];
 	canonical?: RefRecord;
 	targetLocation: 'inline' | 'ldr';
+	contentOverride?: string;
 }
 
 export interface TemplateMatch {

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { prefetchTemplateDataForWikitext } from '../../src/data/templatedata_fetch';
 
-import {transformWikitext} from "../../src/core/build_wikitext";
+import { transformWikitext } from "../../src/core/build_wikitext";
 
 describe('transformWikitext', () => {
 	it('keeps wikitext unchanged when no transformations are specified', () => {
@@ -181,6 +181,51 @@ Intro <ref name="alpha" /> tail <ref name="beta" />
 		expect(result.wikitext).toContain('<ref name="x">Same content</ref>');
 		expect(result.wikitext).not.toContain('name="y">');
 		expect(result.changes.deduped).toContainEqual({ from: 'y', to: 'x' });
+	});
+
+	it('deduplicates citation templates semantically and merges supplementary params', () => {
+		const source = `
+<ref name="primary">{{cite web|title=Alpha|url=http://example.com}}</ref>
+<ref name="secondary">{{cite web|title=Alpha|url=http://example.com|access-date=2020-01-01|archive-url=https://web.archive.org/web/20200101/http://example.com|archive-date=2020-01-02|dead-url=no}}</ref>
+
+Reuse: <ref name="primary" /><ref name="secondary" />
+
+{{reflist}}
+`;
+
+		const result = transformWikitext(source, { dedupe: true, locationMode: 'all_inline' });
+
+		expect(result.wikitext).toContain('<ref name="primary">{{cite web|title=Alpha|url=http://example.com|access-date=2020-01-01|archive-url=https://web.archive.org/web/20200101/http://example.com|archive-date=2020-01-02|dead-url=no}}</ref>');
+		expect(result.wikitext).toContain('<ref name="primary" />');
+		expect(result.wikitext).not.toContain('name="secondary"');
+		expect(result.changes.deduped).toContainEqual({ from: 'secondary', to: 'primary' });
+		expect(result.wikitext).toContain('Reuse: <ref name="primary" /><ref name="primary" />');
+	});
+
+	it('does not dedupe citation templates when supplementary params conflict', () => {
+		const source = `
+<ref name="old">{{cite web|title=Alpha|url=http://example.com|access-date=2020-01-01}}</ref>
+<ref name="new">{{cite web|title=Alpha|url=http://example.com|access-date=2021-01-01}}</ref>
+`;
+
+		const result = transformWikitext(source, { dedupe: true, locationMode: 'all_inline' });
+
+		expect(result.changes.deduped).toHaveLength(0);
+		expect(result.wikitext).toContain('name="old"');
+		expect(result.wikitext).toContain('name="new"');
+	});
+
+	it('treats supplementary aliases as the same parameter when deduping', () => {
+		const source = `
+<ref name="one">{{cite web|title=Alpha|url=http://example.com|accessdate=2020-01-01}}</ref>
+<ref name="two">{{cite web|title=Alpha|url=http://example.com|access-date=2020-01-01}}</ref>
+`;
+
+		const result = transformWikitext(source, { dedupe: true, locationMode: 'all_inline' });
+
+		expect(result.changes.deduped).toContainEqual({ from: 'two', to: 'one' });
+		expect(result.wikitext).toContain('<ref name="one">{{cite web|title=Alpha|url=http://example.com|accessdate=2020-01-01}}</ref>');
+		expect(result.wikitext).not.toMatch(/access-date=/);
 	});
 
 	it('applies threshold-based LDR placement', () => {
