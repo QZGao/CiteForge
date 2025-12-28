@@ -28,5 +28,10 @@
 	},
 	"dependencies": {
 		"tldts": "^7.0.19"
+	},
+	"release": {
+		"branches": [
+			"main"
+		]
 	}
 }

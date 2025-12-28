@@ -14,8 +14,6 @@
 				],
 				"pattern": [
 					{
-						// Matches esbuild's common error format:
-						// path/to/file.ts:12:34: ERROR: message...
 						"regexp": "^\\s*(.+):(\\d+):(\\d+):\\s+(ERROR|WARN|WARNING):\\s+(.*)$",
 						"file": 1,
 						"line": 2,

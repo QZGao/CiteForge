@@ -19,5 +19,9 @@
 		"typescript",
 		"vue"
 	],
-	"typescript.tsdk": "node_modules/typescript/lib"
+	"typescript.tsdk": "node_modules/typescript/lib",
+	"[github-actions-workflow]": {
+		"editor.insertSpaces": true,
+		"editor.tabSize": 2,
+	}
 }
