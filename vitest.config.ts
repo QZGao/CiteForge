@@ -45,6 +45,7 @@ function i18nCataloguesPlugin(): Plugin {
 export default defineConfig({
 	plugins: [i18nCataloguesPlugin()],
 	test: {
+		setupFiles: ['tests/setup_vitest.ts'],
 		coverage: {
 			include: ['src/**/*.{ts,tsx,vue}'],
 			exclude: ['src/**/*.d.ts']
