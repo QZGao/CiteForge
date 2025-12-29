@@ -2,6 +2,11 @@ import { TEMPLATE_PARAM_ALIAS_MAP, TEMPLATE_PARAM_ORDERS } from './fixtures/temp
 
 const originalFetch = typeof fetch === 'function' ? fetch.bind(globalThis) : undefined;
 
+/**
+ * Resolves the URL string from various RequestInfo types.
+ * @param input The RequestInfo or URL to resolve.
+ * @returns The URL string, or undefined if it cannot be resolved.
+ */
 function resolveUrl(input: RequestInfo | URL): string | undefined {
 	if (typeof input === 'string') {
 		return input;
@@ -15,6 +20,11 @@ function resolveUrl(input: RequestInfo | URL): string | undefined {
 	return undefined;
 }
 
+/**
+ * Extracts the template name from a MediaWiki templatedata action URL.
+ * @param targetUrl The target URL string.
+ * @returns The template name, or undefined if not found.
+ */
 function getTemplateName(targetUrl: string): string | undefined {
 	try {
 		const parsed = new URL(targetUrl, 'https://example.invalid');
@@ -32,6 +42,11 @@ function getTemplateName(targetUrl: string): string | undefined {
 	}
 }
 
+/**
+ * Builds a mock Response object for the given template name.
+ * @param template The template name.
+ * @returns A Response object containing the templatedata JSON.
+ */
 function buildTemplateDataResponse(template: string): Response {
 	const order = TEMPLATE_PARAM_ORDERS[template];
 	if (!order) {
@@ -58,6 +73,9 @@ function buildTemplateDataResponse(template: string): Response {
 	});
 }
 
+/**
+ * Mocks the global fetch function to intercept templatedata requests.
+ */
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 	const targetUrl = resolveUrl(input);
 	if (targetUrl) {
