@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { TEMPLATE_PARAM_ORDERS } from './fixtures/template_param_orders';
 
 type Catalogue = Record<string, Record<string, string>>;
 
@@ -47,5 +48,11 @@ describe('i18n locale fallback', () => {
 		module.refreshLocale();
 		expect(module.getLocale()).toBe('zh-hant');
 		expect(module.t('greeting')).toBe('妳好');
+	});
+});
+
+describe('template parameter order fixtures', () => {
+	it('contains cite templates used in tests', () => {
+		expect(Object.keys(TEMPLATE_PARAM_ORDERS)).toEqual(['cite news', 'cite magazine', 'cite web']);
 	});
 });
