@@ -64,7 +64,7 @@
 	"ui.panel.harvLink": "Harv checks reference table",
 	"ui.panel.settings.title": "Cite Forge Settings",
 	"ui.panel.settings.copyFormat": "Copy ref name format",
-	"ui.panel.settings.showCopyPopup": "Show citation hover copy popup",
+	"ui.panel.settings.showCitationPopup": "Show citation hover popup (reload page to apply)",
 	"ui.panel.settings.enableUserNs": "Enable in User namespace",
 	"ui.panel.settings.placement": "Placement",
 	"ui.panel.settings.minUses": "Minimum uses for reflist",
