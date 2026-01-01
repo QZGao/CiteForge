@@ -64,7 +64,7 @@
 	"ui.panel.harvLink": "哈佛文獻格式檢查參考表",
 	"ui.panel.settings.title": "Cite Forge 設定",
 	"ui.panel.settings.copyFormat": "複製引用名格式",
-	"ui.panel.settings.showCopyPopup": "顯示引用懸浮複製提示",
+	"ui.panel.settings.showCitationPopup": "顯示引用懸浮提示（重新載入頁面以應用）",
 	"ui.panel.settings.enableUserNs": "允許在使用者命名空間啟用",
 	"ui.panel.settings.placement": "放置方式",
 	"ui.panel.settings.minUses": "移入參考列表的最少使用次數",

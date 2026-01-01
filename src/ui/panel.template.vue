@@ -200,7 +200,7 @@
 						</div>
 					</div>
 					<cdx-checkbox v-model="settings.showCiteRefCopyBtn">
-						{{ t('ui.panel.settings.showCopyPopup') }}
+						{{ t('ui.panel.settings.showCitationPopup') }}
 					</cdx-checkbox>
 					<cdx-checkbox v-model="settings.showInUserNs">
 						{{ t('ui.panel.settings.enableUserNs') }}
@@ -228,7 +228,8 @@
 					</cdx-checkbox>
 					<cdx-checkbox v-model="settings.allowCosmeticSaves">
 						<span>
-							<template v-for="(segment, idx) in tRich('ui.panel.settings.cosmeticSaves')" :key="`cosmetic-label-${idx}`">
+							<template v-for="(segment, idx) in tRich('ui.panel.settings.cosmeticSaves')"
+								:key="`cosmetic-label-${idx}`">
 								<a v-if="segment.type === 'link'" :href="segment.href" target="_blank" rel="noreferrer">
 									{{ segment.text }}
 								</a>
