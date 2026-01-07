@@ -55,7 +55,8 @@ export interface InspectorState {
 		showInUserNs: boolean;
 		placementMode: 'keep' | 'all_inline' | 'all_ldr' | 'threshold';
 		minUsesForLdr: number;
-		useTemplateR: boolean;
+		preferTemplateR: boolean;
+		preferTemplateReflist: boolean;
 		makeCopies: boolean;
 		normalizeAll: boolean;
 		allowCosmeticSaves: boolean;

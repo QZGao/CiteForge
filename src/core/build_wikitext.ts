@@ -41,7 +41,8 @@ function buildReplacementPlan(ctx: {
 	referencesTags: ReferencesTagMatch[];
 	rTemplates: Array<{ id: number; start: number; end: number; entries: RTemplateEntry[] }>
 }, opts: {
-	useTemplateR: boolean;
+	preferTemplateR: boolean;
+	preferTemplateReflist: boolean;
 	sortRefs: boolean;
 	normalizeAll: boolean;
 	locationModeKeep: boolean;
@@ -60,7 +61,7 @@ function buildReplacementPlan(ctx: {
 
 	// Replace chained {{r}} templates preserving names
 	ctx.rTemplates.forEach((tpl) => {
-		const rendered = renderRTemplate(tpl, ctx.refs, opts.useTemplateR, opts.renameLookup);
+		const rendered = renderRTemplate(tpl, ctx.refs, opts.preferTemplateR, opts.renameLookup);
 		if (rendered !== null) {
 			replacements.push({ start: tpl.start, end: tpl.end, text: rendered });
 		}
@@ -84,7 +85,7 @@ function buildReplacementPlan(ctx: {
 			const canonicalContent = content || '';
 			if (
 				opts.locationModeKeep &&
-				!opts.useTemplateR &&
+				!opts.preferTemplateR &&
 				!opts.normalizeAll &&
 				targetName === use.name &&
 				ref.group === use.group &&
@@ -98,7 +99,7 @@ function buildReplacementPlan(ctx: {
 				replacements.push({ start: use.start, end: use.end, text: rendered });
 				if (targetName) movedInline.push(targetName);
 			} else {
-				const rendered = renderRefSelf(targetName, ref.group, opts.useTemplateR);
+				const rendered = renderRefSelf(targetName, ref.group, opts.preferTemplateR);
 				replacements.push({ start: use.start, end: use.end, text: rendered });
 			}
 			if (isDefinition && targetLocation === 'ldr' && targetName) {
@@ -111,14 +112,14 @@ function buildReplacementPlan(ctx: {
 				const override = opts.contentOverrideLookup?.(canonical);
 				const content = override !== undefined ? override : def.content ?? '';
 				const targetGroup = def.group ?? ref.group;
-				if (!opts.useTemplateR && !opts.normalizeAll && targetName === def.name && targetGroup === def.group) {
+				if (!opts.preferTemplateR && !opts.normalizeAll && targetName === def.name && targetGroup === def.group) {
 					if (override === undefined) {
 						return;
 					}
 				}
 				const rendered = content
 					? renderRefTag(targetName, targetGroup, content, opts.normalizeAll)
-					: renderRefSelf(targetName, targetGroup, opts.useTemplateR);
+					: renderRefSelf(targetName, targetGroup, opts.preferTemplateR);
 				replacements.push({ start: def.start, end: def.end, text: rendered });
 				if (targetName) movedLdr.push(targetName);
 			});
@@ -130,13 +131,19 @@ function buildReplacementPlan(ctx: {
 		const ldrEntries = buildLdrEntries(ctx.refs, opts.contentOverrideLookup);
 		const hasContainer = ctx.templates.length > 0 || ctx.referencesTags.length > 0;
 		ctx.templates.forEach((tpl) => {
-			const updated = updateReflistTemplate(tpl, ldrEntries, opts.sortRefs);
+			const referencesGroup = !opts.preferTemplateReflist ? getConvertibleReflistGroup(tpl.params) : undefined;
+			const updated = referencesGroup !== undefined
+				? buildReferencesTag(ldrEntries, opts.sortRefs, referencesGroup)
+				: updateReflistTemplate(tpl, ldrEntries, opts.sortRefs);
 			if (updated !== tpl.content) {
 				replacements.push({ start: tpl.start, end: tpl.end, text: updated });
 			}
 		});
 		ctx.referencesTags.forEach((tag) => {
-			const updated = updateReferencesTag(tag, ldrEntries, opts.sortRefs);
+			const reflistGroup = opts.preferTemplateReflist ? getConvertibleReferencesGroup(tag.attrs) : undefined;
+			const updated = reflistGroup !== undefined
+				? buildReflistTemplate(ldrEntries, opts.sortRefs, reflistGroup)
+				: updateReferencesTag(tag, ldrEntries, opts.sortRefs);
 			if (updated !== tag.content) {
 				replacements.push({ start: tag.start, end: tag.end, text: updated });
 			}
@@ -144,7 +151,9 @@ function buildReplacementPlan(ctx: {
 
 		// If no reflist but we have LDR entries, append one
 		if (ldrEntries.length > 0 && !hasContainer) {
-			const appendText = buildStandaloneReflist(ldrEntries, opts.sortRefs);
+			const appendText = opts.preferTemplateReflist
+				? buildStandaloneReflist(ldrEntries, opts.sortRefs)
+				: buildStandaloneReferences(ldrEntries, opts.sortRefs);
 			replacements.push({ start: Number.MAX_SAFE_INTEGER, end: Number.MAX_SAFE_INTEGER, text: appendText });
 		}
 	}
@@ -646,6 +655,85 @@ function updateReferencesTag(tag: ReferencesTagMatch, ldrEntries: Array<{
 }
 
 /**
+ * Build a <references> tag string from entries and optional group.
+ * @param entries - List-defined reference entries.
+ * @param sort - Whether to sort entries by name.
+ * @param group - Optional group name.
+ * @returns Rendered references tag string.
+ */
+function buildReferencesTag(entries: Array<{
+	name: string; group: string | null; content: string
+}>, sort: boolean, group: string | null): string {
+	const attrText = group ? ` group="${escapeAttr(group)}"` : '';
+	if (entries.length === 0) {
+		return `<references${attrText} />`;
+	}
+	const refsValue = renderRefsValue(entries, sort);
+	return `<references${attrText}>${refsValue}</references>`;
+}
+
+/**
+ * Convert a reflist template into a references tag if conversion is safe.
+ * @param params - Template parameters from the reflist template.
+ * @returns Group value if convertible, null for no group, or undefined if not convertible.
+ */
+function getConvertibleReflistGroup(params: TemplateParam[]): string | null | undefined {
+	let groupValue: string | null = null;
+	let seenGroup = false;
+	let seenRefs = false;
+	for (const param of params) {
+		if (!param.name) return undefined;
+		const key = param.name.trim().toLowerCase();
+		if (key === 'refs') {
+			if (seenRefs) return undefined;
+			seenRefs = true;
+			continue;
+		}
+		if (key === 'group') {
+			if (seenGroup) return undefined;
+			seenGroup = true;
+			const trimmed = (param.value ?? '').trim();
+			groupValue = trimmed.length ? trimmed : null;
+			continue;
+		}
+		return undefined;
+	}
+	return groupValue;
+}
+
+/**
+ * Convert a <references> tag into a reflist group if conversion is safe.
+ * @param attrs - Raw attributes string from the references tag.
+ * @returns Group value if convertible, null for no group, or undefined if not convertible.
+ */
+function getConvertibleReferencesGroup(attrs: string): string | null | undefined {
+	const trimmed = (attrs ?? '').trim();
+	if (!trimmed) return null;
+	const match = trimmed.match(/^\s*group\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s/>]+))\s*$/i);
+	if (!match) return undefined;
+	return match[1] ?? match[2] ?? match[3] ?? '';
+}
+
+/**
+ * Build a reflist template string from entries and optional group.
+ * @param entries - List-defined reference entries.
+ * @param sort - Whether to sort entries by name.
+ * @param group - Optional group name.
+ * @returns Rendered reflist template string.
+ */
+function buildReflistTemplate(entries: Array<{
+	name: string; group: string | null; content: string
+}>, sort: boolean, group: string | null): string {
+	const params: TemplateParam[] = [];
+	if (group) params.push({ name: 'group', value: group });
+	if (entries.length) {
+		const refsValue = renderRefsValue(entries, sort);
+		params.push({ name: 'refs', value: refsValue });
+	}
+	return renderTemplate('reflist', params);
+}
+
+/**
  * Render the value for a refs parameter from entries.
  * @param entries - List-defined reference entries.
  * @param sort - Whether to sort entries by name.
@@ -761,8 +849,19 @@ function buildRTemplateString(
 function buildStandaloneReflist(entries: Array<{
 	name: string; group: string | null; content: string
 }>, sort: boolean): string {
-	const refsValue = renderRefsValue(entries, sort);
-	return `\n{{reflist|refs=${refsValue}}}`;
+	return `\n${buildReflistTemplate(entries, sort, null)}`;
+}
+
+/**
+ * Build a standalone <references> tag with given entries.
+ * @param entries - List-defined reference entries.
+ * @param sort - Whether to sort entries by name.
+ * @returns Rendered standalone references tag string.
+ */
+function buildStandaloneReferences(entries: Array<{
+	name: string; group: string | null; content: string
+}>, sort: boolean): string {
+	return `\n${buildReferencesTag(entries, sort, null)}`;
 }
 
 interface Replacement {
@@ -817,7 +916,8 @@ export interface TransformOptions {
 	dedupe?: boolean;
 	locationMode?: LocationMode;
 	sortRefs?: boolean;
-	useTemplateR?: boolean;
+	preferTemplateR?: boolean;
+	preferTemplateReflist?: boolean;
 	reflistTemplates?: string[];
 	normalizeAll?: boolean;
 	contentOverrides?: Record<string, string>;
@@ -875,7 +975,8 @@ export function transformWikitext(wikitext: string, options: TransformOptions = 
 	const renameNameless = options.renameNameless || {};
 	const dedupe = Boolean(options.dedupe);
 	const sortRefs = options.sortRefs === undefined ? false : Boolean(options.sortRefs);
-	const useTemplateR = Boolean(options.useTemplateR);
+	const preferTemplateR = Boolean(options.preferTemplateR);
+	const preferTemplateReflist = options.preferTemplateReflist === undefined ? true : Boolean(options.preferTemplateReflist);
 	const normalizeAll = options.normalizeAll === undefined ? false : options.normalizeAll;
 	const reflistNames = (options.reflistTemplates && options.reflistTemplates.length > 0 ? options.reflistTemplates : DEFAULT_REFLIST_TEMPLATES).map((n) => n.toLowerCase());
 	const targetMode = normalizeLocationMode(options.locationMode);
@@ -900,7 +1001,8 @@ export function transformWikitext(wikitext: string, options: TransformOptions = 
 	assignLocations(ctx.refs, targetMode);
 
 	const plan = buildReplacementPlan(ctx, {
-		useTemplateR,
+		preferTemplateR,
+		preferTemplateReflist,
 		sortRefs,
 		normalizeAll,
 		locationModeKeep: targetMode === 'keep',
@@ -909,7 +1011,7 @@ export function transformWikitext(wikitext: string, options: TransformOptions = 
 	});
 
 	const replaced = applyReplacements(wikitext, plan.replacements);
-	const finalText = useTemplateR ? collapseRefsAndRp(replaced, true) : replaced;
+	const finalText = preferTemplateR ? collapseRefsAndRp(replaced, true) : replaced;
 
 	return {
 		wikitext: finalText, changes: {

@@ -1,4 +1,4 @@
-import {TransformOptions} from "../core/build_wikitext";
+import { TransformOptions } from "../core/build_wikitext";
 
 /** User-configurable settings for Cite Forge. */
 export type Settings = {
@@ -13,7 +13,9 @@ export type Settings = {
 	/** Threshold for LDR placement when placementMode is threshold. */
 	minUsesForLdr: number;
 	/** Prefer {{r}} for uses when possible. */
-	useTemplateR: boolean;
+	preferTemplateR: boolean;
+	/** Prefer {{reflist}} templates for LDR output. */
+	preferTemplateReflist: boolean;
 	/** Do not dedupe identical refs; keep separate copies. */
 	makeCopies: boolean;
 	/** Normalize generated ref markup (trim/compact whitespace). */
@@ -32,7 +34,8 @@ const DEFAULT_SETTINGS: Settings = {
 	showInUserNs: true,
 	placementMode: 'keep',
 	minUsesForLdr: 2,
-	useTemplateR: false,
+	preferTemplateR: false,
+	preferTemplateReflist: true,
 	makeCopies: false,
 	normalizeAll: false,
 	allowCosmeticSaves: false
@@ -111,7 +114,8 @@ export function settingsToTransformOptions(
 		renameMap,
 		renameNameless,
 		sortRefs,
-		useTemplateR: Boolean(settings.useTemplateR),
+		preferTemplateR: Boolean(settings.preferTemplateR),
+		preferTemplateReflist: settings.preferTemplateReflist !== false,
 		locationMode: placementMode,
 		dedupe: !settings.makeCopies,
 		normalizeAll: Boolean(settings.normalizeAll),

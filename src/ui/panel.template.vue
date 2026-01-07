@@ -217,8 +217,11 @@
 							<cdx-text-input type="number" min="1" v-model.number="settings.minUsesForLdr" />
 						</div>
 					</div>
-					<cdx-checkbox v-model="settings.useTemplateR">
+					<cdx-checkbox v-model="settings.preferTemplateR">
 						{{ t('ui.panel.settings.preferTemplateR') }}
+					</cdx-checkbox>
+					<cdx-checkbox v-model="settings.preferTemplateReflist">
+						{{ t('ui.panel.settings.preferTemplateReflist') }}
 					</cdx-checkbox>
 					<cdx-checkbox v-model="settings.makeCopies">
 						{{ t('ui.panel.settings.keepCopies') }}

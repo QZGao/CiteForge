@@ -52,10 +52,10 @@ Intro <ref name="unchanged" /> mid <ref name="unchanged" /> end.<ref name="anoth
 `;
 		const source2 = source1.replace(/<ref name="unchanged" \/>/g, '{{r|unchanged}}').replace(/<ref name="another-unchanged" \/>/g, '{{r|another-unchanged}}');
 
-		const result1 = transformWikitext(source1, { useTemplateR: true });
+		const result1 = transformWikitext(source1, { preferTemplateR: true });
 		expect(result1.wikitext).toBe(source2);
 
-		const result2 = transformWikitext(source2, { useTemplateR: false });
+		const result2 = transformWikitext(source2, { preferTemplateR: false });
 		expect(result2.wikitext).toBe(source1);
 	});
 
@@ -73,7 +73,7 @@ Trailing use <ref name="bar" />
 		const result = transformWikitext(source, {
 			renameMap: { foo: 'Foo2020', bar: 'Bar2021' },
 			locationMode: 'all_inline',
-			useTemplateR: true
+			preferTemplateR: true
 		});
 
 		expect(result.wikitext).toContain('<ref name="Foo2020">Alpha</ref>');
@@ -98,6 +98,44 @@ Text <ref name="c">Content C</ref> more <ref name="c" />
 		expect(result.wikitext).toContain('{{reflist|refs=');
 		expect(result.wikitext).toContain('<ref name="c" />');
 		expect(result.wikitext).toContain('<ref name="c">Content C</ref>');
+	});
+
+	it('uses <references> when preferTemplateReflist is false', () => {
+		const source = `
+Lead <ref name="c">Content C</ref> more <ref name="c" />
+`;
+
+		const result = transformWikitext(source, {
+			locationMode: 'all_ldr',
+			sortRefs: true,
+			preferTemplateReflist: false
+		});
+
+		expect(result.wikitext).toContain('<references>');
+		expect(result.wikitext).toContain('<ref name="c" />');
+		expect(result.wikitext).toContain('<ref name="c">Content C</ref>');
+		expect(result.wikitext).not.toContain('{{reflist');
+	});
+
+	it('converts reflist templates to <references> when preferTemplateReflist is false', () => {
+		const source = `
+Lead <ref name="c">Content C</ref> more <ref name="c" />
+
+{{reflist|refs=
+<ref name="c">Content C</ref>
+}}
+`;
+
+		const result = transformWikitext(source, {
+			locationMode: 'all_ldr',
+			sortRefs: true,
+			preferTemplateReflist: false
+		});
+
+		expect(result.wikitext).toContain('<references>');
+		expect(result.wikitext).toContain('<ref name="c">Content C</ref>');
+		expect(result.wikitext).toContain('<ref name="c" />');
+		expect(result.wikitext).not.toContain('{{reflist');
 	});
 
 	it('moves LDR definitions back inline at first use', () => {
@@ -145,7 +183,7 @@ Text <ref name="foo" />
 		expect(result.wikitext).toContain('<ref name="foo">Updated LDR content</ref>');
 	});
 
-	it('moves <references> LDR definitions back inline and collapses the tag when empty', () => {
+	it('moves <references> LDR definitions back inline and converts to reflist when empty', () => {
 		const source = `
 Intro <ref name="alpha" /> tail <ref name="beta" />
 
@@ -160,7 +198,8 @@ Intro <ref name="alpha" /> tail <ref name="beta" />
 
 		expect(result.wikitext).toContain('<ref name="alpha">Alpha content</ref>');
 		expect(result.wikitext).toContain('<ref name="beta">Beta content</ref>');
-		expect(result.wikitext).toContain('<references />');
+		expect(result.wikitext).toContain('{{reflist}}');
+		expect(result.wikitext).not.toContain('<references');
 	});
 
 	it('deduplicates identical reference content and unifies names', () => {
@@ -249,7 +288,7 @@ Repeat <ref name="common">Common content</ref> and again <ref name="common" />
 		expect(result.wikitext).toContain('<ref name="rare">Only once</ref>');
 	});
 
-	it('populates existing <references /> blocks with generated LDR entries', () => {
+	it('converts existing <references /> blocks to reflist with generated LDR entries', () => {
 		const source = `
 Lead <ref name="a">Alpha</ref> tail <ref name="b">Beta</ref>
 
@@ -263,7 +302,8 @@ Lead <ref name="a">Alpha</ref> tail <ref name="b">Beta</ref>
 
 		expect(result.wikitext).toContain('<ref name="a" />');
 		expect(result.wikitext).toContain('<ref name="b" />');
-		expect(result.wikitext).toContain('<references>\n<ref name="a">Alpha</ref>\n<ref name="b">Beta</ref>\n</references>');
+		expect(result.wikitext).toContain('{{reflist|refs=\n<ref name="a">Alpha</ref>\n<ref name="b">Beta</ref>\n}}');
+		expect(result.wikitext).not.toContain('<references');
 	});
 
 	it('handles chained r templates when renaming', () => {
@@ -274,7 +314,7 @@ Lead <ref name="a">Alpha</ref> tail <ref name="b">Beta</ref>
 				'sohu-02': 'sohu-renamed',
 				'dualshockers-01': 'dualshockers-renamed'
 			},
-			useTemplateR: true
+			preferTemplateR: true
 		});
 
 		expect(result.wikitext).toContain('{{r|bilibili-renamed|sohu-renamed|dualshockers-renamed}}');
@@ -284,7 +324,7 @@ Lead <ref name="a">Alpha</ref> tail <ref name="b">Beta</ref>
 		const source = 'See {{r|foo|p=2|bar|p2=8-9}} for pages.';
 		const result = transformWikitext(source, {
 			renameMap: { foo: 'FooRenamed', bar: 'BarRenamed' },
-			useTemplateR: true
+			preferTemplateR: true
 		});
 
 		expect(result.wikitext).toContain('{{r|FooRenamed|p=2|BarRenamed|p2=8-9}}');
@@ -292,14 +332,14 @@ Lead <ref name="a">Alpha</ref> tail <ref name="b">Beta</ref>
 
 	it('converts r templates with only name/group to refs when templateR is off', () => {
 		const source = 'See {{r|foo|grp=baz}}.';
-		const result = transformWikitext(source, { useTemplateR: false });
+		const result = transformWikitext(source, { preferTemplateR: false });
 		expect(result.wikitext).toContain('<ref name="foo" group="baz" />');
 		expect(result.wikitext).not.toContain('{{r|');
 	});
 
 	it('converts chained r templates with only name/group to refs when templateR is off', () => {
 		const source = 'See {{r|n1=foo|grp=g1|bar|group=g2}}.';
-		const result = transformWikitext(source, { useTemplateR: false });
+		const result = transformWikitext(source, { preferTemplateR: false });
 		expect(result.wikitext).toContain('<ref name="foo" group="g1" />');
 		expect(result.wikitext).toContain('<ref name="bar" group="g2" />');
 		expect(result.wikitext).not.toContain('{{r|');
@@ -307,60 +347,60 @@ Lead <ref name="a">Alpha</ref> tail <ref name="b">Beta</ref>
 
 	it('converts refs with only name/group to r templates when templateR is on', () => {
 		const source = 'See <ref name="foo" group="baz" />.';
-		const result = transformWikitext(source, { useTemplateR: true });
+		const result = transformWikitext(source, { preferTemplateR: true });
 		expect(result.wikitext).toContain('{{r|foo|group=baz}}');
 		expect(result.wikitext).not.toContain('<ref ');
 	});
 
 	it('converts chained refs with only name/group to r templates when templateR is on', () => {
 		const source = 'See <ref name="foo" group="g1" /><ref name="bar" group="g2" />.';
-		const result = transformWikitext(source, { useTemplateR: true });
+		const result = transformWikitext(source, { preferTemplateR: true });
 		expect(result.wikitext).toContain('{{r|foo|group=g1|bar|group=g2}}');
 		expect(result.wikitext).not.toContain('<ref ');
 	});
 
 	it('converts r templates with page params to ref + rp when templateR is off', () => {
 		const source = 'See {{r|foo|p=2}} and {{r|bar|pp=4-5}}.';
-		const result = transformWikitext(source, { useTemplateR: false });
+		const result = transformWikitext(source, { preferTemplateR: false });
 		expect(result.wikitext).toContain('<ref name="foo" />{{rp|p=2}}');
 		expect(result.wikitext).toContain('<ref name="bar" />{{rp|pp=4-5}}');
 	});
 
 	it('combines refs with rp back into r when templateR is on', () => {
 		const source = 'See <ref name="foo" />{{rp|p=3}} and <ref name="bar" group="g" />{{rp|pp=4-5}}.';
-		const result = transformWikitext(source, { useTemplateR: true });
+		const result = transformWikitext(source, { preferTemplateR: true });
 		expect(result.wikitext).toMatch(/\{\{r\|foo\|p=3\}\}/);
 		expect(result.wikitext).toMatch(/\{\{r\|bar\|group=g\|pp=4-5\}\}/);
 	});
 
 	it('combines chained refs with rp back into r when templateR is on', () => {
 		const source = 'See <ref name="foo" />{{rp|p=2}}<ref name="bar" group="g" />{{rp|pp=4-5}}.';
-		const result = transformWikitext(source, { useTemplateR: true });
+		const result = transformWikitext(source, { preferTemplateR: true });
 		expect(result.wikitext).toContain('{{r|foo|p=2|bar|group2=g|pp2=4-5}}');
 	});
 
 	it('combines chained refs with rp back into r when templateR is on, longer example', () => {
 		const source = 'See <ref name="foo" group="g1" />{{rp|p=2}}<ref name="bar" />{{rp|pp=4-5}}<ref name="baz" />{{rp|loc=fig1}}.';
-		const result = transformWikitext(source, { useTemplateR: true });
+		const result = transformWikitext(source, { preferTemplateR: true });
 		expect(result.wikitext).toContain('{{r|foo|group=g1|p=2|bar|pp2=4-5|baz|loc3=fig1}}');
 	});
 
 	it('keeps r templates with unsupported params when conversion would drop data', () => {
 		const source = 'See {{r|foo|lang=en|p=2}}.';
-		const result = transformWikitext(source, { useTemplateR: false });
+		const result = transformWikitext(source, { preferTemplateR: false });
 		expect(result.wikitext).toContain('{{r|foo|lang=en|p=2}}');
 	});
 
 	it('keeps unconvertible entries in a chained r as r while converting the convertible ones', () => {
 		const source = 'See {{r|foo|p=2|bar|lang2=en}}.';
-		const result = transformWikitext(source, { useTemplateR: false });
+		const result = transformWikitext(source, { preferTemplateR: false });
 		expect(result.wikitext).toContain('<ref name="foo" />{{rp|p=2}}');
 		expect(result.wikitext).toContain('{{r|bar|lang=en}}');
 	});
 
 	it('keeps unconvertible entries in a chained r as r while converting the convertible ones, longer example', () => {
 		const source = 'See {{r|foo|grp=g1|p=2|bar|lang2=en|baz|pp3=4-5}}.';
-		const result = transformWikitext(source, { useTemplateR: false });
+		const result = transformWikitext(source, { preferTemplateR: false });
 		expect(result.wikitext).toContain('<ref name="foo" group="g1" />{{rp|p=2}}');
 		expect(result.wikitext).toContain('{{r|bar|lang=en}}');  // lang2 is unconvertible, so stays as r, but the index is removed
 		expect(result.wikitext).toContain('<ref name="baz" />{{rp|pp=4-5}}');
@@ -368,7 +408,7 @@ Lead <ref name="a">Alpha</ref> tail <ref name="b">Beta</ref>
 
 	it('keeps unconvertible entries in a chained r as r while converting the convertible ones, even longer example', () => {
 		const source = 'See {{r|foo|grp=g1|p=2|bar|lang2=en|baz|test3=4-5|fourth}}.';
-		const result = transformWikitext(source, { useTemplateR: false });
+		const result = transformWikitext(source, { preferTemplateR: false });
 		expect(result.wikitext).toContain('<ref name="foo" group="g1" />{{rp|p=2}}');
 		expect(result.wikitext).toContain('{{r|bar|lang=en|baz|test2=4-5}}');  // lang2 and test3 are unconvertible, so stay as r, but the indices are removed and renumbered; the two unconvertible stay chained
 		expect(result.wikitext).toContain('<ref name="fourth" />');
@@ -376,21 +416,21 @@ Lead <ref name="a">Alpha</ref> tail <ref name="b">Beta</ref>
 
 	it('keeps unconvertible entries in a chained r as r while converting the convertible ones, when param order is mixed', () => {
 		const source = 'See {{r|foo|lang2=en|lang3=fr|bar|pp=4-5|baz}}.';
-		const result = transformWikitext(source, { useTemplateR: false });
+		const result = transformWikitext(source, { preferTemplateR: false });
 		expect(result.wikitext).toContain('<ref name="foo" />{{rp|pp=4-5}}');
 		expect(result.wikitext).toContain('{{r|bar|lang=en|baz|lang2=fr}}'); // lang2 and lang3 are unconvertible, so stay as r, but the indices are removed and renumbered; the two unconvertible stay chained
 	});
 
 	it('converts chained r with only name/group/page/pages/at into refs + rp when templateR is off', () => {
 		const source = 'See {{r|foo|grp=g1|p=2|bar|grp2=g2|pp2=4-5}}.';
-		const result = transformWikitext(source, { useTemplateR: false });
+		const result = transformWikitext(source, { preferTemplateR: false });
 		expect(result.wikitext).toContain('<ref name="foo" group="g1" />{{rp|p=2}}');
 		expect(result.wikitext).toContain('<ref name="bar" group="g2" />{{rp|pp=4-5}}');
 	});
 
 	it('converts chained r with only name/group/page/pages/at into refs + rp when templateR is off, even when param order is mixed', () => {
 		const source = 'See {{r|foo|pp2=10-12|grp=g1|at3=fig1|bar|p=2|third}}.';
-		const result = transformWikitext(source, { useTemplateR: false });
+		const result = transformWikitext(source, { preferTemplateR: false });
 		expect(result.wikitext).toContain('<ref name="foo" group="g1" />{{rp|p=2}}');
 		expect(result.wikitext).toContain('<ref name="bar" />{{rp|pp=10-12}}');
 		expect(result.wikitext).toContain('<ref name="third" />{{rp|at=fig1}}');
@@ -398,7 +438,7 @@ Lead <ref name="a">Alpha</ref> tail <ref name="b">Beta</ref>
 
 	it('recognizes name and its aliases when converting r to refs', () => {
 		const source = 'See {{r|n1=foo|name2=bar|grp=g1|p=2|pages2=10-12|at3=fig1|3=baz}}.';
-		const result = transformWikitext(source, { useTemplateR: false });
+		const result = transformWikitext(source, { preferTemplateR: false });
 		expect(result.wikitext).toContain('<ref name="foo" group="g1" />{{rp|p=2}}');
 		expect(result.wikitext).toContain('<ref name="bar" />{{rp|pages=10-12}}');
 		expect(result.wikitext).toContain('<ref name="baz" />{{rp|at=fig1}}');
@@ -406,14 +446,14 @@ Lead <ref name="a">Alpha</ref> tail <ref name="b">Beta</ref>
 
 	it('does not populate r-template params beyond what is associated with a ref', () => {
 		const source = 'See {{r|eurogamer_20110728|p=2|youxichaguan_20231130}}.';
-		const result = transformWikitext(source, { useTemplateR: true });
+		const result = transformWikitext(source, { preferTemplateR: true });
 		expect(result.wikitext).toContain('{{r|eurogamer_20110728|p=2|youxichaguan_20231130}}');
 	});
 
 	it('does not remove line breaks', () => {
 		const source = `| MC = PC：83/100{{r|metacritic_pc}}<br />{{tooltip|PS3|PlayStation 3}}：81/100{{r|metacritic_playstation-3}}
 | OC = 76%{{r|opencritic}}`
-		const result = transformWikitext(source, { useTemplateR: true });
+		const result = transformWikitext(source, { preferTemplateR: true });
 		expect(result.wikitext).toBe(source);
 	});
 
@@ -421,7 +461,7 @@ Lead <ref name="a">Alpha</ref> tail <ref name="b">Beta</ref>
 		const source = 'See {{r|name=alpha|grp=g1|p=2|pages2=10-12|at3=fig1}}.';
 		const result = transformWikitext(source, {
 			renameMap: { alpha: 'alpha-renamed' },
-			useTemplateR: true
+			preferTemplateR: true
 		});
 		expect(result.wikitext).toContain('{{r|name=alpha-renamed|grp=g1|p=2|pages2=10-12|at3=fig1}}');
 	});
