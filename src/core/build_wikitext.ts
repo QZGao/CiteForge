@@ -592,7 +592,7 @@ function renderRTemplate(
 	}
 	flushPending();
 
-	return segments.length ? segments.join(' ') : null;
+	return segments.length ? segments.join('') : null;
 }
 
 /**

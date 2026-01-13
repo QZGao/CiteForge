@@ -320,6 +320,13 @@ Lead <ref name="a">Alpha</ref> tail <ref name="b">Beta</ref>
 		expect(result.wikitext).toContain('{{r|bilibili-renamed|sohu-renamed|dualshockers-renamed}}');
 	});
 
+	it('transforms chained r templates to refs when templateR is off', () => {
+		const source = 'See {{r|foo|bar|baz}} for details.';
+		const result = transformWikitext(source, { preferTemplateR: false });
+		expect(result.wikitext).toContain('<ref name="foo" /><ref name="bar" /><ref name="baz" />');
+		expect(result.wikitext).not.toContain('{{r|');
+	});
+
 	it('preserves r-template page params alongside renamed refs', () => {
 		const source = 'See {{r|foo|p=2|bar|p2=8-9}} for pages.';
 		const result = transformWikitext(source, {
