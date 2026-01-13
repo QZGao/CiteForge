@@ -129,32 +129,50 @@ function buildReplacementPlan(ctx: {
 	// Rebuild reflist templates
 	if (!opts.locationModeKeep) {
 		const ldrEntries = buildLdrEntries(ctx.refs, opts.contentOverrideLookup);
-		const hasContainer = ctx.templates.length > 0 || ctx.referencesTags.length > 0;
+		const entriesByGroup = groupEntriesByGroup(ldrEntries);
+		const getEntries = (group: string | null): Array<{ name: string; group: string | null; content: string }> =>
+			entriesByGroup.get(normalizeGroupValue(group)) ?? [];
+		const containerGroups = new Set<string | null>();
+		const hasReferencesTags = ctx.referencesTags.length > 0;
+		const hasGroupedReferencesTags = ctx.referencesTags.some((tag) => {
+			const group = normalizeGroupValue(extractAttr(tag.attrs ?? '', 'group'));
+			return group !== null;
+		});
 		ctx.templates.forEach((tpl) => {
 			const referencesGroup = !opts.preferTemplateReflist ? getConvertibleReflistGroup(tpl.params) : undefined;
+			const templateGroup = normalizeGroupValue(getTemplateGroup(tpl.params));
+			containerGroups.add(templateGroup);
+			const groupEntries = getEntries(referencesGroup ?? templateGroup);
 			const updated = referencesGroup !== undefined
-				? buildReferencesTag(ldrEntries, opts.sortRefs, referencesGroup)
-				: updateReflistTemplate(tpl, ldrEntries, opts.sortRefs);
+				? buildReferencesTag(groupEntries, opts.sortRefs, referencesGroup)
+				: updateReflistTemplate(tpl, groupEntries, opts.sortRefs);
 			if (updated !== tpl.content) {
 				replacements.push({ start: tpl.start, end: tpl.end, text: updated });
 			}
 		});
 		ctx.referencesTags.forEach((tag) => {
-			const reflistGroup = opts.preferTemplateReflist ? getConvertibleReferencesGroup(tag.attrs) : undefined;
+			const tagGroup = normalizeGroupValue(extractAttr(tag.attrs ?? '', 'group'));
+			containerGroups.add(tagGroup);
+			const allowConversion = opts.preferTemplateReflist && !hasGroupedReferencesTags;
+			const reflistGroup = allowConversion ? getConvertibleReferencesGroup(tag.attrs) : undefined;
 			const updated = reflistGroup !== undefined
-				? buildReflistTemplate(ldrEntries, opts.sortRefs, reflistGroup)
-				: updateReferencesTag(tag, ldrEntries, opts.sortRefs);
+				? buildReflistTemplate(getEntries(reflistGroup), opts.sortRefs, reflistGroup)
+				: updateReferencesTag(tag, getEntries(tagGroup), opts.sortRefs);
 			if (updated !== tag.content) {
 				replacements.push({ start: tag.start, end: tag.end, text: updated });
 			}
 		});
 
-		// If no reflist but we have LDR entries, append one
-		if (ldrEntries.length > 0 && !hasContainer) {
-			const appendText = opts.preferTemplateReflist
-				? buildStandaloneReflist(ldrEntries, opts.sortRefs)
-				: buildStandaloneReferences(ldrEntries, opts.sortRefs);
-			replacements.push({ start: Number.MAX_SAFE_INTEGER, end: Number.MAX_SAFE_INTEGER, text: appendText });
+		// Append containers for any missing groups
+		if (ldrEntries.length > 0) {
+			const preferTemplate = opts.preferTemplateReflist && !hasReferencesTags;
+			entriesByGroup.forEach((entries, group) => {
+				if (containerGroups.has(group)) return;
+				const appendText = preferTemplate
+					? buildStandaloneReflist(entries, opts.sortRefs, group)
+					: buildStandaloneReferences(entries, opts.sortRefs, group);
+				replacements.push({ start: Number.MAX_SAFE_INTEGER, end: Number.MAX_SAFE_INTEGER, text: appendText });
+			});
 		}
 	}
 
@@ -186,6 +204,50 @@ function buildLdrEntries(
 		list.push({ name: canonical.name, group: canonical.group, content });
 	});
 	return list;
+}
+
+/**
+ * Normalize a group value for matching and rendering.
+ * @param group - Raw group value.
+ * @returns Normalized group value or null.
+ */
+function normalizeGroupValue(group: string | null | undefined): string | null {
+	if (!group) return null;
+	const trimmed = group.trim();
+	return trimmed.length ? trimmed : null;
+}
+
+/**
+ * Group LDR entries by group name.
+ * @param entries - List-defined reference entries.
+ * @returns Map of group names to entries.
+ */
+function groupEntriesByGroup(entries: Array<{
+	name: string; group: string | null; content: string
+}>): Map<string | null, Array<{ name: string; group: string | null; content: string }>> {
+	const grouped = new Map<string | null, Array<{ name: string; group: string | null; content: string }>>();
+	entries.forEach((entry) => {
+		const group = normalizeGroupValue(entry.group);
+		const bucket = grouped.get(group) ?? [];
+		bucket.push({ ...entry, group });
+		grouped.set(group, bucket);
+	});
+	return grouped;
+}
+
+/**
+ * Extract a group value from template params.
+ * @param params - Template parameters.
+ * @returns Group value or null if not present.
+ */
+function getTemplateGroup(params: TemplateParam[]): string | null {
+	for (const param of params) {
+		if (!param.name) continue;
+		if (param.name.trim().toLowerCase() !== 'group') continue;
+		const trimmed = (param.value ?? '').trim();
+		return trimmed.length ? trimmed : null;
+	}
+	return null;
 }
 
 /**
@@ -711,7 +773,8 @@ function getConvertibleReferencesGroup(attrs: string): string | null | undefined
 	if (!trimmed) return null;
 	const match = trimmed.match(/^\s*group\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s/>]+))\s*$/i);
 	if (!match) return undefined;
-	return match[1] ?? match[2] ?? match[3] ?? '';
+	const value = match[1] ?? match[2] ?? match[3] ?? '';
+	return value.trim().length ? value.trim() : null;
 }
 
 /**
@@ -848,8 +911,8 @@ function buildRTemplateString(
  */
 function buildStandaloneReflist(entries: Array<{
 	name: string; group: string | null; content: string
-}>, sort: boolean): string {
-	return `\n${buildReflistTemplate(entries, sort, null)}`;
+}>, sort: boolean, group: string | null): string {
+	return `\n${buildReflistTemplate(entries, sort, group)}`;
 }
 
 /**
@@ -860,8 +923,8 @@ function buildStandaloneReflist(entries: Array<{
  */
 function buildStandaloneReferences(entries: Array<{
 	name: string; group: string | null; content: string
-}>, sort: boolean): string {
-	return `\n${buildReferencesTag(entries, sort, null)}`;
+}>, sort: boolean, group: string | null): string {
+	return `\n${buildReferencesTag(entries, sort, group)}`;
 }
 
 interface Replacement {

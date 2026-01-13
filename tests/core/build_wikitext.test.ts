@@ -552,4 +552,26 @@ Lead <ref name="a">Alpha</ref> tail <ref name="b">Beta</ref>
 		const result = transformWikitext(source, { normalizeAll: true });
 		expect(result.wikitext).toBe(source);
 	});
+
+	it('references with group attributes', () => {
+		const source = `This is a sentence.<ref group="lower-alpha" name="a_note">This is a note.</ref><ref name="a_ref">This is a reference.</ref>
+
+==Notes==
+<references group="lower-alpha" />
+
+==References==
+<references />`;
+		const result = transformWikitext(source, {
+			locationMode: 'all_ldr'
+		});
+
+		expect(result.wikitext).toContain('<ref name="a_note" group="lower-alpha" />');
+		expect(result.wikitext).toContain('<ref name="a_ref" />');
+		expect(result.wikitext).toContain(`<references group="lower-alpha">
+<ref name="a_note" group="lower-alpha">This is a note.</ref>
+</references>`);
+		expect(result.wikitext).toContain(`<references>
+<ref name="a_ref">This is a reference.</ref>
+</references>`);
+	});
 });
