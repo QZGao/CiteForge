@@ -102,7 +102,7 @@ const createBuildOptions = () => {
 		},
 		banner: {
 			js: `// Cite Forge - Bundled Version
-// Maintainer: SuperGrey
+// Maintainers: SuperGrey, SuperHamster, DeepChirp
 // Repository: https://github.com/QZGao/CiteForge
 // Release: ${pkgJson.version}
 // Timestamp: ${timestamp}
