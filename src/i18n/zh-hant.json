@@ -69,6 +69,7 @@
 	"ui.panel.settings.placement": "放置方式",
 	"ui.panel.settings.minUses": "移入參考列表的最少使用次數",
 	"ui.panel.settings.preferTemplateR": "優先使用 {{r}}",
+	"ui.panel.settings.preferTemplateReflist": "優先使用 {{reflist}}",
 	"ui.panel.settings.keepCopies": "保留個別副本（不去重）",
 	"ui.panel.settings.normalize": "正規化引用標記",
 	"ui.panel.settings.cosmeticSaves": "允許僅儲存[[WP:COSMETICBOT|美觀性變更]]",
