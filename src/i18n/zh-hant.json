@@ -1,4 +1,7 @@
 {
+	"@metadata": {
+		"authors": []
+	},
 	"main.namespaceMismatch": "目前命名空間或內容模型無法使用 Cite Forge。",
 	"data.diffPreview.summary": "修訂引用",
 	"ui.default.nameless": "（未命名）",
