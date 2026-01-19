@@ -1,4 +1,9 @@
 {
+	"@metadata": {
+		"authors": [
+			"SuperGrey"
+		]
+	},
 	"main.namespaceMismatch": "当前命名空间或内容模型中无法使用 Cite Forge。",
 	"data.diffPreview.summary": "修订引用",
 	"ui.default.nameless": "（未命名）",
