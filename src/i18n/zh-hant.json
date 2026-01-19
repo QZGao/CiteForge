@@ -1,4 +1,10 @@
 {
+	"@metadata": {
+		"authors": [
+			"Kly",
+			"SuperGrey"
+		]
+	},
 	"main.namespaceMismatch": "目前命名空間或內容模型無法使用 Cite Forge。",
 	"data.diffPreview.summary": "修訂引用",
 	"ui.default.nameless": "（未命名）",
@@ -19,8 +25,8 @@
 	"ui.panel.search.ariaLabel": "搜尋引用",
 	"ui.panel.refresh": "重新整理",
 	"ui.panel.copyOptions.raw": "原始名稱",
-	"ui.panel.copyOptions.rTemplate": "{{r|name}}",
-	"ui.panel.copyOptions.refTag": "<ref name=\"name\" />",
+	"ui.panel.copyOptions.rTemplate": "{{r|名稱}}",
+	"ui.panel.copyOptions.refTag": "<ref name=\"名稱\" />",
 	"ui.panel.placement.keep": "維持不變",
 	"ui.panel.placement.threshold": "使用次數 ≥ N 的引用移到參考列表",
 	"ui.panel.placement.allLdr": "全部引用移到參考列表",
