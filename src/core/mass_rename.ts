@@ -121,6 +121,100 @@ function stripLanguagePrefix(value: string): string {
 	return (value || '').replace(/^[a-zA-Z-]{2,}:\s*/, '');
 }
 
+type ParsedDate = { dateYMD?: string; dateDisplay?: string };
+
+/**
+ * Parse and normalize a date string.
+ * @param value - Input date string.
+ * @returns Parsed date components.
+ */
+function parseNormalizedDate(value: string): ParsedDate {
+	const trimmed = value.trim();
+	if (!trimmed) return {};
+	const pad = (n: number) => n.toString().padStart(2, '0');
+	const makeDate = (year: number, month: number, day: number): ParsedDate => {
+		const dateYMD = `${year}${pad(month)}${pad(day)}`;
+		if (typeof Date.prototype.toLocaleDateString === 'function') {
+			const d = new Date(Date.UTC(year, month - 1, day));
+			return { dateYMD, dateDisplay: d.toLocaleDateString(undefined, { timeZone: 'UTC' }) };
+		}
+		return { dateYMD, dateDisplay: `${year}-${pad(month)}-${pad(day)}` };
+	};
+
+	const numericMatch = trimmed.match(/^(\d{4})(?:\D+(\d{1,2})(?:\D+(\d{1,2}))?)?$/);
+	if (numericMatch) {
+		const [, y, m, d] = numericMatch;
+		if (y && m && d) {
+			return makeDate(Number(y), Number(m), Number(d));
+		}
+		if (y && m) {
+			return { dateYMD: `${y}${pad(Number(m))}01`, dateDisplay: `${y}-${pad(Number(m))}` };
+		}
+		if (y) {
+			return { dateYMD: y, dateDisplay: y };
+		}
+	}
+
+	const monthMap = new Map<string, number>([
+		['jan', 1],
+		['january', 1],
+		['feb', 2],
+		['february', 2],
+		['mar', 3],
+		['march', 3],
+		['apr', 4],
+		['april', 4],
+		['may', 5],
+		['jun', 6],
+		['june', 6],
+		['jul', 7],
+		['july', 7],
+		['aug', 8],
+		['august', 8],
+		['sep', 9],
+		['sept', 9],
+		['september', 9],
+		['oct', 10],
+		['october', 10],
+		['nov', 11],
+		['november', 11],
+		['dec', 12],
+		['december', 12]
+	]);
+	const dayMonth = trimmed.match(/^(\d{1,2})\s+([a-zA-Z.]+)\s*,?\s*(\d{4})$/);
+	if (dayMonth) {
+		const [, dayRaw, monthRaw, yearRaw] = dayMonth;
+		const key = monthRaw.replace(/[^a-zA-Z]/g, '').toLowerCase();
+		const month = monthMap.get(key) ?? monthMap.get(key.slice(0, 3));
+		if (month) {
+			return makeDate(Number(yearRaw), month, Number(dayRaw));
+		}
+	}
+	const monthDay = trimmed.match(/^([a-zA-Z.]+)\s+(\d{1,2})(?:\s*,\s*|\s+)(\d{4})$/);
+	if (monthDay) {
+		const [, monthRaw, dayRaw, yearRaw] = monthDay;
+		const key = monthRaw.replace(/[^a-zA-Z]/g, '').toLowerCase();
+		const month = monthMap.get(key) ?? monthMap.get(key.slice(0, 3));
+		if (month) {
+			return makeDate(Number(yearRaw), month, Number(dayRaw));
+		}
+	}
+
+	const parsed = Date.parse(trimmed);
+	if (!Number.isNaN(parsed)) {
+		const d = new Date(parsed);
+		return {
+			dateYMD: `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}`,
+			dateDisplay:
+				typeof d.toLocaleDateString === 'function'
+					? d.toLocaleDateString(undefined, { timeZone: 'UTC' })
+					: trimmed
+		};
+	}
+
+	return {};
+}
+
 /**
  * Extract reference metadata from content.
  * @param ref - Reference object.
@@ -159,32 +253,9 @@ export function extractMetadata(ref: Reference, providedContent?: string): RefMe
 	const rawDate = pick('date');
 	const normalizedDate = rawDate ? convertDigitsToAscii(stripMarkup(rawDate)) : '';
 	if (normalizedDate) {
-		const pad = (n: number) => n.toString().padStart(2, '0');
-		const parsed = Date.parse(normalizedDate);
-		if (!Number.isNaN(parsed)) {
-			const d = new Date(parsed);
-			meta.dateYMD = `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}`;
-			if (typeof d.toLocaleDateString === 'function') {
-				meta.dateDisplay = d.toLocaleDateString(undefined, { timeZone: 'UTC' });
-			} else {
-				meta.dateDisplay = normalizedDate;
-			}
-		} else {
-			const match = normalizedDate.match(/(\d{4})(?:\D?(\d{1,2})(?:\D?(\d{1,2}))?)?/);
-			if (match) {
-				const [, y, m, d] = match;
-				if (y && m && d) {
-					meta.dateYMD = `${y}${pad(Number(m))}${pad(Number(d))}`;
-					meta.dateDisplay = `${y}-${pad(Number(m))}-${pad(Number(d))}`;
-				} else if (y && m) {
-					meta.dateYMD = `${y}${pad(Number(m))}`;
-					meta.dateDisplay = `${y}-${pad(Number(m))}`;
-				} else if (y) {
-					meta.dateYMD = y;
-					meta.dateDisplay = y;
-				}
-			}
-		}
+		const parsed = parseNormalizedDate(normalizedDate);
+		meta.dateYMD = parsed.dateYMD;
+		meta.dateDisplay = parsed.dateDisplay;
 	}
 
 	// Extract year
@@ -283,7 +354,7 @@ function sanitizeToken(token: string, config: MassRenameConfig): string {
 		text = text.toLowerCase();
 	}
 	const spaceReplacement = config.replaceSpaceWith;
-    text = text.replace(/\s+/g, spaceReplacement);
+	text = text.replace(/\s+/g, spaceReplacement);
 	text = text.replace(/_{2,}/g, '_').replace(/\s{2,}/g, ' ');
 	return text.trim();
 }
