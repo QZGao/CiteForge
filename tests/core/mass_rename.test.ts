@@ -42,6 +42,20 @@ describe('mass_rename core helpers', () => {
 		expect(meta.dateDisplay).toMatch(/2023/);
 	});
 
+	it('parses named month dates without shifting to the previous day', () => {
+		const originalTZ = process.env.TZ;
+		try {
+			process.env.TZ = 'Pacific/Auckland';
+			const ref = baseRef({
+				contentWikitext: '{{cite web|title=Foo|date=21 May 2021|url=https://example.com}}'
+			});
+			const meta = extractMetadata(ref);
+			expect(meta.dateYMD).toBe('20210521');
+		} finally {
+			process.env.TZ = originalTZ;
+		}
+	});
+
 	it('extracts partial dates and falls back to text years in content', () => {
 		const ref = baseRef({
 			contentWikitext: '{{cite news|title=Foo|date=2020-02|url=https://example.com}} Published 1999'
