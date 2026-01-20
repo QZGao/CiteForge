@@ -6,6 +6,7 @@ import {
 	domainShortFromUrl,
 	extractUrl,
 	firstYearCandidate,
+	MONTH_NAME_MAP,
 	normalizeNameKey,
 	stripMarkup,
 	toLatin
@@ -155,37 +156,11 @@ function parseNormalizedDate(value: string): ParsedDate {
 		}
 	}
 
-	const monthMap = new Map<string, number>([
-		['jan', 1],
-		['january', 1],
-		['feb', 2],
-		['february', 2],
-		['mar', 3],
-		['march', 3],
-		['apr', 4],
-		['april', 4],
-		['may', 5],
-		['jun', 6],
-		['june', 6],
-		['jul', 7],
-		['july', 7],
-		['aug', 8],
-		['august', 8],
-		['sep', 9],
-		['sept', 9],
-		['september', 9],
-		['oct', 10],
-		['october', 10],
-		['nov', 11],
-		['november', 11],
-		['dec', 12],
-		['december', 12]
-	]);
 	const dayMonth = trimmed.match(/^(\d{1,2})\s+([a-zA-Z.]+)\s*,?\s*(\d{4})$/);
 	if (dayMonth) {
 		const [, dayRaw, monthRaw, yearRaw] = dayMonth;
 		const key = monthRaw.replace(/[^a-zA-Z]/g, '').toLowerCase();
-		const month = monthMap.get(key) ?? monthMap.get(key.slice(0, 3));
+		const month = MONTH_NAME_MAP.get(key) ?? MONTH_NAME_MAP.get(key.slice(0, 3));
 		if (month) {
 			return makeDate(Number(yearRaw), month, Number(dayRaw));
 		}
@@ -194,7 +169,7 @@ function parseNormalizedDate(value: string): ParsedDate {
 	if (monthDay) {
 		const [, monthRaw, dayRaw, yearRaw] = monthDay;
 		const key = monthRaw.replace(/[^a-zA-Z]/g, '').toLowerCase();
-		const month = monthMap.get(key) ?? monthMap.get(key.slice(0, 3));
+		const month = MONTH_NAME_MAP.get(key) ?? MONTH_NAME_MAP.get(key.slice(0, 3));
 		if (month) {
 			return makeDate(Number(yearRaw), month, Number(dayRaw));
 		}

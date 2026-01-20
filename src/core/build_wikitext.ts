@@ -1,5 +1,5 @@
 import { getTemplateAliasMap, getTemplateParamOrder } from "../data/templatedata_fetch";
-import { escapeAttr, extractAttr } from "./string_utils";
+import { convertDigitsToAscii, escapeAttr, extractAttr, MONTH_NAME_MAP } from "./string_utils";
 import {
 	parseRTemplateEntries,
 	parseTemplateParams,
@@ -289,6 +289,110 @@ function renderRefTag(name: string | null, group: string | null, content: string
 }
 
 /**
+ * Pad a date part with leading zero if needed.
+ * @param value - Numeric date part.
+ * @returns Padded date part as string.
+ */
+function padDatePart(value: number): string {
+	return value.toString().padStart(2, '0');
+}
+
+/**
+ * Build an ISO date string from year, month, and day.
+ * @param year - Full year.
+ * @param month - Month (1-12).
+ * @param day - Day (1-31).
+ * @returns ISO date string or null if invalid.
+ */
+function buildIsoDate(year: number, month: number, day: number): string | null {
+	if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+	const date = new Date(Date.UTC(year, month - 1, day));
+	if (date.getUTCFullYear() !== year || date.getUTCMonth() + 1 !== month || date.getUTCDate() !== day) return null;
+	return `${year}-${padDatePart(month)}-${padDatePart(day)}`;
+}
+
+/**
+ * Normalize a raw date value into ISO format (yyyy-mm-dd).
+ * @param rawValue - Raw date string.
+ * @returns Normalized ISO date string or null if unrecognized.
+ */
+function normalizeDateValue(rawValue: string): string | null {
+	if (!rawValue) return null;
+	const trimmed = convertDigitsToAscii(rawValue).trim();
+	if (!trimmed) return null;
+	if (/[\{\}\[\]]/.test(trimmed)) return null;
+
+	const ymd = trimmed.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})$/);
+	if (ymd) {
+		const [, y, m, d] = ymd;
+		return buildIsoDate(Number(y), Number(m), Number(d));
+	}
+
+	const zh = trimmed.match(/^(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日$/);
+	if (zh) {
+		const [, y, m, d] = zh;
+		return buildIsoDate(Number(y), Number(m), Number(d));
+	}
+
+	const dayMonth = trimmed.match(/^(\d{1,2})\s+([A-Za-z.]+)\s*,?\s*(\d{4})$/);
+	if (dayMonth) {
+		const [, dayRaw, monthRaw, yearRaw] = dayMonth;
+		const key = monthRaw.replace(/[^A-Za-z]/g, '').toLowerCase();
+		const month = MONTH_NAME_MAP.get(key) ?? MONTH_NAME_MAP.get(key.slice(0, 3));
+		if (month) return buildIsoDate(Number(yearRaw), month, Number(dayRaw));
+	}
+
+	const monthDay = trimmed.match(/^([A-Za-z.]+)\s+(\d{1,2})(?:\s*,\s*|\s+)(\d{4})$/);
+	if (monthDay) {
+		const [, monthRaw, dayRaw, yearRaw] = monthDay;
+		const key = monthRaw.replace(/[^A-Za-z]/g, '').toLowerCase();
+		const month = MONTH_NAME_MAP.get(key) ?? MONTH_NAME_MAP.get(key.slice(0, 3));
+		if (month) return buildIsoDate(Number(yearRaw), month, Number(dayRaw));
+	}
+
+	const dmyOrMdy = trimmed.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+	if (dmyOrMdy) {
+		const [, firstRaw, secondRaw, yearRaw] = dmyOrMdy;
+		const first = Number(firstRaw);
+		const second = Number(secondRaw);
+		if (first > 12) return buildIsoDate(Number(yearRaw), second, first);
+		if (second > 12) return buildIsoDate(Number(yearRaw), first, second);
+	}
+
+	return null;
+}
+
+/**
+ * Determine if a parameter name indicates a date field.
+ * @param name - Parameter name to check.
+ * @returns True if the name indicates a date field, false otherwise.
+ */
+function isDateParamName(name?: string | null): boolean {
+	if (!name) return false;
+	const trimmed = name.trim().toLowerCase();
+	if (!trimmed || /^\d+$/.test(trimmed)) return false;
+	const key = trimmed.replace(/_/g, '-');
+	if (key === 'date') return true;
+	if (key === 'access-date' || key === 'archive-date' || key === 'publication-date' || key === 'orig-date') return true;
+	if (key === 'accessdate' || key === 'archivedate' || key === 'publicationdate' || key === 'origdate') return true;
+	if (/^date\d+$/.test(key)) return true;
+	if (/^(access|archive|publication|orig)date\d*$/.test(key)) return true;
+	return false;
+}
+
+/**
+ * Normalize a date parameter value if applicable.
+ * @param name - Parameter name.
+ * @param value - Parameter value.
+ * @returns Normalized date value or original value if not a date param.
+ */
+function normalizeDateParamValue(name: string, value: string): string {
+	if (!isDateParamName(name)) return value;
+	const normalized = normalizeDateValue(value);
+	return normalized ?? value;
+}
+
+/**
  * Normalize the body of a reference, reordering citation template parameters.
  * @param content - Raw content of the reference.
  * @returns Normalized reference body content.
@@ -334,7 +438,10 @@ function normalizeRefBody(content: string): string {
 		const parts = ordered.map((p) => {
 			const val = String(p.value).trim();
 			const name = p.name?.trim();
-			if (name) return `${name}=${val}`;
+			if (name) {
+				const normalizedValue = normalizeDateParamValue(name, val);
+				return `${name}=${normalizedValue}`;
+			}
 			return val;
 		});
 		return `{{${name.trim()}${parts.length ? ' |' + parts.join(' |') : ''}}}`;

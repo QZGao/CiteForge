@@ -532,6 +532,16 @@ Lead <ref name="a">Alpha</ref> tail <ref name="b">Beta</ref>
 		expect(result.wikitext).toBe('<ref name="Custom maps">{{cite web |title=The 25 best Minecraft custom maps |url=http://www.pcgamer.com/2012/10/20/the-25-best-minecraft-custom-maps/ |work=[[PC Gamer]] |last=Savage |first=Phil |dead-url=no |archive-url=https://web.archive.org/web/20121023211322/http://www.pcgamer.com/2012/10/20/the-25-best-minecraft-custom-maps/ |archive-date=2012-10-23 |accessdate=2012-10-28 |publisher=[[Future plc]]}}</ref>');
 	});
 
+	it('normalizes cite date params to yyyy-mm-dd', async () => {
+		const source = '<ref name="date-test">{{cite web|title=Foo|url=https://example.com|date=21 May 2021|access-date=2021年5月2日|archive-date=05/21/2021|publication-date=21/05/2021}}</ref>';
+		await prefetchTemplateDataForWikitext(source);
+		const result = transformWikitext(source, { normalizeAll: true });
+		expect(result.wikitext).toContain('date=2021-05-21');
+		expect(result.wikitext).toContain('access-date=2021-05-02');
+		expect(result.wikitext).toContain('archive-date=2021-05-21');
+		expect(result.wikitext).toContain('publication-date=2021-05-21');
+	});
+
 	it('normalizes ref content, test 3', async () => {
 		const source = `<ref name="OXMUK_20130510">{{Cite magazine |title=''Terraria'' – Can Re-Logic’s tile-based sandbox dig its way out of Minecraft’s shadow? |last=Borthwick |first=Ben |magazine=[[Official Xbox Magazine|Xbox 360: The Official Xbox Magazine (UK)]] |date=2013-05-10 |issue=99 (June 2013) |publisher=[[Future Publishing]] |pages=84–85 |language=en-GB |issn=1534-7850}}</ref>`;
 		await prefetchTemplateDataForWikitext(source);

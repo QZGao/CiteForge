@@ -123,3 +123,4 @@ location.reload();
   - [Citation Style Marker](https://en.wikipedia.org/wiki/User:BrandonXLF/CitationStyleMarker) (CC BY-SA 4.0) by BrandonXLF
   - [HarvErrors](https://en.wikipedia.org/wiki/User:Ucucha/HarvErrors) (CC BY-SA 4.0) by Ucucha
   - [reviewsourcecheck](https://en.wikipedia.org/wiki/User:Lingzhi2/reviewsourcecheck) (CC BY-SA 4.0) by Lingzhi & Ucucha
+  - [MOSNUM dates](https://zh.wikipedia.org/wiki/User:Vozhuo/Tool/MOSNUM_dates) (CC BY-SA 4.0) by Ohconfucius & Vozhuo
