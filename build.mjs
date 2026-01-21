@@ -2,6 +2,7 @@ import esbuild from 'esbuild';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { minify as minifyHtml } from 'html-minifier-terser';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,6 +11,7 @@ const watch = process.argv.includes('--watch');
 const debug = process.argv.includes('--debug');
 const pkgJson = JSON.parse(fs.readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 const outFile = path.join(__dirname, debug ? '.debug' : 'dist', 'bundled.js');
+const shouldMinify = !debug;
 
 /**
  * esbuild plugin to extract <template> content from .vue files.
@@ -24,13 +26,39 @@ const vueTemplatePlugin = {
 			if (!match) {
 				return { errors: [{ text: `No <template> block found in ${args.path}` }] };
 			}
-			const template = match[1];
+			const template = shouldMinify
+				? await minifyHtml(match[1], {
+					collapseWhitespace: true,
+					conservativeCollapse: true,
+					removeComments: true,
+					keepClosingSlash: true
+				})
+				: match[1];
 			// Escape backticks and backslashes for template literal
 			const escaped = template.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
 			return {
 				contents: `export default \`${escaped}\`;`,
 				loader: 'js'
 			};
+		});
+	}
+};
+
+const cssMinifyPlugin = {
+	name: 'css-minify',
+	setup(build) {
+		build.onLoad({ filter: /\.css$/ }, async (args) => {
+			const text = await fs.promises.readFile(args.path, 'utf8');
+			if (!shouldMinify) {
+				return { contents: text, loader: 'text' };
+			}
+
+			const result = await esbuild.transform(text, {
+				loader: 'css',
+				minify: true
+			});
+
+			return { contents: result.code, loader: 'text' };
 		});
 	}
 };
@@ -93,9 +121,9 @@ const createBuildOptions = () => {
 		format: 'iife',
 		charset: 'utf8',
 		target: ['es2017'],
-		minify: !debug,
+		minify: shouldMinify,
 		sourcemap: debug ? 'inline' : false,
-		plugins: [vueTemplatePlugin, i18nCatalogPlugin],
+		plugins: [vueTemplatePlugin, cssMinifyPlugin, i18nCatalogPlugin],
 		// Tell esbuild to load CSS files as text so they're bundled into the JS
 		loader: {
 			'.css': 'text'
