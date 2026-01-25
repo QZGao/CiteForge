@@ -1300,7 +1300,7 @@ function normalizeContent(content: string): string {
 	return content.replace(/\s+/g, ' ').trim();
 }
 
-type TemplateSupplementaryEntry = {
+type TemplateParamEntry = {
 	key: string;
 	value: string;
 	paramName: string;
@@ -1310,9 +1310,7 @@ type TemplateSupplementaryEntry = {
 type TemplateFingerprint = {
 	normalizedName: string;
 	originalName: string;
-	nonSupplementary: Map<string, string[]>;
-	supplementary: Map<string, TemplateSupplementaryEntry>;
-	signature: string;
+	params: Map<string, { values: string[]; entries: TemplateParamEntry[] }>;
 	templateText: string;
 	leadingWhitespace: string;
 	trailingWhitespace: string;
@@ -1323,18 +1321,10 @@ type TemplateCanonicalEntry = {
 	fingerprint: TemplateFingerprint;
 };
 
-const SUPPLEMENTARY_PARAM_ALIASES = new Map<string, string>([
-	['access-date', 'access-date'],
-	['archive-url', 'archive-url'],
-	['archive-date', 'archive-date'],
-	['archive-format', 'archive-format'],
-	['url-status', 'url-status'],
-	['dead-url', 'dead-url'],
-
-	// Aliases -> standard name mapping
+const PARAM_KEY_ALIASES = new Map<string, string>([
 	['accessdate', 'access-date'],
 	['archiveurl', 'archive-url'],
-	['archivedate', 'archive-date'],
+	['archivedate', 'archive-date']
 ]);
 
 /**
@@ -1354,35 +1344,25 @@ function buildTemplateFingerprint(content: string): TemplateFingerprint | null {
 	const originalName = nameMatch[1].trim();
 	const normalizedName = normalizeTemplateName(originalName);
 	const params = parseTemplateParams(trimmed);
-	const nonSupplementary = new Map<string, string[]>();
-	const supplementary = new Map<string, TemplateSupplementaryEntry>();
+	const paramBuckets = new Map<string, { values: string[]; entries: TemplateParamEntry[] }>();
 	params.forEach((param) => {
 		const normalizedKey = normalizeParamKey(param.name);
 		if (!normalizedKey) return;
-		const supplementaryKey = canonicalSupplementaryKey(normalizedKey);
 		const normalizedValue = canonicalizeParamValue(param.value);
-		if (supplementaryKey) {
-			if (!supplementary.has(supplementaryKey)) {
-				supplementary.set(supplementaryKey, {
-					key: supplementaryKey,
-					value: normalizedValue,
-					paramName: param.name || supplementaryKey,
-					paramValue: param.value.trim()
-				});
-			}
-			return;
-		}
-		const bucket = nonSupplementary.get(normalizedKey) ?? [];
-		bucket.push(normalizedValue);
-		nonSupplementary.set(normalizedKey, bucket);
+		const bucket = paramBuckets.get(normalizedKey) ?? { values: [], entries: [] };
+		bucket.values.push(normalizedValue);
+		bucket.entries.push({
+			key: normalizedKey,
+			value: normalizedValue,
+			paramName: param.name || normalizedKey,
+			paramValue: param.value.trim()
+		});
+		paramBuckets.set(normalizedKey, bucket);
 	});
-	const signature = buildNonSupplementarySignature(nonSupplementary);
 	return {
 		normalizedName,
 		originalName,
-		nonSupplementary,
-		supplementary,
-		signature,
+		params: paramBuckets,
 		templateText: trimmed,
 		leadingWhitespace,
 		trailingWhitespace
@@ -1439,18 +1419,9 @@ function normalizeParamKey(name?: string | null): string | null {
 	const trimmed = name.trim();
 	if (!trimmed) return null;
 	if (/^\d+$/.test(trimmed)) return trimmed;
-	return trimmed.toLowerCase();
-}
-
-/**
- * Get the canonical supplementary parameter key for a normalized name.
- * @param normalizedName - Normalized parameter name.
- * @returns Canonical supplementary key or null if not a supplementary param.
- */
-function canonicalSupplementaryKey(normalizedName: string | null): string | null {
-	if (!normalizedName) return null;
-	const collapsed = normalizedName.replace(/[_-]+/g, '-');
-	return SUPPLEMENTARY_PARAM_ALIASES.get(collapsed) ?? null;
+	const lower = trimmed.toLowerCase();
+	const collapsed = lower.replace(/[_-]+/g, '-');
+	return PARAM_KEY_ALIASES.get(collapsed) ?? collapsed;
 }
 
 /**
@@ -1463,24 +1434,26 @@ function canonicalizeParamValue(value: string): string {
 }
 
 /**
- * Build a signature string from non-supplementary template parameters.
- * @param map - Map of non-supplementary parameter keys to their values.
- * @returns Signature string.
- */
-function buildNonSupplementarySignature(map: Map<string, string[]>): string {
-	const entries = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-	return entries
-		.map(([key, values]) => `${key}=${values.join('\u0001')}`)
-		.join('\u0002');
-}
-
-/**
  * Build a base key for a template fingerprint.
  * @param fp - Template fingerprint.
  * @returns Base key string.
  */
 function buildTemplateBaseKey(fp: TemplateFingerprint): string {
-	return `${fp.normalizedName}::${fp.signature}`;
+	return fp.normalizedName;
+}
+
+/**
+ * Compare two arrays for strict equality in order and length.
+ * @param a - First array.
+ * @param b - Second array.
+ * @returns True if arrays match exactly, false otherwise.
+ */
+function arraysEqual(a: string[], b: string[]): boolean {
+	if (a.length !== b.length) return false;
+	for (let i = 0; i < a.length; i++) {
+		if (a[i] !== b[i]) return false;
+	}
+	return true;
 }
 
 /**
@@ -1491,25 +1464,24 @@ function buildTemplateBaseKey(fp: TemplateFingerprint): string {
  */
 function templatesCompatible(a: TemplateFingerprint, b: TemplateFingerprint): boolean {
 	if (a.normalizedName !== b.normalizedName) return false;
-	if (a.signature !== b.signature) return false;
-	for (const [key, existing] of a.supplementary.entries()) {
-		const incoming = b.supplementary.get(key);
-		if (incoming && incoming.value !== existing.value) return false;
+	for (const [key, existing] of a.params.entries()) {
+		const incoming = b.params.get(key);
+		if (incoming && !arraysEqual(existing.values, incoming.values)) return false;
 	}
-	for (const [key, incoming] of b.supplementary.entries()) {
-		const existing = a.supplementary.get(key);
-		if (existing && existing.value !== incoming.value) return false;
+	for (const [key, incoming] of b.params.entries()) {
+		const existing = a.params.get(key);
+		if (existing && !arraysEqual(existing.values, incoming.values)) return false;
 	}
 	return true;
 }
 
 /**
- * Insert a supplementary parameter into a template text block.
+ * Insert a parameter into a template text block.
  * @param text - Original template text.
- * @param addition - Supplementary parameter entry to insert.
- * @returns Updated template text with the supplementary parameter inserted.
+ * @param addition - Parameter entry to insert.
+ * @returns Updated template text with the parameter inserted.
  */
-function insertSupplementaryParam(text: string, addition: TemplateSupplementaryEntry): string {
+function insertTemplateParam(text: string, addition: TemplateParamEntry): string {
 	const closingIndex = findTemplateCloseIndex(text);
 	if (closingIndex === -1) return text;
 	const beforeClose = text.slice(0, closingIndex);
@@ -1520,17 +1492,17 @@ function insertSupplementaryParam(text: string, addition: TemplateSupplementaryE
 	const newlineIdx = withoutTrailing.lastIndexOf('\n');
 	const indent = newlineIdx >= 0 ? (withoutTrailing.slice(newlineIdx + 1).match(/^\s*/)?.[0] ?? '') : '';
 	const prefix = newlineIdx >= 0 ? `\n${indent}|` : '|';
-	const paramText = formatSupplementaryParam(addition);
+	const paramText = formatTemplateParam(addition);
 	const updatedBefore = `${withoutTrailing}${prefix}${paramText}${trailingWhitespace}`;
 	return `${updatedBefore}${afterClose}`;
 }
 
 /**
- * Format a supplementary parameter entry into a template parameter string.
- * @param entry - Supplementary parameter entry.
+ * Format a parameter entry into a template parameter string.
+ * @param entry - Parameter entry.
  * @returns Formatted parameter string.
  */
-function formatSupplementaryParam(entry: TemplateSupplementaryEntry): string {
+function formatTemplateParam(entry: TemplateParamEntry): string {
 	const value = entry.paramValue || '';
 	if (entry.paramName) {
 		return `${entry.paramName}=${value}`;
@@ -1563,19 +1535,21 @@ function findTemplateCloseIndex(text: string): number {
 }
 
 /**
- * Merge supplementary parameters from an incoming template fingerprint into a canonical entry.
+ * Merge missing parameters from an incoming template fingerprint into a canonical entry.
  * Updates the template text and content override if changes are made.
  * @param entry - Canonical template entry to update.
- * @param incoming - Incoming template fingerprint with supplementary parameters.
+ * @param incoming - Incoming template fingerprint with mergeable parameters.
  */
-function mergeTemplateSupplementary(entry: TemplateCanonicalEntry, incoming: TemplateFingerprint): void {
+function mergeTemplateParams(entry: TemplateCanonicalEntry, incoming: TemplateFingerprint): void {
 	let templateText = entry.fingerprint.templateText;
 	let changed = false;
-	incoming.supplementary.forEach((addition, key) => {
-		if (entry.fingerprint.supplementary.has(key)) return;
-		entry.fingerprint.supplementary.set(key, addition);
-		templateText = insertSupplementaryParam(templateText, addition);
-		changed = true;
+	incoming.params.forEach((bucket, key) => {
+		if (entry.fingerprint.params.has(key)) return;
+		entry.fingerprint.params.set(key, { values: [...bucket.values], entries: [...bucket.entries] });
+		bucket.entries.forEach((addition) => {
+			templateText = insertTemplateParam(templateText, addition);
+			changed = true;
+		});
 	});
 	if (changed) {
 		entry.fingerprint.templateText = templateText;
@@ -1620,7 +1594,7 @@ function applyDedupe(refs: Map<RefKey, RefRecord>): Array<{ from: string; to: st
 				if (match && match.canonical.name) {
 					ref.canonical = match.canonical;
 					inheritDefinitionContent(match.canonical, ref);
-					mergeTemplateSupplementary(match, templateInfo);
+					mergeTemplateParams(match, templateInfo);
 					changes.push({ from: ref.name, to: match.canonical.name });
 					return;
 				}
