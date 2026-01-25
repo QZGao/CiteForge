@@ -267,6 +267,18 @@ Reuse: <ref name="primary" /><ref name="secondary" />
 		expect(result.wikitext).not.toMatch(/access-date=/);
 	});
 
+	it('deduplicates references, additional test case 1', () => {
+		const source = `
+		<ref name="gameres">{{Cite web |title=《明日方舟：终末地》实机演示首曝，鹰角网络越来越出人意料了 - GameRes游资网 |url=https://www.gameres.com/893623.html |url-status=live |archive-url=https://web.archive.org/web/20231113032935/https://www.gameres.com/893623.html |archive-date=2023-11-13 |access-date=2025-02-01 |website=www.gameres.com}}</ref>
+		<ref name="gameres-a">{{cite web |title=《明日方舟：终末地》实机演示首曝，鹰角网络越来越出人意料了 - GameRes游资网 |url=https://www.gameres.com/893623.html}}</ref>
+		`;
+
+		const result = transformWikitext(source, { dedupe: true, locationMode: 'all_inline' });
+		expect(result.changes.deduped).toContainEqual({ from: 'gameres-a', to: 'gameres' });
+		expect(result.wikitext).toContain('<ref name="gameres">{{Cite web |title=《明日方舟：终末地》实机演示首曝，鹰角网络越来越出人意料了 - GameRes游资网 |url=https://www.gameres.com/893623.html |url-status=live |archive-url=https://web.archive.org/web/20231113032935/https://www.gameres.com/893623.html |archive-date=2023-11-13 |access-date=2025-02-01 |website=www.gameres.com}}</ref>');
+		expect(result.wikitext).not.toContain('name="gameres-a"');
+	});
+
 	it('applies threshold-based LDR placement', () => {
 		const source = `
 First <ref name="rare">Only once</ref>
