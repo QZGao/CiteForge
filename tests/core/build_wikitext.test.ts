@@ -274,9 +274,36 @@ Reuse: <ref name="primary" /><ref name="secondary" />
 		`;
 
 		const result = transformWikitext(source, { dedupe: true, locationMode: 'all_inline' });
+
 		expect(result.changes.deduped).toContainEqual({ from: 'gameres-a', to: 'gameres' });
 		expect(result.wikitext).toContain('<ref name="gameres">{{Cite web |title=《明日方舟：终末地》实机演示首曝，鹰角网络越来越出人意料了 - GameRes游资网 |url=https://www.gameres.com/893623.html |url-status=live |archive-url=https://web.archive.org/web/20231113032935/https://www.gameres.com/893623.html |archive-date=2023-11-13 |access-date=2025-02-01 |website=www.gameres.com}}</ref>');
 		expect(result.wikitext).not.toContain('name="gameres-a"');
+	});
+
+	it('deduplicates references, additional test case 2', () => {
+		const source = `
+		<ref name="MC">{{cite web |title=Arknights: Endfield Reviews |url=https://www.metacritic.com/game/arknights-endfield/ |url-status=live |archive-url=https://web.archive.org/web/20260120153606/https://www.metacritic.com/game/arknights-endfield/ |archive-date=2026-01-20 |accessdate=2026-01-22 |website=[[Metacritic]] |language=en}}</ref>
+		<ref name="metacritic">{{Cite web |title=Arknights: Endfield Reviews |url=https://www.metacritic.com/game/arknights-endfield/ |website=Metacritic}}</ref>
+		`;
+
+		const result = transformWikitext(source, { dedupe: true, locationMode: 'all_inline' });
+
+		expect(result.changes.deduped).toContainEqual({ from: 'metacritic', to: 'MC' });
+		expect(result.wikitext).toContain('<ref name="MC">{{cite web |title=Arknights: Endfield Reviews |url=https://www.metacritic.com/game/arknights-endfield/ |url-status=live |archive-url=https://web.archive.org/web/20260120153606/https://www.metacritic.com/game/arknights-endfield/ |archive-date=2026-01-20 |accessdate=2026-01-22 |website=[[Metacritic]] |language=en}}</ref>');
+		expect(result.wikitext).not.toContain('name="metacritic"');
+	});
+
+	it('deduplicates references, additional test case 3', () => {
+		const source = `
+		<ref name="MC">{{cite web |title=Arknights: Endfield Reviews |url=https://www.metacritic.com/game/arknights-endfield/ |url-status=live |archive-url=https://web.archive.org/web/20260120153606/https://www.metacritic.com/game/arknights-endfield/ |archive-date=2026-01-20 |accessdate=2026-01-22 |website=Metacritic |language=en}}</ref>
+		<ref name="metacritic">{{Cite web |title=Arknights: Endfield Reviews |url=https://www.metacritic.com/game/arknights-endfield/ |website=www.metacritic.com}}</ref>
+		`;
+
+		const result = transformWikitext(source, { dedupe: true, locationMode: 'all_inline' });
+
+		expect(result.changes.deduped).toContainEqual({ from: 'metacritic', to: 'MC' });
+		expect(result.wikitext).toContain('<ref name="MC">{{cite web |title=Arknights: Endfield Reviews |url=https://www.metacritic.com/game/arknights-endfield/ |url-status=live |archive-url=https://web.archive.org/web/20260120153606/https://www.metacritic.com/game/arknights-endfield/ |archive-date=2026-01-20 |accessdate=2026-01-22 |website=Metacritic |language=en}}</ref>');
+		expect(result.wikitext).not.toContain('name="metacritic"');
 	});
 
 	it('applies threshold-based LDR placement', () => {
