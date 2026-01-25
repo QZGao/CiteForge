@@ -1457,6 +1457,81 @@ function arraysEqual(a: string[], b: string[]): boolean {
 }
 
 /**
+ * Check if a parameter value uses wiki link markup.
+ * @param value - Parameter value string.
+ * @returns True if value contains wiki link markup.
+ */
+function hasWikiLink(value: string): boolean {
+	return /\[\[[^\]]+]]/.test(value);
+}
+
+/**
+ * Get the hostname from a template fingerprint URL parameter if available.
+ * @param fp - Template fingerprint.
+ * @returns Hostname string or null if unavailable.
+ */
+function getUrlHost(fp: TemplateFingerprint): string | null {
+	const urlBucket = fp.params.get('url');
+	if (!urlBucket || urlBucket.entries.length !== 1) return null;
+	const urlValue = urlBucket.entries[0].paramValue.trim();
+	if (!urlValue) return null;
+	try {
+		const parsed = new URL(urlValue);
+		return parsed.hostname ? parsed.hostname.toLowerCase() : null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Check if a website value is just the domain for the associated URL param.
+ * @param entry - Website parameter entry.
+ * @param fp - Template fingerprint for context.
+ * @returns True if the website is a domain-only URL for the same host.
+ */
+function isWebsiteDomainOnly(entry: TemplateParamEntry, fp: TemplateFingerprint): boolean {
+	const websiteValue = entry.paramValue.trim();
+	if (!websiteValue) return false;
+	const urlHost = getUrlHost(fp);
+	const normalizeHost = (host: string): string => host.toLowerCase().replace(/^www\./, '');
+	if (!urlHost) return false;
+	const normalizedValue = normalizeHost(websiteValue);
+	const normalizedHost = normalizeHost(urlHost);
+	return normalizedValue === normalizedHost;
+}
+
+/**
+ * Decide which parameter entry is better filled based on heuristics.
+ * @param key - Normalized parameter key.
+ * @param a - First parameter entry.
+ * @param b - Second parameter entry.
+ * @param aCtx - First parameter fingerprint context.
+ * @param bCtx - Second parameter fingerprint context.
+ * @returns 1 if a is preferred, -1 if b is preferred, 0 if no preference.
+ */
+function preferParamEntry(
+	key: string,
+	a: TemplateParamEntry,
+	b: TemplateParamEntry,
+	aCtx: TemplateFingerprint,
+	bCtx: TemplateFingerprint
+): 1 | 0 | -1 {
+	const aValue = a.paramValue.trim();
+	const bValue = b.paramValue.trim();
+	const aLinked = hasWikiLink(aValue);
+	const bLinked = hasWikiLink(bValue);
+	if (aLinked !== bLinked) return aLinked ? 1 : -1;
+
+	if (key === 'website') {
+		const aDomain = isWebsiteDomainOnly(a, aCtx);
+		const bDomain = isWebsiteDomainOnly(b, bCtx);
+		if (aDomain !== bDomain) return aDomain ? -1 : 1;
+	}
+
+	return 0;
+}
+
+/**
  * Check if two template fingerprints are compatible for deduplication.
  * @param a - First template fingerprint.
  * @param b - Second template fingerprint.
@@ -1466,11 +1541,19 @@ function templatesCompatible(a: TemplateFingerprint, b: TemplateFingerprint): bo
 	if (a.normalizedName !== b.normalizedName) return false;
 	for (const [key, existing] of a.params.entries()) {
 		const incoming = b.params.get(key);
-		if (incoming && !arraysEqual(existing.values, incoming.values)) return false;
+		if (!incoming) continue;
+		if (arraysEqual(existing.values, incoming.values)) continue;
+		if (existing.values.length !== 1 || incoming.values.length !== 1) return false;
+		const preferred = preferParamEntry(key, existing.entries[0], incoming.entries[0], a, b);
+		if (preferred === 0) return false;
 	}
 	for (const [key, incoming] of b.params.entries()) {
 		const existing = a.params.get(key);
-		if (existing && !arraysEqual(existing.values, incoming.values)) return false;
+		if (!existing) continue;
+		if (arraysEqual(existing.values, incoming.values)) continue;
+		if (existing.values.length !== 1 || incoming.values.length !== 1) return false;
+		const preferred = preferParamEntry(key, existing.entries[0], incoming.entries[0], a, b);
+		if (preferred === 0) return false;
 	}
 	return true;
 }
@@ -1495,6 +1578,40 @@ function insertTemplateParam(text: string, addition: TemplateParamEntry): string
 	const paramText = formatTemplateParam(addition);
 	const updatedBefore = `${withoutTrailing}${prefix}${paramText}${trailingWhitespace}`;
 	return `${updatedBefore}${afterClose}`;
+}
+
+/**
+ * Replace a parameter value in a template text block.
+ * @param text - Original template text.
+ * @param key - Normalized parameter key to replace.
+ * @param entry - Parameter entry with replacement value.
+ * @returns Updated template text with the parameter replaced.
+ */
+function replaceTemplateParam(text: string, key: string, entry: TemplateParamEntry): string {
+	const match = text.match(/^\{\{\s*([^{|}]+?)(?=\s*\||\s*}})/);
+	if (!match) return text;
+	const inner = text.replace(/^\{\{/, '').replace(/\}\}$/, '');
+	const pipeIdx = inner.indexOf('|');
+	if (pipeIdx === -1) return text;
+	const namePart = inner.slice(0, pipeIdx);
+	const paramsText = inner.slice(pipeIdx + 1);
+	const parts = splitTemplateParams(paramsText);
+	let replaced = false;
+	const updated = parts.map((part) => {
+		const eqIdx = part.indexOf('=');
+		const namePartRaw = eqIdx >= 0 ? part.slice(0, eqIdx) : '';
+		const normalized = normalizeParamKey(namePartRaw.trim());
+		if (normalized !== key) return part;
+		replaced = true;
+		const leading = part.match(/^\s*/)?.[0] ?? '';
+		const trailing = part.match(/\s*$/)?.[0] ?? '';
+		const paramName = entry.paramName || namePartRaw.trim() || key;
+		const paramValue = entry.paramValue;
+		if (paramName) return `${leading}${paramName}=${paramValue}${trailing}`;
+		return `${leading}${paramValue}${trailing}`;
+	});
+	if (!replaced) return text;
+	return `{{${namePart}|${updated.join('|')}}}`;
 }
 
 /**
@@ -1544,7 +1661,18 @@ function mergeTemplateParams(entry: TemplateCanonicalEntry, incoming: TemplateFi
 	let templateText = entry.fingerprint.templateText;
 	let changed = false;
 	incoming.params.forEach((bucket, key) => {
-		if (entry.fingerprint.params.has(key)) return;
+		const existingBucket = entry.fingerprint.params.get(key);
+		if (existingBucket) {
+			if (!arraysEqual(existingBucket.values, bucket.values) && existingBucket.values.length === 1 && bucket.values.length === 1) {
+				const preferred = preferParamEntry(key, existingBucket.entries[0], bucket.entries[0], entry.fingerprint, incoming);
+				if (preferred === -1) {
+					entry.fingerprint.params.set(key, { values: [...bucket.values], entries: [...bucket.entries] });
+					templateText = replaceTemplateParam(templateText, key, bucket.entries[0]);
+					changed = true;
+				}
+			}
+			return;
+		}
 		entry.fingerprint.params.set(key, { values: [...bucket.values], entries: [...bucket.entries] });
 		bucket.entries.forEach((addition) => {
 			templateText = insertTemplateParam(templateText, addition);
