@@ -1322,9 +1322,13 @@ type TemplateCanonicalEntry = {
 };
 
 const PARAM_KEY_ALIASES = new Map<string, string>([
+	// Left: alias; right: canonical
 	['accessdate', 'access-date'],
 	['archiveurl', 'archive-url'],
-	['archivedate', 'archive-date']
+	['archivedate', 'archive-date'],
+	['last1', 'last'],
+	['first1', 'first'],
+	['author1', 'author']
 ]);
 
 /**

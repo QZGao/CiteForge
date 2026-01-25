@@ -306,6 +306,32 @@ Reuse: <ref name="primary" /><ref name="secondary" />
 		expect(result.wikitext).not.toContain('name="metacritic"');
 	});
 
+	it('deduplicates references, additional test case 4', () => {
+		const source = `
+		<ref name="GamingBolt Review">{{cite news |last1=Sinha |first1=Ravi |date=2026-01-22 |title=Arknights: Endfield Review – Stars From the End |url=https://gamingbolt.com/arknights-endfield-review-stars-from-the-end |url-status=live |archive-url=https://web.archive.org/web/20260122210242/https://gamingbolt.com/arknights-endfield-review-stars-from-the-end |archive-date=2026-01-22 |accessdate=2026-01-22 |work=GamingBolt |language=en}}</ref>
+		<ref name="gamingbolt">{{Cite web |last=Sinha |first=Ravi |title=Arknights: Endfield Review – Stars From the End |url=https://gamingbolt.com/arknights-endfield-review-stars-from-the-end}}</ref>
+		`;
+
+		const result = transformWikitext(source, { dedupe: true, locationMode: 'all_inline' });
+
+		expect(result.changes.deduped).toContainEqual({ from: 'gamingbolt', to: 'GamingBolt Review' });
+		expect(result.wikitext).toContain('<ref name="GamingBolt Review">{{cite news |last=Sinha |first=Ravi |date=2026-01-22 |title=Arknights: Endfield Review – Stars From the End |url=https://gamingbolt.com/arknights-endfield-review-stars-from-the-end |url-status=live |archive-url=https://web.archive.org/web/20260122210242/https://gamingbolt.com/arknights-endfield-review-stars-from-the-end |archive-date=2026-01-22 |accessdate=2026-01-22 |work=GamingBolt |language=en}}</ref>');
+		expect(result.wikitext).not.toContain('name="gamingbolt"');
+	});
+
+	it('deduplicates references, additional test case 5', () => {
+		const source = `
+		<ref name="CGMagazine Review">{{cite news |last1=Biordi |first1=Jordan |date=2026-01-20 |title=Arknights: Endfield (PC) Review |url=https://www.cgmagonline.com/review/game/arknights-endfield-pc/ |accessdate=2026-01-22 |work=CGMagazine |language=en}}</ref>
+		<ref name="cgmagonline-20260120">{{Cite web |date=2026-01-20 |title=Arknights: Endfield (PC) Review - CGMagazine |url=https://www.cgmagonline.com/review/game/arknights-endfield-pc/ |website=www.cgmagonline.com}}</ref>
+		`;
+
+		const result = transformWikitext(source, { dedupe: true, locationMode: 'all_inline' });
+
+		expect(result.changes.deduped).toContainEqual({ from: 'cgmagonline-20260120', to: 'CGMagazine Review' });
+		expect(result.wikitext).toContain('<ref name="CGMagazine Review">{{cite news |last=Biordi |first=Jordan |date=2026-01-20 |title=Arknights: Endfield (PC) Review |url=https://www.cgmagonline.com/review/game/arknights-endfield-pc/ |accessdate=2026-01-22 |work=CGMagazine |language=en}}</ref>');
+		expect(result.wikitext).not.toContain('name="cgmagonline-20260120"');
+	});
+
 	it('applies threshold-based LDR placement', () => {
 		const source = `
 First <ref name="rare">Only once</ref>
