@@ -607,6 +607,26 @@ Lead <ref name="a">Alpha</ref> tail <ref name="b">Beta</ref>
 		expect(result.wikitext).toContain('publication-date=2021-05-21');
 	});
 
+	it('normalizes cite date params to MMMM d, yyyy', async () => {
+		const source = '<ref name="date-test">{{cite web|title=Foo|url=https://example.com|date=21 May 2021|access-date=2021年5月2日|archive-date=05/21/2021|publication-date=21/05/2021}}</ref>';
+		await prefetchTemplateDataForWikitext(source);
+		const result = transformWikitext(source, { normalizeAll: true, dateFormat: 'mdy' });
+		expect(result.wikitext).toContain('date=May 21, 2021');
+		expect(result.wikitext).toContain('access-date=May 2, 2021');
+		expect(result.wikitext).toContain('archive-date=May 21, 2021');
+		expect(result.wikitext).toContain('publication-date=May 21, 2021');
+	});
+
+	it('normalizes cite date params to d MMMM yyyy', async () => {
+		const source = '<ref name="date-test">{{cite web|title=Foo|url=https://example.com|date=21 May 2021|access-date=2021年5月2日|archive-date=05/21/2021|publication-date=21/05/2021}}</ref>';
+		await prefetchTemplateDataForWikitext(source);
+		const result = transformWikitext(source, { normalizeAll: true, dateFormat: 'dmy' });
+		expect(result.wikitext).toContain('date=21 May 2021');
+		expect(result.wikitext).toContain('access-date=2 May 2021');
+		expect(result.wikitext).toContain('archive-date=21 May 2021');
+		expect(result.wikitext).toContain('publication-date=21 May 2021');
+	});
+
 	it('normalizes ref content, test 3', async () => {
 		const source = `<ref name="OXMUK_20130510">{{Cite magazine |title=''Terraria'' – Can Re-Logic’s tile-based sandbox dig its way out of Minecraft’s shadow? |last=Borthwick |first=Ben |magazine=[[Official Xbox Magazine|Xbox 360: The Official Xbox Magazine (UK)]] |date=2013-05-10 |issue=99 (June 2013) |publisher=[[Future Publishing]] |pages=84–85 |language=en-GB |issn=1534-7850}}</ref>`;
 		await prefetchTemplateDataForWikitext(source);

@@ -1,5 +1,5 @@
 import { getTemplateAliasMap, getTemplateParamOrder } from "../data/templatedata_fetch";
-import { convertDigitsToAscii, escapeAttr, extractAttr, MONTH_NAME_MAP } from "./string_utils";
+import { convertDigitsToAscii, escapeAttr, extractAttr, MONTH_NAME_MAP, MONTH_NAMES } from "./string_utils";
 import {
 	parseRTemplateEntries,
 	parseTemplateParams,
@@ -45,6 +45,7 @@ function buildReplacementPlan(ctx: {
 	preferTemplateReflist: boolean;
 	sortRefs: boolean;
 	normalizeAll: boolean;
+	dateFormat: DateFormat;
 	locationModeKeep: boolean;
 	renameLookup?: (name: string) => string | null | undefined;
 	contentOverrideLookup?: (ref: RefRecord) => string | undefined;
@@ -95,7 +96,7 @@ function buildReplacementPlan(ctx: {
 			}
 			if (targetLocation === 'inline' && canonical === ref && useIdx === 0 && canonicalContent) {
 				// Ensure first use holds definition
-				const rendered = renderRefTag(targetName, ref.group, canonicalContent, opts.normalizeAll);
+				const rendered = renderRefTag(targetName, ref.group, canonicalContent, opts.normalizeAll, opts.dateFormat);
 				replacements.push({ start: use.start, end: use.end, text: rendered });
 				if (targetName) movedInline.push(targetName);
 			} else {
@@ -118,7 +119,7 @@ function buildReplacementPlan(ctx: {
 					}
 				}
 				const rendered = content
-					? renderRefTag(targetName, targetGroup, content, opts.normalizeAll)
+					? renderRefTag(targetName, targetGroup, content, opts.normalizeAll, opts.dateFormat)
 					: renderRefSelf(targetName, targetGroup, opts.preferTemplateR);
 				replacements.push({ start: def.start, end: def.end, text: rendered });
 				if (targetName) movedLdr.push(targetName);
@@ -272,19 +273,28 @@ function renderRefSelf(name: string | null, group: string | null, preferTemplate
 	return `<ref ${attrs.join(' ')} />`;
 }
 
+type DateFormat = 'iso' | 'mdy' | 'dmy';
+
 /**
  * Render a full reference tag with content.
  * @param name - Reference name.
  * @param group - Reference group.
  * @param content - Reference content.
  * @param normalize - Whether to normalize the content body.
+ * @param dateFormat - Date format for normalization.
  * @returns Rendered full reference tag string.
  */
-function renderRefTag(name: string | null, group: string | null, content: string, normalize = false): string {
+function renderRefTag(
+	name: string | null,
+	group: string | null,
+	content: string,
+	normalize = false,
+	dateFormat: DateFormat = 'iso'
+): string {
 	const attrs: string[] = [];
 	if (name) attrs.push(`name="${escapeAttr(name)}"`);
 	if (group) attrs.push(`group="${escapeAttr(group)}"`);
-	const inner = normalize ? normalizeRefBody(content) : normalizeContentBlock(content);
+	const inner = normalize ? normalizeRefBody(content, dateFormat) : normalizeContentBlock(content);
 	return `<ref${attrs.length ? ' ' + attrs.join(' ') : ''}>${inner}</ref>`;
 }
 
@@ -363,6 +373,26 @@ function normalizeDateValue(rawValue: string): string | null {
 }
 
 /**
+ * Format an ISO date value into the specified format.
+ * @param isoValue - ISO date string (yyyy-mm-dd).
+ * @param format - Desired output format.
+ * @returns Formatted date string.
+ */
+function formatDateValue(isoValue: string, format: DateFormat): string {
+	if (format === 'iso') return isoValue;
+	const match = isoValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+	if (!match) return isoValue;
+	const [, year, monthRaw, dayRaw] = match;
+	const month = Number(monthRaw);
+	const day = Number(dayRaw);
+	const monthName = MONTH_NAMES[month - 1];
+	if (!monthName) return isoValue;
+	const dayText = String(day);
+	if (format === 'mdy') return `${monthName} ${dayText}, ${year}`;
+	return `${dayText} ${monthName} ${year}`;
+}
+
+/**
  * Determine if a parameter name indicates a date field.
  * @param name - Parameter name to check.
  * @returns True if the name indicates a date field, false otherwise.
@@ -384,20 +414,23 @@ function isDateParamName(name?: string | null): boolean {
  * Normalize a date parameter value if applicable.
  * @param name - Parameter name.
  * @param value - Parameter value.
+ * @param dateFormat - Desired date format.
  * @returns Normalized date value or original value if not a date param.
  */
-function normalizeDateParamValue(name: string, value: string): string {
+function normalizeDateParamValue(name: string, value: string, dateFormat: DateFormat): string {
 	if (!isDateParamName(name)) return value;
 	const normalized = normalizeDateValue(value);
-	return normalized ?? value;
+	if (!normalized) return value;
+	return formatDateValue(normalized, dateFormat);
 }
 
 /**
  * Normalize the body of a reference, reordering citation template parameters.
  * @param content - Raw content of the reference.
+ * @param dateFormat - Desired date format for normalization.
  * @returns Normalized reference body content.
  */
-function normalizeRefBody(content: string): string {
+function normalizeRefBody(content: string, dateFormat: DateFormat): string {
 	let text = normalizeContentBlock(content);
 	const citeRegex = /\{\{\s*([Cc]ite\s+[^\|\}]+)\s*\|([\s\S]*?)\}\}/g;
 	text = text.replace(citeRegex, (match, name: string, paramText: string) => {
@@ -439,7 +472,7 @@ function normalizeRefBody(content: string): string {
 			const val = String(p.value).trim();
 			const name = p.name?.trim();
 			if (name) {
-				const normalizedValue = normalizeDateParamValue(name, val);
+				const normalizedValue = normalizeDateParamValue(name, val, dateFormat);
 				return `${name}=${normalizedValue}`;
 			}
 			return val;
@@ -1090,6 +1123,7 @@ export interface TransformOptions {
 	preferTemplateReflist?: boolean;
 	reflistTemplates?: string[];
 	normalizeAll?: boolean;
+	dateFormat?: DateFormat;
 	contentOverrides?: Record<string, string>;
 }
 
@@ -1148,6 +1182,7 @@ export function transformWikitext(wikitext: string, options: TransformOptions = 
 	const preferTemplateR = Boolean(options.preferTemplateR);
 	const preferTemplateReflist = options.preferTemplateReflist === undefined ? true : Boolean(options.preferTemplateReflist);
 	const normalizeAll = options.normalizeAll === undefined ? false : options.normalizeAll;
+	const dateFormat: DateFormat = options.dateFormat ?? 'iso';
 	const reflistNames = (options.reflistTemplates && options.reflistTemplates.length > 0 ? options.reflistTemplates : DEFAULT_REFLIST_TEMPLATES).map((n) => n.toLowerCase());
 	const targetMode = normalizeLocationMode(options.locationMode);
 	const contentOverrides = options.contentOverrides || {};
@@ -1175,6 +1210,7 @@ export function transformWikitext(wikitext: string, options: TransformOptions = 
 		preferTemplateReflist,
 		sortRefs,
 		normalizeAll,
+		dateFormat,
 		locationModeKeep: targetMode === 'keep',
 		renameLookup: (name: string) => renameMap[name],
 		contentOverrideLookup

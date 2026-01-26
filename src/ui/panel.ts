@@ -332,6 +332,17 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					{ label: t('ui.panel.copyOptions.refTag'), value: 'ref' }
 				];
 			},
+			/**
+			 * Get options for date formatting when normalizing.
+			 * @returns Array of label/value pairs for date format selection.
+			 */
+			dateFormatOptions(): Array<{ label: string; value: 'iso' | 'mdy' | 'dmy' }> {
+				return [
+					{ label: t('ui.panel.settings.dateFormat.iso'), value: 'iso' },
+					{ label: t('ui.panel.settings.dateFormat.mdy'), value: 'mdy' },
+					{ label: t('ui.panel.settings.dateFormat.dmy'), value: 'dmy' }
+				];
+			},
 
 			/**
 			 * Get options for reference re-placement strategies.

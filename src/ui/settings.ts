@@ -20,6 +20,8 @@ export type Settings = {
 	makeCopies: boolean;
 	/** Normalize generated ref markup (trim/compact whitespace). */
 	normalizeAll: boolean;
+	/** Date format to use when normalizing cite date parameters. */
+	normalizeDateFormat: 'iso' | 'mdy' | 'dmy';
 	/** Allow running saves even if only cosmetic changes would occur. */
 	allowCosmeticSaves: boolean;
 };
@@ -38,6 +40,7 @@ const DEFAULT_SETTINGS: Settings = {
 	preferTemplateReflist: true,
 	makeCopies: false,
 	normalizeAll: false,
+	normalizeDateFormat: 'iso',
 	allowCosmeticSaves: false
 };
 
@@ -119,6 +122,7 @@ export function settingsToTransformOptions(
 		locationMode: placementMode,
 		dedupe: !settings.makeCopies,
 		normalizeAll: Boolean(settings.normalizeAll),
+		dateFormat: settings.normalizeDateFormat,
 		contentOverrides
 	};
 }
