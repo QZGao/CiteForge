@@ -202,13 +202,13 @@ Intro <ref name="alpha" /> tail <ref name="beta" />
 		expect(result.wikitext).not.toContain('<references');
 	});
 
-	it('deduplicates identical reference content and unifies names', () => {
+	it('deduplicates identical reference content and unifies names', async () => {
 		const source = `
 <ref name="x">Same content</ref> text <ref name="y">Same content</ref>
 
 {{reflist}}
 `;
-
+		await prefetchTemplateDataForWikitext(source);
 		const result = transformWikitext(source, {
 			dedupe: true,
 			locationMode: 'all_ldr',
@@ -222,7 +222,7 @@ Intro <ref name="alpha" /> tail <ref name="beta" />
 		expect(result.changes.deduped).toContainEqual({ from: 'y', to: 'x' });
 	});
 
-	it('deduplicates citation templates semantically and merges supplementary params', () => {
+	it('deduplicates citation templates semantically and merges supplementary params', async () => {
 		const source = `
 <ref name="primary">{{cite web|title=Alpha|url=http://example.com}}</ref>
 <ref name="secondary">{{cite web|title=Alpha|url=http://example.com|access-date=2020-01-01|archive-url=https://web.archive.org/web/20200101/http://example.com|archive-date=2020-01-02|dead-url=no}}</ref>
@@ -231,7 +231,7 @@ Reuse: <ref name="primary" /><ref name="secondary" />
 
 {{reflist}}
 `;
-
+		await prefetchTemplateDataForWikitext(source);
 		const result = transformWikitext(source, { dedupe: true, locationMode: 'all_inline' });
 
 		expect(result.wikitext).toContain('<ref name="primary">{{cite web|title=Alpha|url=http://example.com|access-date=2020-01-01|archive-url=https://web.archive.org/web/20200101/http://example.com|archive-date=2020-01-02|dead-url=no}}</ref>');
@@ -241,12 +241,12 @@ Reuse: <ref name="primary" /><ref name="secondary" />
 		expect(result.wikitext).toContain('Reuse: <ref name="primary" /><ref name="primary" />');
 	});
 
-	it('does not dedupe citation templates when supplementary params conflict', () => {
+	it('does not dedupe citation templates when supplementary params conflict', async () => {
 		const source = `
 <ref name="old">{{cite web|title=Alpha|url=http://example.com|access-date=2020-01-01}}</ref>
 <ref name="new">{{cite web|title=Alpha|url=http://example.com|access-date=2021-01-01}}</ref>
 `;
-
+		await prefetchTemplateDataForWikitext(source);
 		const result = transformWikitext(source, { dedupe: true, locationMode: 'all_inline' });
 
 		expect(result.changes.deduped).toHaveLength(0);
@@ -254,12 +254,12 @@ Reuse: <ref name="primary" /><ref name="secondary" />
 		expect(result.wikitext).toContain('name="new"');
 	});
 
-	it('treats supplementary aliases as the same parameter when deduping', () => {
+	it('treats supplementary aliases as the same parameter when deduping', async () => {
 		const source = `
 <ref name="one">{{cite web|title=Alpha|url=http://example.com|accessdate=2020-01-01}}</ref>
 <ref name="two">{{cite web|title=Alpha|url=http://example.com|access-date=2020-01-01}}</ref>
 `;
-
+		await prefetchTemplateDataForWikitext(source);
 		const result = transformWikitext(source, { dedupe: true, locationMode: 'all_inline' });
 
 		expect(result.changes.deduped).toContainEqual({ from: 'two', to: 'one' });
@@ -267,12 +267,12 @@ Reuse: <ref name="primary" /><ref name="secondary" />
 		expect(result.wikitext).not.toMatch(/access-date=/);
 	});
 
-	it('deduplicates references, additional test case 1', () => {
+	it('deduplicates references, additional test case 1', async () => {
 		const source = `
 		<ref name="gameres">{{Cite web |title=《明日方舟：终末地》实机演示首曝，鹰角网络越来越出人意料了 - GameRes游资网 |url=https://www.gameres.com/893623.html |url-status=live |archive-url=https://web.archive.org/web/20231113032935/https://www.gameres.com/893623.html |archive-date=2023-11-13 |access-date=2025-02-01 |website=www.gameres.com}}</ref>
 		<ref name="gameres-a">{{cite web |title=《明日方舟：终末地》实机演示首曝，鹰角网络越来越出人意料了 - GameRes游资网 |url=https://www.gameres.com/893623.html}}</ref>
 		`;
-
+		await prefetchTemplateDataForWikitext(source);
 		const result = transformWikitext(source, { dedupe: true, locationMode: 'all_inline' });
 
 		expect(result.changes.deduped).toContainEqual({ from: 'gameres-a', to: 'gameres' });
@@ -280,12 +280,12 @@ Reuse: <ref name="primary" /><ref name="secondary" />
 		expect(result.wikitext).not.toContain('name="gameres-a"');
 	});
 
-	it('deduplicates references, additional test case 2', () => {
+	it('deduplicates references, additional test case 2', async () => {
 		const source = `
 		<ref name="MC">{{cite web |title=Arknights: Endfield Reviews |url=https://www.metacritic.com/game/arknights-endfield/ |url-status=live |archive-url=https://web.archive.org/web/20260120153606/https://www.metacritic.com/game/arknights-endfield/ |archive-date=2026-01-20 |accessdate=2026-01-22 |website=[[Metacritic]] |language=en}}</ref>
 		<ref name="metacritic">{{Cite web |title=Arknights: Endfield Reviews |url=https://www.metacritic.com/game/arknights-endfield/ |website=Metacritic}}</ref>
 		`;
-
+		await prefetchTemplateDataForWikitext(source);
 		const result = transformWikitext(source, { dedupe: true, locationMode: 'all_inline' });
 
 		expect(result.changes.deduped).toContainEqual({ from: 'metacritic', to: 'MC' });
@@ -293,12 +293,12 @@ Reuse: <ref name="primary" /><ref name="secondary" />
 		expect(result.wikitext).not.toContain('name="metacritic"');
 	});
 
-	it('deduplicates references, additional test case 3', () => {
+	it('deduplicates references, additional test case 3', async () => {
 		const source = `
 		<ref name="MC">{{cite web |title=Arknights: Endfield Reviews |url=https://www.metacritic.com/game/arknights-endfield/ |url-status=live |archive-url=https://web.archive.org/web/20260120153606/https://www.metacritic.com/game/arknights-endfield/ |archive-date=2026-01-20 |accessdate=2026-01-22 |website=Metacritic |language=en}}</ref>
 		<ref name="metacritic">{{Cite web |title=Arknights: Endfield Reviews |url=https://www.metacritic.com/game/arknights-endfield/ |website=www.metacritic.com}}</ref>
 		`;
-
+		await prefetchTemplateDataForWikitext(source);
 		const result = transformWikitext(source, { dedupe: true, locationMode: 'all_inline' });
 
 		expect(result.changes.deduped).toContainEqual({ from: 'metacritic', to: 'MC' });
@@ -306,29 +306,29 @@ Reuse: <ref name="primary" /><ref name="secondary" />
 		expect(result.wikitext).not.toContain('name="metacritic"');
 	});
 
-	it('deduplicates references, additional test case 4', () => {
+	it('deduplicates references, additional test case 4', async () => {
 		const source = `
 		<ref name="GamingBolt Review">{{cite news |last1=Sinha |first1=Ravi |date=2026-01-22 |title=Arknights: Endfield Review – Stars From the End |url=https://gamingbolt.com/arknights-endfield-review-stars-from-the-end |url-status=live |archive-url=https://web.archive.org/web/20260122210242/https://gamingbolt.com/arknights-endfield-review-stars-from-the-end |archive-date=2026-01-22 |accessdate=2026-01-22 |work=GamingBolt |language=en}}</ref>
 		<ref name="gamingbolt">{{Cite web |last=Sinha |first=Ravi |title=Arknights: Endfield Review – Stars From the End |url=https://gamingbolt.com/arknights-endfield-review-stars-from-the-end}}</ref>
 		`;
-
+		await prefetchTemplateDataForWikitext(source);
 		const result = transformWikitext(source, { dedupe: true, locationMode: 'all_inline' });
 
 		expect(result.changes.deduped).toContainEqual({ from: 'gamingbolt', to: 'GamingBolt Review' });
-		expect(result.wikitext).toContain('<ref name="GamingBolt Review">{{cite news |last=Sinha |first=Ravi |date=2026-01-22 |title=Arknights: Endfield Review – Stars From the End |url=https://gamingbolt.com/arknights-endfield-review-stars-from-the-end |url-status=live |archive-url=https://web.archive.org/web/20260122210242/https://gamingbolt.com/arknights-endfield-review-stars-from-the-end |archive-date=2026-01-22 |accessdate=2026-01-22 |work=GamingBolt |language=en}}</ref>');
+		expect(result.wikitext).toContain('<ref name="GamingBolt Review">{{cite news |last1=Sinha |first1=Ravi |date=2026-01-22 |title=Arknights: Endfield Review – Stars From the End |url=https://gamingbolt.com/arknights-endfield-review-stars-from-the-end |url-status=live |archive-url=https://web.archive.org/web/20260122210242/https://gamingbolt.com/arknights-endfield-review-stars-from-the-end |archive-date=2026-01-22 |accessdate=2026-01-22 |work=GamingBolt |language=en}}</ref>');
 		expect(result.wikitext).not.toContain('name="gamingbolt"');
 	});
 
-	it('deduplicates references, additional test case 5', () => {
+	it('deduplicates references, additional test case 5', async () => {
 		const source = `
 		<ref name="CGMagazine Review">{{cite news |last1=Biordi |first1=Jordan |date=2026-01-20 |title=Arknights: Endfield (PC) Review |url=https://www.cgmagonline.com/review/game/arknights-endfield-pc/ |accessdate=2026-01-22 |work=CGMagazine |language=en}}</ref>
 		<ref name="cgmagonline-20260120">{{Cite web |date=2026-01-20 |title=Arknights: Endfield (PC) Review - CGMagazine |url=https://www.cgmagonline.com/review/game/arknights-endfield-pc/ |website=www.cgmagonline.com}}</ref>
 		`;
-
+		await prefetchTemplateDataForWikitext(source);
 		const result = transformWikitext(source, { dedupe: true, locationMode: 'all_inline' });
 
 		expect(result.changes.deduped).toContainEqual({ from: 'cgmagonline-20260120', to: 'CGMagazine Review' });
-		expect(result.wikitext).toContain('<ref name="CGMagazine Review">{{cite news |last=Biordi |first=Jordan |date=2026-01-20 |title=Arknights: Endfield (PC) Review |url=https://www.cgmagonline.com/review/game/arknights-endfield-pc/ |accessdate=2026-01-22 |work=CGMagazine |language=en}}</ref>');
+		expect(result.wikitext).toContain('<ref name="CGMagazine Review">{{cite news |last1=Biordi |first1=Jordan |date=2026-01-20 |title=Arknights: Endfield (PC) Review |url=https://www.cgmagonline.com/review/game/arknights-endfield-pc/ |accessdate=2026-01-22 |work=CGMagazine |language=en}}</ref>');
 		expect(result.wikitext).not.toContain('name="cgmagonline-20260120"');
 	});
 

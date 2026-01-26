@@ -1321,15 +1321,16 @@ type TemplateCanonicalEntry = {
 	fingerprint: TemplateFingerprint;
 };
 
-const PARAM_KEY_ALIASES = new Map<string, string>([
-	// Left: alias; right: canonical
-	['accessdate', 'access-date'],
-	['archiveurl', 'archive-url'],
-	['archivedate', 'archive-date'],
-	['last1', 'last'],
-	['first1', 'first'],
-	['author1', 'author']
-]);
+const PARAM_KEY_ALIAS_GROUPS: string[][] = [
+	['work', 'website', 'publisher', 'journal'],
+];
+
+const PARAM_KEY_ALIASES = new Map<string, string>(
+	PARAM_KEY_ALIAS_GROUPS.flatMap((group) => {
+		const [canonical, ...aliases] = group;
+		return [canonical, ...aliases].map((name) => [name, canonical] as const);
+	})
+);
 
 /**
  * Build a fingerprint for a template content block.
@@ -1348,9 +1349,10 @@ function buildTemplateFingerprint(content: string): TemplateFingerprint | null {
 	const originalName = nameMatch[1].trim();
 	const normalizedName = normalizeTemplateName(originalName);
 	const params = parseTemplateParams(trimmed);
+	const aliasMap = getTemplateAliasMap(originalName);
 	const paramBuckets = new Map<string, { values: string[]; entries: TemplateParamEntry[] }>();
 	params.forEach((param) => {
-		const normalizedKey = normalizeParamKey(param.name);
+		const normalizedKey = normalizeParamKeyWithAlias(param.name, aliasMap);
 		if (!normalizedKey) return;
 		const normalizedValue = canonicalizeParamValue(param.value);
 		const bucket = paramBuckets.get(normalizedKey) ?? { values: [], entries: [] };
@@ -1429,21 +1431,28 @@ function normalizeParamKey(name?: string | null): string | null {
 }
 
 /**
+ * Normalize a template parameter key using TemplateData aliases plus local aliases.
+ * @param name - Raw parameter name.
+ * @param aliasMap - TemplateData alias map for the template.
+ * @returns Normalized parameter key or null if invalid.
+ */
+function normalizeParamKeyWithAlias(name: string | null | undefined, aliasMap: Record<string, string>): string | null {
+	if (name === undefined || name === null) return null;
+	const trimmed = name.trim().toLowerCase();
+	if (!trimmed) return null;
+	if (/^\d+$/.test(trimmed)) return trimmed;
+
+	const canonical = aliasMap[trimmed] ?? trimmed;
+	return PARAM_KEY_ALIASES.get(canonical) ?? canonical;
+}
+
+/**
  * Canonicalize a template parameter value by collapsing whitespace and trimming.
  * @param value - Parameter value to canonicalize.
  * @returns Canonicalized parameter value.
  */
 function canonicalizeParamValue(value: string): string {
 	return value.replace(/\s+/g, ' ').trim();
-}
-
-/**
- * Build a base key for a template fingerprint.
- * @param fp - Template fingerprint.
- * @returns Base key string.
- */
-function buildTemplateBaseKey(fp: TemplateFingerprint): string {
-	return fp.normalizedName;
 }
 
 /**
@@ -1458,6 +1467,24 @@ function arraysEqual(a: string[], b: string[]): boolean {
 		if (a[i] !== b[i]) return false;
 	}
 	return true;
+}
+
+/**
+ * Get the comparison group for a template name.
+ * @param name - Normalized template name.
+ * @returns Group key for compatibility checks.
+ */
+/**
+ * Prefer non-cite web templates when compatible.
+ * @param aName - First normalized template name.
+ * @param bName - Second normalized template name.
+ * @returns 1 if a is preferred, -1 if b is preferred, 0 if no preference.
+ */
+function preferTemplateName(aName: string, bName: string): 1 | 0 | -1 {
+	if (aName === bName) return 0;
+	if (aName === 'cite web') return -1;
+	if (bName === 'cite web') return 1;
+	return 0;
 }
 
 /**
@@ -1488,6 +1515,19 @@ function getUrlHost(fp: TemplateFingerprint): string | null {
 }
 
 /**
+ * Get the normalized URL value from a template fingerprint if available.
+ * @param fp - Template fingerprint.
+ * @returns Normalized URL string or null if unavailable.
+ */
+function getUrlKey(fp: TemplateFingerprint): string | null {
+	const urlBucket = fp.params.get('url');
+	if (!urlBucket || urlBucket.entries.length !== 1) return null;
+	const urlValue = urlBucket.entries[0].paramValue.trim();
+	if (!urlValue) return null;
+	return canonicalizeParamValue(urlValue);
+}
+
+/**
  * Check if a website value is just the domain for the associated URL param.
  * @param entry - Website parameter entry.
  * @param fp - Template fingerprint for context.
@@ -1502,6 +1542,15 @@ function isWebsiteDomainOnly(entry: TemplateParamEntry, fp: TemplateFingerprint)
 	const normalizedValue = normalizeHost(websiteValue);
 	const normalizedHost = normalizeHost(urlHost);
 	return normalizedValue === normalizedHost;
+}
+
+/**
+ * Check if a title value is less preferred for dedupe.
+ * @param value - Title parameter value.
+ * @returns True if title is less preferred.
+ */
+function isLessPreferredTitle(value: string): boolean {
+	return value.includes('{{!}}') || value.includes('-');
 }
 
 /**
@@ -1526,7 +1575,13 @@ function preferParamEntry(
 	const bLinked = hasWikiLink(bValue);
 	if (aLinked !== bLinked) return aLinked ? 1 : -1;
 
-	if (key === 'website') {
+	if (key === 'title') {
+		const aLessPreferred = isLessPreferredTitle(aValue);
+		const bLessPreferred = isLessPreferredTitle(bValue);
+		if (aLessPreferred !== bLessPreferred) return aLessPreferred ? -1 : 1;
+	}
+
+	if (key === 'work') {
 		const aDomain = isWebsiteDomainOnly(a, aCtx);
 		const bDomain = isWebsiteDomainOnly(b, bCtx);
 		if (aDomain !== bDomain) return aDomain ? -1 : 1;
@@ -1542,7 +1597,7 @@ function preferParamEntry(
  * @returns True if compatible, false otherwise.
  */
 function templatesCompatible(a: TemplateFingerprint, b: TemplateFingerprint): boolean {
-	if (a.normalizedName !== b.normalizedName) return false;
+	if (a.normalizedName !== b.normalizedName && preferTemplateName(a.normalizedName, b.normalizedName) === 0) return false;
 	for (const [key, existing] of a.params.entries()) {
 		const incoming = b.params.get(key);
 		if (!incoming) continue;
@@ -1619,6 +1674,16 @@ function replaceTemplateParam(text: string, key: string, entry: TemplateParamEnt
 }
 
 /**
+ * Replace the template name at the start of a template text block.
+ * @param text - Original template text.
+ * @param newName - Replacement template name.
+ * @returns Updated template text with the new template name.
+ */
+function replaceTemplateName(text: string, newName: string): string {
+	return text.replace(/^\{\{\s*([^{|}]+?)(?=\s*\||\s*}})/, (full: string, name: string) => full.replace(name, newName));
+}
+
+/**
  * Format a parameter entry into a template parameter string.
  * @param entry - Parameter entry.
  * @returns Formatted parameter string.
@@ -1664,6 +1729,13 @@ function findTemplateCloseIndex(text: string): number {
 function mergeTemplateParams(entry: TemplateCanonicalEntry, incoming: TemplateFingerprint): void {
 	let templateText = entry.fingerprint.templateText;
 	let changed = false;
+	const templatePreference = preferTemplateName(entry.fingerprint.normalizedName, incoming.normalizedName);
+	if (templatePreference === -1) {
+		templateText = replaceTemplateName(templateText, incoming.originalName);
+		entry.fingerprint.normalizedName = incoming.normalizedName;
+		entry.fingerprint.originalName = incoming.originalName;
+		changed = true;
+	}
 	incoming.params.forEach((bucket, key) => {
 		const existingBucket = entry.fingerprint.params.get(key);
 		if (existingBucket) {
@@ -1711,7 +1783,7 @@ function inheritDefinitionContent(target: RefRecord, source: RefRecord): void {
  */
 function applyDedupe(refs: Map<RefKey, RefRecord>): Array<{ from: string; to: string }> {
 	const canonicalByContent = new Map<string, RefRecord>();
-	const templateCanonicals = new Map<string, TemplateCanonicalEntry[]>();
+	const bucketsByUrl = new Map<string, TemplateCanonicalEntry[]>();
 	const changes: Array<{ from: string; to: string }> = [];
 
 	refIterator(refs).forEach((ref) => {
@@ -1719,8 +1791,8 @@ function applyDedupe(refs: Map<RefKey, RefRecord>): Array<{ from: string; to: st
 		if (!content || !ref.name) return;
 		const templateInfo = buildTemplateFingerprint(content);
 		if (templateInfo) {
-			const baseKey = buildTemplateBaseKey(templateInfo);
-			const bucket = templateCanonicals.get(baseKey);
+			const urlKey = getUrlKey(templateInfo) ?? '';
+			const bucket = bucketsByUrl.get(urlKey);
 			if (bucket) {
 				const match = bucket.find((entry) => templatesCompatible(entry.fingerprint, templateInfo));
 				if (match && match.canonical.name) {
@@ -1735,7 +1807,7 @@ function applyDedupe(refs: Map<RefKey, RefRecord>): Array<{ from: string; to: st
 			if (bucket) {
 				bucket.push(entry);
 			} else {
-				templateCanonicals.set(baseKey, [entry]);
+				bucketsByUrl.set(urlKey, [entry]);
 			}
 			ref.canonical = ref;
 			return;

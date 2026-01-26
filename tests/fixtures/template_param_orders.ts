@@ -452,18 +452,27 @@ export const TEMPLATE_PARAM_ALIAS_MAP: Record<string, Record<string, string[]>> 
 		'access-date': ['accessdate'],
 		'archive-date': ['archivedate'],
 		'archive-url': ['archiveurl'],
-		'url-status': ['dead-url', 'deadurl']
+		'url-status': ['dead-url', 'deadurl'],
+		'first': ['first1'],
+		'last': ['last1'],
+		'author': ['author1']
 	},
 	'cite news': {
 		'access-date': ['accessdate'],
 		'archive-date': ['archivedate'],
 		'archive-url': ['archiveurl'],
-		'url-status': ['dead-url', 'deadurl']
+		'url-status': ['dead-url', 'deadurl'],
+		'first': ['first1'],
+		'last': ['last1'],
+		'author': ['author1']
 	},
 	'cite magazine': {
 		'access-date': ['accessdate'],
 		'archive-date': ['archivedate'],
 		'archive-url': ['archiveurl'],
-		'url-status': ['dead-url', 'deadurl']
+		'url-status': ['dead-url', 'deadurl'],
+		'first': ['first1'],
+		'last': ['last1'],
+		'author': ['author1']
 	}
 };

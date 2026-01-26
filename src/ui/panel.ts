@@ -974,7 +974,7 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 
 					const transformOpts = settingsToTransformOptions(this.settings, renameMap, renameNameless, contentOverrides);
 
-					if (transformOpts.normalizeAll) {
+					if (transformOpts.normalizeAll || transformOpts.dedupe) {
 						await prefetchTemplateDataForWikitext(base);
 					}
 
