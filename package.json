@@ -1,6 +1,6 @@
 {
 	"name": "citeforge",
-	"version": "0.2.14",
+	"version": "0.2.15",
 	"private": true,
 	"description": "Unified reference workbench that lets you inspect, rename, reorganize, and check all citations on a page. ",
 	"type": "module",
