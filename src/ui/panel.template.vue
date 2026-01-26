@@ -229,6 +229,12 @@
 					<cdx-checkbox v-model="settings.normalizeAll">
 						{{ t('ui.panel.settings.normalize') }}
 					</cdx-checkbox>
+					<div class="citeforge-settings__row citeforge-settings__row--stack" v-if="settings.normalizeAll">
+						<span>{{ t('ui.panel.settings.dateFormat') }}</span>
+						<div class="citeforge-select-wrap">
+							<cdx-select v-model:selected="settings.normalizeDateFormat" :menu-items="dateFormatOptions" />
+						</div>
+					</div>
 					<cdx-checkbox v-model="settings.allowCosmeticSaves">
 						<span>
 							<template v-for="(segment, idx) in tRich('ui.panel.settings.cosmeticSaves')"

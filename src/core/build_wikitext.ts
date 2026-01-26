@@ -1,5 +1,5 @@
 import { getTemplateAliasMap, getTemplateParamOrder } from "../data/templatedata_fetch";
-import { convertDigitsToAscii, escapeAttr, extractAttr, MONTH_NAME_MAP } from "./string_utils";
+import { convertDigitsToAscii, escapeAttr, extractAttr, MONTH_NAME_MAP, MONTH_NAMES } from "./string_utils";
 import {
 	parseRTemplateEntries,
 	parseTemplateParams,
@@ -45,6 +45,7 @@ function buildReplacementPlan(ctx: {
 	preferTemplateReflist: boolean;
 	sortRefs: boolean;
 	normalizeAll: boolean;
+	dateFormat: DateFormat;
 	locationModeKeep: boolean;
 	renameLookup?: (name: string) => string | null | undefined;
 	contentOverrideLookup?: (ref: RefRecord) => string | undefined;
@@ -95,7 +96,7 @@ function buildReplacementPlan(ctx: {
 			}
 			if (targetLocation === 'inline' && canonical === ref && useIdx === 0 && canonicalContent) {
 				// Ensure first use holds definition
-				const rendered = renderRefTag(targetName, ref.group, canonicalContent, opts.normalizeAll);
+				const rendered = renderRefTag(targetName, ref.group, canonicalContent, opts.normalizeAll, opts.dateFormat);
 				replacements.push({ start: use.start, end: use.end, text: rendered });
 				if (targetName) movedInline.push(targetName);
 			} else {
@@ -118,7 +119,7 @@ function buildReplacementPlan(ctx: {
 					}
 				}
 				const rendered = content
-					? renderRefTag(targetName, targetGroup, content, opts.normalizeAll)
+					? renderRefTag(targetName, targetGroup, content, opts.normalizeAll, opts.dateFormat)
 					: renderRefSelf(targetName, targetGroup, opts.preferTemplateR);
 				replacements.push({ start: def.start, end: def.end, text: rendered });
 				if (targetName) movedLdr.push(targetName);
@@ -272,19 +273,28 @@ function renderRefSelf(name: string | null, group: string | null, preferTemplate
 	return `<ref ${attrs.join(' ')} />`;
 }
 
+type DateFormat = 'iso' | 'mdy' | 'dmy';
+
 /**
  * Render a full reference tag with content.
  * @param name - Reference name.
  * @param group - Reference group.
  * @param content - Reference content.
  * @param normalize - Whether to normalize the content body.
+ * @param dateFormat - Date format for normalization.
  * @returns Rendered full reference tag string.
  */
-function renderRefTag(name: string | null, group: string | null, content: string, normalize = false): string {
+function renderRefTag(
+	name: string | null,
+	group: string | null,
+	content: string,
+	normalize = false,
+	dateFormat: DateFormat = 'iso'
+): string {
 	const attrs: string[] = [];
 	if (name) attrs.push(`name="${escapeAttr(name)}"`);
 	if (group) attrs.push(`group="${escapeAttr(group)}"`);
-	const inner = normalize ? normalizeRefBody(content) : normalizeContentBlock(content);
+	const inner = normalize ? normalizeRefBody(content, dateFormat) : normalizeContentBlock(content);
 	return `<ref${attrs.length ? ' ' + attrs.join(' ') : ''}>${inner}</ref>`;
 }
 
@@ -363,6 +373,26 @@ function normalizeDateValue(rawValue: string): string | null {
 }
 
 /**
+ * Format an ISO date value into the specified format.
+ * @param isoValue - ISO date string (yyyy-mm-dd).
+ * @param format - Desired output format.
+ * @returns Formatted date string.
+ */
+function formatDateValue(isoValue: string, format: DateFormat): string {
+	if (format === 'iso') return isoValue;
+	const match = isoValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+	if (!match) return isoValue;
+	const [, year, monthRaw, dayRaw] = match;
+	const month = Number(monthRaw);
+	const day = Number(dayRaw);
+	const monthName = MONTH_NAMES[month - 1];
+	if (!monthName) return isoValue;
+	const dayText = String(day);
+	if (format === 'mdy') return `${monthName} ${dayText}, ${year}`;
+	return `${dayText} ${monthName} ${year}`;
+}
+
+/**
  * Determine if a parameter name indicates a date field.
  * @param name - Parameter name to check.
  * @returns True if the name indicates a date field, false otherwise.
@@ -384,20 +414,23 @@ function isDateParamName(name?: string | null): boolean {
  * Normalize a date parameter value if applicable.
  * @param name - Parameter name.
  * @param value - Parameter value.
+ * @param dateFormat - Desired date format.
  * @returns Normalized date value or original value if not a date param.
  */
-function normalizeDateParamValue(name: string, value: string): string {
+function normalizeDateParamValue(name: string, value: string, dateFormat: DateFormat): string {
 	if (!isDateParamName(name)) return value;
 	const normalized = normalizeDateValue(value);
-	return normalized ?? value;
+	if (!normalized) return value;
+	return formatDateValue(normalized, dateFormat);
 }
 
 /**
  * Normalize the body of a reference, reordering citation template parameters.
  * @param content - Raw content of the reference.
+ * @param dateFormat - Desired date format for normalization.
  * @returns Normalized reference body content.
  */
-function normalizeRefBody(content: string): string {
+function normalizeRefBody(content: string, dateFormat: DateFormat): string {
 	let text = normalizeContentBlock(content);
 	const citeRegex = /\{\{\s*([Cc]ite\s+[^\|\}]+)\s*\|([\s\S]*?)\}\}/g;
 	text = text.replace(citeRegex, (match, name: string, paramText: string) => {
@@ -439,7 +472,7 @@ function normalizeRefBody(content: string): string {
 			const val = String(p.value).trim();
 			const name = p.name?.trim();
 			if (name) {
-				const normalizedValue = normalizeDateParamValue(name, val);
+				const normalizedValue = normalizeDateParamValue(name, val, dateFormat);
 				return `${name}=${normalizedValue}`;
 			}
 			return val;
@@ -1090,6 +1123,7 @@ export interface TransformOptions {
 	preferTemplateReflist?: boolean;
 	reflistTemplates?: string[];
 	normalizeAll?: boolean;
+	dateFormat?: DateFormat;
 	contentOverrides?: Record<string, string>;
 }
 
@@ -1148,6 +1182,7 @@ export function transformWikitext(wikitext: string, options: TransformOptions = 
 	const preferTemplateR = Boolean(options.preferTemplateR);
 	const preferTemplateReflist = options.preferTemplateReflist === undefined ? true : Boolean(options.preferTemplateReflist);
 	const normalizeAll = options.normalizeAll === undefined ? false : options.normalizeAll;
+	const dateFormat: DateFormat = options.dateFormat ?? 'iso';
 	const reflistNames = (options.reflistTemplates && options.reflistTemplates.length > 0 ? options.reflistTemplates : DEFAULT_REFLIST_TEMPLATES).map((n) => n.toLowerCase());
 	const targetMode = normalizeLocationMode(options.locationMode);
 	const contentOverrides = options.contentOverrides || {};
@@ -1175,6 +1210,7 @@ export function transformWikitext(wikitext: string, options: TransformOptions = 
 		preferTemplateReflist,
 		sortRefs,
 		normalizeAll,
+		dateFormat,
 		locationModeKeep: targetMode === 'keep',
 		renameLookup: (name: string) => renameMap[name],
 		contentOverrideLookup
@@ -1300,7 +1336,7 @@ function normalizeContent(content: string): string {
 	return content.replace(/\s+/g, ' ').trim();
 }
 
-type TemplateSupplementaryEntry = {
+type TemplateParamEntry = {
 	key: string;
 	value: string;
 	paramName: string;
@@ -1310,9 +1346,7 @@ type TemplateSupplementaryEntry = {
 type TemplateFingerprint = {
 	normalizedName: string;
 	originalName: string;
-	nonSupplementary: Map<string, string[]>;
-	supplementary: Map<string, TemplateSupplementaryEntry>;
-	signature: string;
+	params: Map<string, { values: string[]; entries: TemplateParamEntry[] }>;
 	templateText: string;
 	leadingWhitespace: string;
 	trailingWhitespace: string;
@@ -1323,19 +1357,16 @@ type TemplateCanonicalEntry = {
 	fingerprint: TemplateFingerprint;
 };
 
-const SUPPLEMENTARY_PARAM_ALIASES = new Map<string, string>([
-	['access-date', 'access-date'],
-	['archive-url', 'archive-url'],
-	['archive-date', 'archive-date'],
-	['archive-format', 'archive-format'],
-	['url-status', 'url-status'],
-	['dead-url', 'dead-url'],
+const PARAM_KEY_ALIAS_GROUPS: string[][] = [
+	['work', 'website', 'publisher', 'journal'],
+];
 
-	// Aliases -> standard name mapping
-	['accessdate', 'access-date'],
-	['archiveurl', 'archive-url'],
-	['archivedate', 'archive-date'],
-]);
+const PARAM_KEY_ALIASES = new Map<string, string>(
+	PARAM_KEY_ALIAS_GROUPS.flatMap((group) => {
+		const [canonical, ...aliases] = group;
+		return [canonical, ...aliases].map((name) => [name, canonical] as const);
+	})
+);
 
 /**
  * Build a fingerprint for a template content block.
@@ -1354,35 +1385,26 @@ function buildTemplateFingerprint(content: string): TemplateFingerprint | null {
 	const originalName = nameMatch[1].trim();
 	const normalizedName = normalizeTemplateName(originalName);
 	const params = parseTemplateParams(trimmed);
-	const nonSupplementary = new Map<string, string[]>();
-	const supplementary = new Map<string, TemplateSupplementaryEntry>();
+	const aliasMap = getTemplateAliasMap(originalName);
+	const paramBuckets = new Map<string, { values: string[]; entries: TemplateParamEntry[] }>();
 	params.forEach((param) => {
-		const normalizedKey = normalizeParamKey(param.name);
+		const normalizedKey = normalizeParamKeyWithAlias(param.name, aliasMap);
 		if (!normalizedKey) return;
-		const supplementaryKey = canonicalSupplementaryKey(normalizedKey);
 		const normalizedValue = canonicalizeParamValue(param.value);
-		if (supplementaryKey) {
-			if (!supplementary.has(supplementaryKey)) {
-				supplementary.set(supplementaryKey, {
-					key: supplementaryKey,
-					value: normalizedValue,
-					paramName: param.name || supplementaryKey,
-					paramValue: param.value.trim()
-				});
-			}
-			return;
-		}
-		const bucket = nonSupplementary.get(normalizedKey) ?? [];
-		bucket.push(normalizedValue);
-		nonSupplementary.set(normalizedKey, bucket);
+		const bucket = paramBuckets.get(normalizedKey) ?? { values: [], entries: [] };
+		bucket.values.push(normalizedValue);
+		bucket.entries.push({
+			key: normalizedKey,
+			value: normalizedValue,
+			paramName: param.name || normalizedKey,
+			paramValue: param.value.trim()
+		});
+		paramBuckets.set(normalizedKey, bucket);
 	});
-	const signature = buildNonSupplementarySignature(nonSupplementary);
 	return {
 		normalizedName,
 		originalName,
-		nonSupplementary,
-		supplementary,
-		signature,
+		params: paramBuckets,
 		templateText: trimmed,
 		leadingWhitespace,
 		trailingWhitespace
@@ -1439,18 +1461,25 @@ function normalizeParamKey(name?: string | null): string | null {
 	const trimmed = name.trim();
 	if (!trimmed) return null;
 	if (/^\d+$/.test(trimmed)) return trimmed;
-	return trimmed.toLowerCase();
+	const lower = trimmed.toLowerCase();
+	const collapsed = lower.replace(/[_-]+/g, '-');
+	return PARAM_KEY_ALIASES.get(collapsed) ?? collapsed;
 }
 
 /**
- * Get the canonical supplementary parameter key for a normalized name.
- * @param normalizedName - Normalized parameter name.
- * @returns Canonical supplementary key or null if not a supplementary param.
+ * Normalize a template parameter key using TemplateData aliases plus local aliases.
+ * @param name - Raw parameter name.
+ * @param aliasMap - TemplateData alias map for the template.
+ * @returns Normalized parameter key or null if invalid.
  */
-function canonicalSupplementaryKey(normalizedName: string | null): string | null {
-	if (!normalizedName) return null;
-	const collapsed = normalizedName.replace(/[_-]+/g, '-');
-	return SUPPLEMENTARY_PARAM_ALIASES.get(collapsed) ?? null;
+function normalizeParamKeyWithAlias(name: string | null | undefined, aliasMap: Record<string, string>): string | null {
+	if (name === undefined || name === null) return null;
+	const trimmed = name.trim().toLowerCase();
+	if (!trimmed) return null;
+	if (/^\d+$/.test(trimmed)) return trimmed;
+
+	const canonical = aliasMap[trimmed] ?? trimmed;
+	return PARAM_KEY_ALIASES.get(canonical) ?? canonical;
 }
 
 /**
@@ -1463,24 +1492,138 @@ function canonicalizeParamValue(value: string): string {
 }
 
 /**
- * Build a signature string from non-supplementary template parameters.
- * @param map - Map of non-supplementary parameter keys to their values.
- * @returns Signature string.
+ * Compare two arrays for strict equality in order and length.
+ * @param a - First array.
+ * @param b - Second array.
+ * @returns True if arrays match exactly, false otherwise.
  */
-function buildNonSupplementarySignature(map: Map<string, string[]>): string {
-	const entries = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-	return entries
-		.map(([key, values]) => `${key}=${values.join('\u0001')}`)
-		.join('\u0002');
+function arraysEqual(a: string[], b: string[]): boolean {
+	if (a.length !== b.length) return false;
+	for (let i = 0; i < a.length; i++) {
+		if (a[i] !== b[i]) return false;
+	}
+	return true;
 }
 
 /**
- * Build a base key for a template fingerprint.
- * @param fp - Template fingerprint.
- * @returns Base key string.
+ * Get the comparison group for a template name.
+ * @param name - Normalized template name.
+ * @returns Group key for compatibility checks.
  */
-function buildTemplateBaseKey(fp: TemplateFingerprint): string {
-	return `${fp.normalizedName}::${fp.signature}`;
+/**
+ * Prefer non-cite web templates when compatible.
+ * @param aName - First normalized template name.
+ * @param bName - Second normalized template name.
+ * @returns 1 if a is preferred, -1 if b is preferred, 0 if no preference.
+ */
+function preferTemplateName(aName: string, bName: string): 1 | 0 | -1 {
+	if (aName === bName) return 0;
+	if (aName === 'cite web') return -1;
+	if (bName === 'cite web') return 1;
+	return 0;
+}
+
+/**
+ * Check if a parameter value uses wiki link markup.
+ * @param value - Parameter value string.
+ * @returns True if value contains wiki link markup.
+ */
+function hasWikiLink(value: string): boolean {
+	return /\[\[[^\]]+]]/.test(value);
+}
+
+/**
+ * Get the hostname from a template fingerprint URL parameter if available.
+ * @param fp - Template fingerprint.
+ * @returns Hostname string or null if unavailable.
+ */
+function getUrlHost(fp: TemplateFingerprint): string | null {
+	const urlBucket = fp.params.get('url');
+	if (!urlBucket || urlBucket.entries.length !== 1) return null;
+	const urlValue = urlBucket.entries[0].paramValue.trim();
+	if (!urlValue) return null;
+	try {
+		const parsed = new URL(urlValue);
+		return parsed.hostname ? parsed.hostname.toLowerCase() : null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Get the normalized URL value from a template fingerprint if available.
+ * @param fp - Template fingerprint.
+ * @returns Normalized URL string or null if unavailable.
+ */
+function getUrlKey(fp: TemplateFingerprint): string | null {
+	const urlBucket = fp.params.get('url');
+	if (!urlBucket || urlBucket.entries.length !== 1) return null;
+	const urlValue = urlBucket.entries[0].paramValue.trim();
+	if (!urlValue) return null;
+	return canonicalizeParamValue(urlValue);
+}
+
+/**
+ * Check if a website value is just the domain for the associated URL param.
+ * @param entry - Website parameter entry.
+ * @param fp - Template fingerprint for context.
+ * @returns True if the website is a domain-only URL for the same host.
+ */
+function isWebsiteDomainOnly(entry: TemplateParamEntry, fp: TemplateFingerprint): boolean {
+	const websiteValue = entry.paramValue.trim();
+	if (!websiteValue) return false;
+	const urlHost = getUrlHost(fp);
+	const normalizeHost = (host: string): string => host.toLowerCase().replace(/^www\./, '');
+	if (!urlHost) return false;
+	const normalizedValue = normalizeHost(websiteValue);
+	const normalizedHost = normalizeHost(urlHost);
+	return normalizedValue === normalizedHost;
+}
+
+/**
+ * Check if a title value is less preferred for dedupe.
+ * @param value - Title parameter value.
+ * @returns True if title is less preferred.
+ */
+function isLessPreferredTitle(value: string): boolean {
+	return value.includes('{{!}}') || value.includes('-');
+}
+
+/**
+ * Decide which parameter entry is better filled based on heuristics.
+ * @param key - Normalized parameter key.
+ * @param a - First parameter entry.
+ * @param b - Second parameter entry.
+ * @param aCtx - First parameter fingerprint context.
+ * @param bCtx - Second parameter fingerprint context.
+ * @returns 1 if a is preferred, -1 if b is preferred, 0 if no preference.
+ */
+function preferParamEntry(
+	key: string,
+	a: TemplateParamEntry,
+	b: TemplateParamEntry,
+	aCtx: TemplateFingerprint,
+	bCtx: TemplateFingerprint
+): 1 | 0 | -1 {
+	const aValue = a.paramValue.trim();
+	const bValue = b.paramValue.trim();
+	const aLinked = hasWikiLink(aValue);
+	const bLinked = hasWikiLink(bValue);
+	if (aLinked !== bLinked) return aLinked ? 1 : -1;
+
+	if (key === 'title') {
+		const aLessPreferred = isLessPreferredTitle(aValue);
+		const bLessPreferred = isLessPreferredTitle(bValue);
+		if (aLessPreferred !== bLessPreferred) return aLessPreferred ? -1 : 1;
+	}
+
+	if (key === 'work') {
+		const aDomain = isWebsiteDomainOnly(a, aCtx);
+		const bDomain = isWebsiteDomainOnly(b, bCtx);
+		if (aDomain !== bDomain) return aDomain ? -1 : 1;
+	}
+
+	return 0;
 }
 
 /**
@@ -1490,26 +1633,33 @@ function buildTemplateBaseKey(fp: TemplateFingerprint): string {
  * @returns True if compatible, false otherwise.
  */
 function templatesCompatible(a: TemplateFingerprint, b: TemplateFingerprint): boolean {
-	if (a.normalizedName !== b.normalizedName) return false;
-	if (a.signature !== b.signature) return false;
-	for (const [key, existing] of a.supplementary.entries()) {
-		const incoming = b.supplementary.get(key);
-		if (incoming && incoming.value !== existing.value) return false;
+	if (a.normalizedName !== b.normalizedName && preferTemplateName(a.normalizedName, b.normalizedName) === 0) return false;
+	for (const [key, existing] of a.params.entries()) {
+		const incoming = b.params.get(key);
+		if (!incoming) continue;
+		if (arraysEqual(existing.values, incoming.values)) continue;
+		if (existing.values.length !== 1 || incoming.values.length !== 1) return false;
+		const preferred = preferParamEntry(key, existing.entries[0], incoming.entries[0], a, b);
+		if (preferred === 0) return false;
 	}
-	for (const [key, incoming] of b.supplementary.entries()) {
-		const existing = a.supplementary.get(key);
-		if (existing && existing.value !== incoming.value) return false;
+	for (const [key, incoming] of b.params.entries()) {
+		const existing = a.params.get(key);
+		if (!existing) continue;
+		if (arraysEqual(existing.values, incoming.values)) continue;
+		if (existing.values.length !== 1 || incoming.values.length !== 1) return false;
+		const preferred = preferParamEntry(key, existing.entries[0], incoming.entries[0], a, b);
+		if (preferred === 0) return false;
 	}
 	return true;
 }
 
 /**
- * Insert a supplementary parameter into a template text block.
+ * Insert a parameter into a template text block.
  * @param text - Original template text.
- * @param addition - Supplementary parameter entry to insert.
- * @returns Updated template text with the supplementary parameter inserted.
+ * @param addition - Parameter entry to insert.
+ * @returns Updated template text with the parameter inserted.
  */
-function insertSupplementaryParam(text: string, addition: TemplateSupplementaryEntry): string {
+function insertTemplateParam(text: string, addition: TemplateParamEntry): string {
 	const closingIndex = findTemplateCloseIndex(text);
 	if (closingIndex === -1) return text;
 	const beforeClose = text.slice(0, closingIndex);
@@ -1520,17 +1670,61 @@ function insertSupplementaryParam(text: string, addition: TemplateSupplementaryE
 	const newlineIdx = withoutTrailing.lastIndexOf('\n');
 	const indent = newlineIdx >= 0 ? (withoutTrailing.slice(newlineIdx + 1).match(/^\s*/)?.[0] ?? '') : '';
 	const prefix = newlineIdx >= 0 ? `\n${indent}|` : '|';
-	const paramText = formatSupplementaryParam(addition);
+	const paramText = formatTemplateParam(addition);
 	const updatedBefore = `${withoutTrailing}${prefix}${paramText}${trailingWhitespace}`;
 	return `${updatedBefore}${afterClose}`;
 }
 
 /**
- * Format a supplementary parameter entry into a template parameter string.
- * @param entry - Supplementary parameter entry.
+ * Replace a parameter value in a template text block.
+ * @param text - Original template text.
+ * @param key - Normalized parameter key to replace.
+ * @param entry - Parameter entry with replacement value.
+ * @returns Updated template text with the parameter replaced.
+ */
+function replaceTemplateParam(text: string, key: string, entry: TemplateParamEntry): string {
+	const match = text.match(/^\{\{\s*([^{|}]+?)(?=\s*\||\s*}})/);
+	if (!match) return text;
+	const inner = text.replace(/^\{\{/, '').replace(/\}\}$/, '');
+	const pipeIdx = inner.indexOf('|');
+	if (pipeIdx === -1) return text;
+	const namePart = inner.slice(0, pipeIdx);
+	const paramsText = inner.slice(pipeIdx + 1);
+	const parts = splitTemplateParams(paramsText);
+	let replaced = false;
+	const updated = parts.map((part) => {
+		const eqIdx = part.indexOf('=');
+		const namePartRaw = eqIdx >= 0 ? part.slice(0, eqIdx) : '';
+		const normalized = normalizeParamKey(namePartRaw.trim());
+		if (normalized !== key) return part;
+		replaced = true;
+		const leading = part.match(/^\s*/)?.[0] ?? '';
+		const trailing = part.match(/\s*$/)?.[0] ?? '';
+		const paramName = entry.paramName || namePartRaw.trim() || key;
+		const paramValue = entry.paramValue;
+		if (paramName) return `${leading}${paramName}=${paramValue}${trailing}`;
+		return `${leading}${paramValue}${trailing}`;
+	});
+	if (!replaced) return text;
+	return `{{${namePart}|${updated.join('|')}}}`;
+}
+
+/**
+ * Replace the template name at the start of a template text block.
+ * @param text - Original template text.
+ * @param newName - Replacement template name.
+ * @returns Updated template text with the new template name.
+ */
+function replaceTemplateName(text: string, newName: string): string {
+	return text.replace(/^\{\{\s*([^{|}]+?)(?=\s*\||\s*}})/, (full: string, name: string) => full.replace(name, newName));
+}
+
+/**
+ * Format a parameter entry into a template parameter string.
+ * @param entry - Parameter entry.
  * @returns Formatted parameter string.
  */
-function formatSupplementaryParam(entry: TemplateSupplementaryEntry): string {
+function formatTemplateParam(entry: TemplateParamEntry): string {
 	const value = entry.paramValue || '';
 	if (entry.paramName) {
 		return `${entry.paramName}=${value}`;
@@ -1563,19 +1757,39 @@ function findTemplateCloseIndex(text: string): number {
 }
 
 /**
- * Merge supplementary parameters from an incoming template fingerprint into a canonical entry.
+ * Merge missing parameters from an incoming template fingerprint into a canonical entry.
  * Updates the template text and content override if changes are made.
  * @param entry - Canonical template entry to update.
- * @param incoming - Incoming template fingerprint with supplementary parameters.
+ * @param incoming - Incoming template fingerprint with mergeable parameters.
  */
-function mergeTemplateSupplementary(entry: TemplateCanonicalEntry, incoming: TemplateFingerprint): void {
+function mergeTemplateParams(entry: TemplateCanonicalEntry, incoming: TemplateFingerprint): void {
 	let templateText = entry.fingerprint.templateText;
 	let changed = false;
-	incoming.supplementary.forEach((addition, key) => {
-		if (entry.fingerprint.supplementary.has(key)) return;
-		entry.fingerprint.supplementary.set(key, addition);
-		templateText = insertSupplementaryParam(templateText, addition);
+	const templatePreference = preferTemplateName(entry.fingerprint.normalizedName, incoming.normalizedName);
+	if (templatePreference === -1) {
+		templateText = replaceTemplateName(templateText, incoming.originalName);
+		entry.fingerprint.normalizedName = incoming.normalizedName;
+		entry.fingerprint.originalName = incoming.originalName;
 		changed = true;
+	}
+	incoming.params.forEach((bucket, key) => {
+		const existingBucket = entry.fingerprint.params.get(key);
+		if (existingBucket) {
+			if (!arraysEqual(existingBucket.values, bucket.values) && existingBucket.values.length === 1 && bucket.values.length === 1) {
+				const preferred = preferParamEntry(key, existingBucket.entries[0], bucket.entries[0], entry.fingerprint, incoming);
+				if (preferred === -1) {
+					entry.fingerprint.params.set(key, { values: [...bucket.values], entries: [...bucket.entries] });
+					templateText = replaceTemplateParam(templateText, key, bucket.entries[0]);
+					changed = true;
+				}
+			}
+			return;
+		}
+		entry.fingerprint.params.set(key, { values: [...bucket.values], entries: [...bucket.entries] });
+		bucket.entries.forEach((addition) => {
+			templateText = insertTemplateParam(templateText, addition);
+			changed = true;
+		});
 	});
 	if (changed) {
 		entry.fingerprint.templateText = templateText;
@@ -1605,7 +1819,7 @@ function inheritDefinitionContent(target: RefRecord, source: RefRecord): void {
  */
 function applyDedupe(refs: Map<RefKey, RefRecord>): Array<{ from: string; to: string }> {
 	const canonicalByContent = new Map<string, RefRecord>();
-	const templateCanonicals = new Map<string, TemplateCanonicalEntry[]>();
+	const bucketsByUrl = new Map<string, TemplateCanonicalEntry[]>();
 	const changes: Array<{ from: string; to: string }> = [];
 
 	refIterator(refs).forEach((ref) => {
@@ -1613,14 +1827,14 @@ function applyDedupe(refs: Map<RefKey, RefRecord>): Array<{ from: string; to: st
 		if (!content || !ref.name) return;
 		const templateInfo = buildTemplateFingerprint(content);
 		if (templateInfo) {
-			const baseKey = buildTemplateBaseKey(templateInfo);
-			const bucket = templateCanonicals.get(baseKey);
+			const urlKey = getUrlKey(templateInfo) ?? '';
+			const bucket = bucketsByUrl.get(urlKey);
 			if (bucket) {
 				const match = bucket.find((entry) => templatesCompatible(entry.fingerprint, templateInfo));
 				if (match && match.canonical.name) {
 					ref.canonical = match.canonical;
 					inheritDefinitionContent(match.canonical, ref);
-					mergeTemplateSupplementary(match, templateInfo);
+					mergeTemplateParams(match, templateInfo);
 					changes.push({ from: ref.name, to: match.canonical.name });
 					return;
 				}
@@ -1629,7 +1843,7 @@ function applyDedupe(refs: Map<RefKey, RefRecord>): Array<{ from: string; to: st
 			if (bucket) {
 				bucket.push(entry);
 			} else {
-				templateCanonicals.set(baseKey, [entry]);
+				bucketsByUrl.set(urlKey, [entry]);
 			}
 			ref.canonical = ref;
 			return;

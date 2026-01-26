@@ -43,6 +43,21 @@ export const MONTH_NAME_MAP = new Map<string, number>([
 	['december', 12]
 ]);
 
+export const MONTH_NAMES = [
+	'January',
+	'February',
+	'March',
+	'April',
+	'May',
+	'June',
+	'July',
+	'August',
+	'September',
+	'October',
+	'November',
+	'December'
+];
+
 /**
  * Strip basic wikitext/HTML markup for token extraction.
  * @param text - Raw wikitext or HTML snippet.

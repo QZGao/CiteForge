@@ -59,6 +59,7 @@ export interface InspectorState {
 		preferTemplateReflist: boolean;
 		makeCopies: boolean;
 		normalizeAll: boolean;
+		normalizeDateFormat: 'iso' | 'mdy' | 'dmy';
 		allowCosmeticSaves: boolean;
 	};
 	showSettings: boolean;
