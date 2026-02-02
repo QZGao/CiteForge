@@ -14,6 +14,7 @@ import { openDiffPreview } from '../data/diff_preview';
 import { groupKey } from '../core/parse_wikitext';
 import { prefetchTemplateDataForWikitext } from '../data/templatedata_fetch';
 import { openMassRenameDialog } from './mass_rename';
+import { openExtractCitationsDialog } from './extract_citations';
 import { disableChecks, enableChecks, isChecksActive } from './checks';
 import panelStyles from './panel.css';
 import PANEL_TEMPLATE from './panel.template.vue';
@@ -749,6 +750,13 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 						this.applyMassRename(renameMap, renameNameless);
 					}
 				});
+			},
+
+			/**
+			 * Open the extract citations dialog for selected reference names.
+			 */
+			openExtractCitations(this: InspectorCtx): void {
+				void openExtractCitationsDialog(this.refs);
 			},
 
 			/**
