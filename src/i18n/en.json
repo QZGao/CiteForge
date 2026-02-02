@@ -19,8 +19,6 @@
 	"ui.panel.search.ariaLabel": "Search citations",
 	"ui.panel.refresh": "Refresh",
 	"ui.panel.copyOptions.raw": "raw name",
-	"ui.panel.copyOptions.rTemplate": "{{r|name}}",
-	"ui.panel.copyOptions.refTag": "<ref name=\"name\" />",
 	"ui.panel.placement.keep": "Keep as is",
 	"ui.panel.placement.threshold": "Refs with ≥ N uses to reflist",
 	"ui.panel.placement.allLdr": "All refs to reflist",

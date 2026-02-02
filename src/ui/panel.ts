@@ -329,8 +329,8 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			copyFormatOptions(): Array<{ label: string; value: string }> {
 				return [
 					{ label: t('ui.panel.copyOptions.raw'), value: 'raw' },
-					{ label: t('ui.panel.copyOptions.rTemplate'), value: 'r' },
-					{ label: t('ui.panel.copyOptions.refTag'), value: 'ref' }
+					{ label: '{{r|' + t('ui.panel.copyOptions.raw') + '}}', value: 'r' },
+					{ label: '<ref name="' + t('ui.panel.copyOptions.raw') + '" />', value: 'ref' }
 				];
 			},
 			/**
