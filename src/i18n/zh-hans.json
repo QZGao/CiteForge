@@ -148,7 +148,7 @@
 	"ui.massRename.dialog.footerConflicts": "$1 个冲突",
 	"ui.massRename.dialog.sendToInspector": "发送到检视器",
 	"ui.massRename.dialog.suggestedAria": "建议的引用名称",
-	"ui.checks.unexpectedFormatting": "结果异常——模板中可能存在额外格式？",
+	"ui.checks.unexpectedFormatting": "结果异常：模板中可能存在额外格式？",
 	"ui.checks.missingPagenumsChapter": "书籍章节缺少页码？",
 	"ui.checks.missingFirstName": "缺少名字：$1",
 	"ui.checks.missingIdentifier": "缺少标识符（ISSN、JSTOR 等）",
