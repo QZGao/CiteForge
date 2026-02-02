@@ -1,0 +1,21 @@
+.citeforge-extract-dialog {
+	display: grid;
+	gap: 12px;
+}
+
+.citeforge-extract-field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.citeforge-extract-label {
+	font-weight: 600;
+}
+
+.citeforge-extract-actions {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+	margin-top: 4px;
+}

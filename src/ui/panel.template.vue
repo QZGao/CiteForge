@@ -175,6 +175,16 @@
 						</span>
 						<span class="citeforge-tool-label">{{ t('ui.panel.massRenameButton.label') }}</span>
 					</button>
+					<button class="citeforge-tool-btn" type="button" :title="t('ui.panel.extractCitationsButton.title')"
+						@click.prevent="openExtractCitations">
+						<span class="citeforge-tool-icon" aria-hidden="true">
+							<svg viewBox="0 0 20 20" width="16" height="16">
+								<path fill="currentColor"
+									d="M19 1h-8l3.286 3.286L6 12l1.371 1.472 8.332-7.77.007.008L19 9zM2 5h4v2H3v10h10v-4.004h2V18a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1" />
+							</svg>
+						</span>
+						<span class="citeforge-tool-label">{{ t('ui.panel.extractCitationsButton.label') }}</span>
+					</button>
 					<button class="citeforge-tool-btn" :class="{ 'is-active': checksOn }" type="button"
 						:title="t('ui.panel.checksButton.title')" @click.prevent="toggleChecks">
 						<span class="citeforge-tool-icon" aria-hidden="true">
@@ -232,7 +242,8 @@
 					<div class="citeforge-settings__row citeforge-settings__row--stack" v-if="settings.normalizeAll">
 						<span>{{ t('ui.panel.settings.dateFormat') }}</span>
 						<div class="citeforge-select-wrap">
-							<cdx-select v-model:selected="settings.normalizeDateFormat" :menu-items="dateFormatOptions" />
+							<cdx-select v-model:selected="settings.normalizeDateFormat"
+								:menu-items="dateFormatOptions" />
 						</div>
 					</div>
 					<cdx-checkbox v-model="settings.allowCosmeticSaves">
