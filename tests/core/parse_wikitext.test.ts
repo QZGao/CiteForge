@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { parseReferences } from '../../src/core/parse_wikitext';
+import {
+	parseReferences,
+	parseTemplateParams,
+	splitTemplateParams
+} from '../../src/core/parse_wikitext';
 
 describe('parseReferences', () => {
 	describe('named refs with content', () => {
@@ -297,5 +301,20 @@ describe('parseReferences', () => {
 			expect(refs).toHaveLength(1);
 			expect(refs[0].name).toBe('a/b/c/d');
 		});
+	});
+});
+
+describe('template parameter splitting', () => {
+	it('treats four closing braces as two template closes in splitTemplateParams', () => {
+		const parts = splitTemplateParams('a|b={{{{foo}}|bar}}|c');
+		expect(parts).toEqual(['a', 'b={{{{foo}}|bar}}', 'c']);
+	});
+
+	it('parses following top-level params after {{{{...}}|...}} correctly', () => {
+		const params = parseTemplateParams('{{reflist|refs={{{{foo}}|bar}}|group=notes}}');
+		expect(params).toEqual([
+			{ name: 'refs', value: '{{{{foo}}|bar}}' },
+			{ name: 'group', value: 'notes' }
+		]);
 	});
 });
