@@ -213,12 +213,14 @@ export function splitTemplateParams(text: string): string[] {
 		const next = text[i + 1];
 		if (ch === '{' && next === '{') {
 			depth++;
-			current += ch;
+			current += '{{';
+			i++;
 			continue;
 		}
 		if (ch === '}' && next === '}') {
 			if (depth > 0) depth--;
-			current += ch;
+			current += '}}';
+			i++;
 			continue;
 		}
 		if (ch === '|' && depth === 0) {
@@ -615,22 +617,26 @@ function splitParams(text: string): string[] {
 		const next = text[i + 1];
 		if (ch === '{' && next === '{') {
 			depth++;
-			current += ch;
+			current += '{{';
+			i++;
 			continue;
 		}
 		if (ch === '}' && next === '}') {
 			if (depth > 0) depth--;
-			current += ch;
+			current += '}}';
+			i++;
 			continue;
 		}
 		if (ch === '[' && next === '[') {
 			linkDepth++;
-			current += ch;
+			current += '[[';
+			i++;
 			continue;
 		}
 		if (ch === ']' && next === ']') {
 			if (linkDepth > 0) linkDepth--;
-			current += ch;
+			current += ']]';
+			i++;
 			continue;
 		}
 		if (ch === '|' && depth === 0 && linkDepth === 0) {
