@@ -127,5 +127,8 @@
 	"ui.massRename.dialog.namingPartsDescription": "Combiné ij camp (autor, tìtol, domini, travaj, fras) për fabriché dij nòm.",
 	"ui.massRename.dialog.collisionSuffix": "Conflit ëd sufiss",
 	"ui.massRename.dialog.delimiterConditional": "Mach apress ai nùmer",
-	"ui.massRename.dialog.spaceReplacement": "Rampiass dë spassi"
+	"ui.massRename.dialog.spaceReplacement": "Rampiass dë spassi",
+	"ui.massRename.dialog.convertYearDigits": "Convertì le gifre nen ASCII",
+	"ui.massRename.dialog.lowercase": "Minùscol",
+	"ui.massRename.dialog.stripPunctuation": "Gavé la pontegiadura"
 }
