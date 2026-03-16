@@ -96,7 +96,7 @@ const DIALOG_NAME = 'insert_citation';
 const STYLE_ID = 'citeforge-insert-citation-styles';
 const MOUNT_ID = `citeforge-${DIALOG_NAME}-mount`;
 const TOOL_NAME = 'citeforgeInsertCitation';
-const TOOLBAR_READY_DELAY_MS = 1000;
+const TOOLBAR_READY_DELAY_MS = 2000;
 const AUTO_FILL_SOURCE_PARAMS = ['url', 'doi', 'isbn', 'pmid', 'pmc', 'arxiv', 'jstor', 'oclc'] as const;
 const TOOLBAR_ICON = `data:image/svg+xml,${encodeURIComponent(
 	"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><path fill='#1d3557' d='M4 4h5v5H6.8L7 10.7A3.2 3.2 0 0 1 4 14V4zm7 0h5v5h-2.2L14 10.7A3.2 3.2 0 0 1 11 14V4z'/><path fill='#5d7ea6' d='M4 15h12v1H4z'/></svg>"
@@ -260,6 +260,27 @@ export function createParamRow(name = '', value = ''): InsertCitationParamRow {
 }
 
 /**
+ * Format the current local date as yyyy-mm-dd for citation fields.
+ * @param date - Date to format.
+ * @returns Local calendar date in yyyy-mm-dd format.
+ */
+function formatDateYyyyMmDd(date: Date): string {
+	const year = String(date.getFullYear());
+	const month = String(date.getMonth() + 1).padStart(2, '0');
+	const day = String(date.getDate()).padStart(2, '0');
+	return `${year}-${month}-${day}`;
+}
+
+/**
+ * Get the default startup value for a parameter row when one is needed.
+ * @param name - Parameter name.
+ * @returns Prefilled parameter value.
+ */
+function getDefaultParamValue(name: string): string {
+	return name === 'access-date' ? formatDateYyyyMmDd(new Date()) : '';
+}
+
+/**
  * Build the default parameter name for an indexed author field.
  * @param baseName - Base author parameter name.
  * @param index - 1-based author row index.
@@ -345,7 +366,11 @@ export function createDefaultRowsForTemplate(templateName: string): InsertCitati
 	const specs = DEFAULT_TEMPLATE_ROWS[normalizeTemplateName(templateName)] ?? DEFAULT_TEMPLATE_ROWS['cite web'];
 	let nextAuthorIndex = 1;
 	return sortRowsAuthorFirst(
-		specs.map((spec) => (spec.kind === 'author' ? createAuthorRow(spec.mode, nextAuthorIndex++) : createParamRow(spec.name)))
+		specs.map((spec) =>
+			spec.kind === 'author'
+				? createAuthorRow(spec.mode, nextAuthorIndex++)
+				: createParamRow(spec.name, getDefaultParamValue(spec.name))
+		)
 	);
 }
 
