@@ -2,6 +2,11 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
+			"label": "install-debug-chrome-for-testing",
+			"type": "shell",
+			"command": "node scripts/install_chrome_for_testing.mjs"
+		},
+		{
 			"label": "watch-debug-extension",
 			"type": "shell",
 			"command": "npm run watch:debug",
@@ -28,6 +33,14 @@
 					"endsPattern": "\\[Cite Forge build\\] Watching for changes\\.\\.\\."
 				}
 			}
+		},
+		{
+			"label": "prepare-debug-chrome",
+			"dependsOrder": "sequence",
+			"dependsOn": [
+				"install-debug-chrome-for-testing",
+				"watch-debug-extension"
+			]
 		}
 	]
 }

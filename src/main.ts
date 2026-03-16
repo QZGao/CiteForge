@@ -5,6 +5,7 @@ import { refreshLocale, t } from './i18n';
 import { initColorSchemeSync } from './ui/color_scheme';
 import { initCitationPopup, initReferencePopup } from './ui/citations';
 import { loadInspectorData } from './ui/inspector_loader';
+import { initInsertCitationToolbar } from './ui/insert_citation';
 
 initColorSchemeSync();
 
@@ -17,6 +18,7 @@ async function init(): Promise<void> {
 	refreshLocale();
 	initCitationPopup();
 	initReferencePopup();
+	void initInsertCitationToolbar();
 
 	const toggle = async () => {
 		if (isHubVisible()) {

@@ -2,11 +2,11 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "Debug Cite Forge on Wikipedia",
+			"name": "Debug Cite Forge on Firefox",
 			"type": "firefox",
 			"request": "launch",
 			"reAttach": true,
-			"url": "https://en.wikipedia.org/wiki/Terraria",
+			"url": "https://en.wikipedia.org/wiki/Varsapura",
 			"webRoot": "${workspaceFolder}",
 			"addonPath": "${workspaceFolder}/.debug",
 			"preLaunchTask": "watch-debug-extension",
@@ -18,6 +18,24 @@
 				],
 				"debounce": 200
 			},
+			"skipFiles": [
+				"**/load.php*",
+				"**/ext.*.js"
+			]
+		},
+		{
+			"name": "Debug Cite Forge on Chrome",
+			"type": "chrome",
+			"request": "launch",
+			"url": "https://en.wikipedia.org/wiki/Varsapura",
+			"webRoot": "${workspaceFolder}",
+			"preLaunchTask": "prepare-debug-chrome",
+			"runtimeExecutable": "${workspaceFolder}/.debug/chrome/chrome-win64/chrome.exe",
+			"runtimeArgs": [
+				"--user-data-dir=${workspaceFolder}/.debug/chrome-profile",
+				"--disable-extensions-except=${workspaceFolder}/.debug",
+				"--load-extension=${workspaceFolder}/.debug"
+			],
 			"skipFiles": [
 				"**/load.php*",
 				"**/ext.*.js"

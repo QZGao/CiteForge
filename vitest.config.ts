@@ -42,8 +42,48 @@ function i18nCataloguesPlugin(): Plugin {
 	};
 }
 
+function vueTemplatePlugin(): Plugin {
+	return {
+		name: 'citeforge-vitest-vue-template',
+		async load(id) {
+			if (!id.endsWith('.vue')) {
+				return null;
+			}
+			const text = await fs.readFile(id, 'utf8');
+			const match = text.match(/<template>([\s\S]*)<\/template>/);
+			if (!match) {
+				throw new Error(`[Cite Forge Vitest] No <template> block found in ${id}`);
+			}
+			const escaped = match[1]
+				.replace(/\\/g, '\\\\')
+				.replace(/`/g, '\\`')
+				.replace(/\$\{/g, '\\${');
+			return {
+				code: `export default \`${escaped}\`;`,
+				map: null
+			};
+		}
+	};
+}
+
+function cssTextPlugin(): Plugin {
+	return {
+		name: 'citeforge-vitest-css-text',
+		async load(id) {
+			if (!id.endsWith('.css')) {
+				return null;
+			}
+			const text = await fs.readFile(id, 'utf8');
+			return {
+				code: `export default ${JSON.stringify(text)};`,
+				map: null
+			};
+		}
+	};
+}
+
 export default defineConfig({
-	plugins: [i18nCataloguesPlugin()],
+	plugins: [i18nCataloguesPlugin(), vueTemplatePlugin(), cssTextPlugin()],
 	test: {
 		setupFiles: ['tests/setup_vitest.ts'],
 		coverage: {
