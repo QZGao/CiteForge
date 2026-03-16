@@ -6,6 +6,7 @@ import {
 	buildCitationWikitext,
 	captureInsertionTarget,
 	createAuthorRow,
+	createDefaultRowsForTemplate,
 	createParamRow,
 	findAutoFillQuery,
 	insertTextAtSelection,
@@ -82,6 +83,28 @@ describe('insert citation helpers', () => {
 		expect(row.split.link.name).toBe('author-link2');
 		expect(row.single.author.name).toBe('author2');
 		expect(row.single.link.name).toBe('author-link2');
+	});
+
+	it('prefills access-date with today on dialog startup rows', () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-03-15T10:30:00'));
+
+		try {
+			const rows = createDefaultRowsForTemplate('cite web');
+			const accessDateRow = rows.find(
+				(row) => row.kind === 'param' && row.field.name === 'access-date'
+			);
+
+			expect(accessDateRow).toMatchObject({
+				kind: 'param',
+				field: {
+					name: 'access-date',
+					value: '2026-03-15'
+				}
+			});
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it('prefers the first supported source field for auto-fill queries', () => {
