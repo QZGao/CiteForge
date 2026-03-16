@@ -13,14 +13,17 @@
 						:aria-label="t('ui.insertCitation.dialog.refNameLabel')" />
 				</div>
 				<div class="citeforge-insert-dialog__toolbar-actions">
-					<span v-if="loadingParams" class="citeforge-insert-dialog__status">{{
-						t('ui.insertCitation.dialog.loadingParams')
+					<span v-if="loadingParams || autoFilling" class="citeforge-insert-dialog__status">{{
+						t(autoFilling ? 'ui.insertCitation.dialog.autoFilling' : 'ui.insertCitation.dialog.loadingParams')
 					}}</span>
 					<cdx-button weight="quiet" @click.prevent="addNameRow">
 						{{ t('ui.insertCitation.dialog.addNames') }}
 					</cdx-button>
 					<cdx-button weight="quiet" @click.prevent="addParamRow">
 						{{ t('ui.insertCitation.dialog.addParam') }}
+					</cdx-button>
+					<cdx-button weight="quiet" :disabled="autoFilling" @click.prevent="autoFillFromCitoid">
+						{{ t('ui.insertCitation.dialog.autoFill') }}
 					</cdx-button>
 				</div>
 			</div>

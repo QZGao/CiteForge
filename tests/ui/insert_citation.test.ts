@@ -2,11 +2,14 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import {
+	applyCitoidMappedParams,
 	buildCitationWikitext,
 	captureInsertionTarget,
 	createAuthorRow,
 	createParamRow,
+	findAutoFillQuery,
 	insertTextAtSelection,
+	mapCitoidDataToParams,
 	toggleAuthorRowMode
 } from '../../src/ui/insert_citation';
 
@@ -79,6 +82,133 @@ describe('insert citation helpers', () => {
 		expect(row.split.link.name).toBe('author-link2');
 		expect(row.single.author.name).toBe('author2');
 		expect(row.single.link.name).toBe('author-link2');
+	});
+
+	it('prefers the first supported source field for auto-fill queries', () => {
+		const query = findAutoFillQuery('cite web', [
+			createParamRow('title', 'Example'),
+			createParamRow('doi', '10.1000/example'),
+			createParamRow('url', 'https://example.org')
+		]);
+
+		expect(query).toEqual({
+			query: 'https://example.org',
+			sourceParam: 'url'
+		});
+	});
+
+	it('maps citoid payloads into template parameters', () => {
+		const mapped = mapCitoidDataToParams(
+			{
+				title: 'Measured measurement',
+				url: 'https://www.nature.com/articles/nphys1170',
+				publicationTitle: 'Nature Physics',
+				date: '2009-01',
+				DOI: '10.1038/nphys1170',
+				author: [
+					['Markus', 'Aspelmeyer'],
+					['Jane', 'Doe']
+				],
+				accessDate: '2026-03-16'
+			},
+			{
+				title: 'title',
+				url: 'url',
+				publicationTitle: 'journal',
+				date: 'date',
+				DOI: 'doi',
+				accessDate: 'access-date',
+				author: [
+					['first', 'last'],
+					['first2', 'last2']
+				]
+			}
+		);
+
+		expect(mapped).toEqual({
+			title: 'Measured measurement',
+			url: 'https://www.nature.com/articles/nphys1170',
+			journal: 'Nature Physics',
+			date: '2009-01',
+			doi: '10.1038/nphys1170',
+			'access-date': '2026-03-16',
+			first: 'Markus',
+			last: 'Aspelmeyer',
+			first2: 'Jane',
+			last2: 'Doe'
+		});
+	});
+
+	it('applies mapped citoid params to split author and parameter rows', () => {
+		const rows = [
+			createAuthorRow('split', 1),
+			createParamRow('url', 'https://example.org'),
+			createParamRow('title', '')
+		];
+
+		const updated = applyCitoidMappedParams('cite web', rows, {
+			first: 'Markus',
+			last: 'Aspelmeyer',
+			title: 'Measured measurement',
+			website: 'Nature',
+			first2: 'Jane',
+			last2: 'Doe'
+		});
+
+		expect(updated[0]).toMatchObject({
+			kind: 'author',
+			index: 1,
+			split: {
+				first: { value: 'Markus' },
+				last: { value: 'Aspelmeyer' }
+			}
+		});
+		expect(updated[1]).toMatchObject({
+			kind: 'author',
+			index: 2,
+			split: {
+				first: { value: 'Jane' },
+				last: { value: 'Doe' }
+			}
+		});
+		expect(updated).toContainEqual(
+			expect.objectContaining({
+				kind: 'param',
+				field: expect.objectContaining({
+					name: 'title',
+					value: 'Measured measurement'
+				})
+			})
+		);
+		expect(updated).toContainEqual(
+			expect.objectContaining({
+				kind: 'param',
+				field: expect.objectContaining({
+					name: 'website',
+					value: 'Nature'
+				})
+			})
+		);
+	});
+
+	it('applies split citoid author data to single author rows', () => {
+		const row = createAuthorRow('single', 1);
+		row.single.link.value = 'Existing';
+
+		const [updatedRow] = applyCitoidMappedParams('cite web', [row], {
+			first: 'Jane',
+			last: 'Doe',
+			'author-link': 'Jane_Doe'
+		});
+
+		expect(updatedRow).toMatchObject({
+			kind: 'author',
+			mode: 'single',
+			single: {
+				author: { value: 'Jane Doe' },
+				link: { value: 'Jane_Doe' }
+			}
+		});
 	});
 
 	it('inserts rendered text at the captured cursor position', () => {

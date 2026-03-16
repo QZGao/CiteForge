@@ -1,4 +1,11 @@
-import { fetchTemplateDataOrder, getTemplateAliasMap, getTemplateParamOrder } from '../data/templatedata_fetch';
+import {
+	fetchTemplateDataCitoidMap,
+	fetchTemplateDataOrder,
+	getTemplateAliasMap,
+	getTemplateParamOrder,
+	type TemplateCitoidMap
+} from '../data/templatedata_fetch';
+import { fetchCitoidData, type CitoidDataObject } from '../data/citoid';
 import { MessageKey, MessageParams, t } from '../i18n';
 import { ensureMount, ensureStyleElement, loadCodexAndVue, registerCodexComponents } from './codex';
 import styles from './insert_citation.css';
@@ -8,6 +15,12 @@ type VueModule = { createMwApp: (options: unknown) => VueApp };
 type VueApp = { mount: (selector: string) => unknown; component?: (name: string, value: unknown) => VueApp };
 
 type DefaultRowSpec = { kind: 'param'; name: string } | { kind: 'author'; mode?: 'split' | 'single' };
+type AuthorValueKey = 'author' | 'first' | 'last' | 'link';
+type AutoFillQueryResult = {
+	query: string;
+	sourceParam: string;
+};
+type MappedCitoidParams = Record<string, string>;
 
 export type ParamField = {
 	name: string;
@@ -52,6 +65,7 @@ type InsertCitationState = {
 	refName: string;
 	rows: InsertCitationRow[];
 	allParamOptions: string[];
+	autoFilling: boolean;
 	loadingParams: boolean;
 	dialogName: string;
 	paramDatalistId: string;
@@ -64,6 +78,7 @@ type InsertCitationVm = InsertCitationState & {
 	loadTemplateParams: (templateName: string) => Promise<void>;
 	addParamRow: () => void;
 	addNameRow: () => void;
+	autoFillFromCitoid: () => Promise<void>;
 	removeRow: (rowId: string) => void;
 	setAuthorMode: (row: InsertCitationAuthorRow, useSingle: boolean) => void;
 	insertCitation: () => void;
@@ -82,6 +97,7 @@ const STYLE_ID = 'citeforge-insert-citation-styles';
 const MOUNT_ID = `citeforge-${DIALOG_NAME}-mount`;
 const TOOL_NAME = 'citeforgeInsertCitation';
 const TOOLBAR_READY_DELAY_MS = 1000;
+const AUTO_FILL_SOURCE_PARAMS = ['url', 'doi', 'isbn', 'pmid', 'pmc', 'arxiv', 'jstor', 'oclc'] as const;
 const TOOLBAR_ICON = `data:image/svg+xml,${encodeURIComponent(
 	"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><path fill='#1d3557' d='M4 4h5v5H6.8L7 10.7A3.2 3.2 0 0 1 4 14V4zm7 0h5v5h-2.2L14 10.7A3.2 3.2 0 0 1 11 14V4z'/><path fill='#5d7ea6' d='M4 15h12v1H4z'/></svg>"
 )}`;
@@ -142,6 +158,7 @@ const DEFAULT_TEMPLATE_ROWS: Record<string, DefaultRowSpec[]> = {
 		{ kind: 'param', name: 'issue' },
 		{ kind: 'param', name: 'pages' },
 		{ kind: 'param', name: 'doi' },
+		{ kind: 'param', name: 'url' },
 		{ kind: 'param', name: 'language' }
 	],
 	'cite av media': [
@@ -292,6 +309,11 @@ function sortRowsAuthorFirst(rows: InsertCitationRow[]): InsertCitationRow[] {
 			return;
 		}
 		paramRows.push(row);
+	});
+
+	authorRows.sort((left, right) => {
+		if (left.kind !== 'author' || right.kind !== 'author') return 0;
+		return left.index - right.index;
 	});
 
 	return [...authorRows, ...paramRows];
@@ -446,7 +468,294 @@ export function buildCitationWikitext(templateName: string, refName: string, row
 	parts.push('}}');
 	const trimmedRefName = refName.trim();
 	const refNameAttribute = trimmedRefName ? ` name="${escapeRefNameAttribute(trimmedRefName)}"` : '';
-	return `<ref${refNameAttribute}>${parts.join(' ')}</ref>`;
+	return `<ref${refNameAttribute}>${parts.join('')}</ref>`;
+}
+
+/**
+ * Clone a single row model so autofill can return a fresh array for Vue reactivity.
+ * @param row - Row model to duplicate.
+ * @returns Cloned row model.
+ */
+function cloneRow(row: InsertCitationRow): InsertCitationRow {
+	if (row.kind === 'param') {
+		return {
+			...row,
+			field: { ...row.field }
+		};
+	}
+
+	return {
+		...row,
+		split: {
+			last: { ...row.split.last },
+			first: { ...row.split.first },
+			link: { ...row.split.link }
+		},
+		single: {
+			author: { ...row.single.author },
+			link: { ...row.single.link }
+		}
+	};
+}
+
+/**
+ * Normalize a parameter name to its canonical TemplateData parameter.
+ * @param templateName - Citation template name.
+ * @param paramName - Raw parameter name.
+ * @returns Canonical lowercased parameter name.
+ */
+function normalizeParamNameForTemplate(templateName: string, paramName: string): string {
+	const normalizedName = paramName.trim().toLowerCase();
+	if (!normalizedName) return '';
+
+	const aliasMap = getTemplateAliasMap(templateName);
+	const localCanonical = LOCAL_PARAM_ALIASES[normalizedName] ?? normalizedName;
+	return aliasMap[normalizedName] ?? aliasMap[localCanonical] ?? localCanonical;
+}
+
+/**
+ * Check whether a value is a plain object with string keys.
+ * @param value - Candidate value.
+ * @returns True when the value is an object record.
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Convert an unknown error into a log-friendly object.
+ * @param error - Thrown error value.
+ * @returns Error details suitable for console logging.
+ */
+function describeError(error: unknown): Record<string, unknown> {
+	if (!isRecord(error)) {
+		return { value: error };
+	}
+
+	return {
+		name: error instanceof Error ? error.name : undefined,
+		message: error instanceof Error ? error.message : undefined,
+		...error
+	};
+}
+
+/**
+ * Convert a Citoid value into plain text suitable for a citation parameter.
+ * @param value - Raw Citoid value.
+ * @returns Flattened string value.
+ */
+function stringifyCitoidValue(value: unknown): string {
+	if (typeof value === 'string') {
+		return value.trim();
+	}
+
+	if (typeof value === 'number' || typeof value === 'boolean') {
+		return String(value);
+	}
+
+	if (Array.isArray(value)) {
+		return value
+			.map((item) => {
+				if (Array.isArray(item)) {
+					return item.map((part) => stringifyCitoidValue(part)).filter(Boolean).join(', ');
+				}
+				return stringifyCitoidValue(item);
+			})
+			.filter(Boolean)
+			.join('; ');
+	}
+
+	return '';
+}
+
+/**
+ * Recursively apply a TemplateData Citoid map to a Citoid response object.
+ * @param output - Parameter map being built.
+ * @param source - Current Citoid source value.
+ * @param map - Current TemplateData Citoid map value.
+ */
+function applyCitoidMapValue(output: MappedCitoidParams, source: unknown, map: unknown): void {
+	if (source === undefined || map === undefined || map === null) return;
+
+	if (typeof map === 'string') {
+		const value = stringifyCitoidValue(source);
+		const paramName = map.trim().toLowerCase();
+		if (paramName && value) {
+			output[paramName] = value;
+		}
+		return;
+	}
+
+	if (Array.isArray(map)) {
+		if (!Array.isArray(source)) return;
+		map.forEach((childMap, index) => {
+			applyCitoidMapValue(output, source[index], childMap);
+		});
+		return;
+	}
+
+	if (!isRecord(map) || !isRecord(source)) return;
+
+	Object.entries(map).forEach(([key, childMap]) => {
+		applyCitoidMapValue(output, source[key], childMap);
+	});
+}
+
+/**
+ * Convert a Citoid response into template parameters using TemplateData's map.
+ * @param citoidData - Raw Citoid response item.
+ * @param citoidMap - TemplateData Citoid map for the selected template.
+ * @returns Canonical parameter/value pairs.
+ */
+export function mapCitoidDataToParams(citoidData: CitoidDataObject, citoidMap: TemplateCitoidMap): MappedCitoidParams {
+	const mapped: MappedCitoidParams = {};
+	applyCitoidMapValue(mapped, citoidData, citoidMap);
+	return mapped;
+}
+
+/**
+ * Parse an author-related parameter name into its row index and field kind.
+ * @param paramName - Canonical parameter name.
+ * @returns Parsed author field metadata, or null for non-author params.
+ */
+function parseAuthorParamName(paramName: string): { field: AuthorValueKey; index: number } | null {
+	const match = /^(author-link|author|first|last)(\d*)$/.exec(paramName.trim().toLowerCase());
+	if (!match) return null;
+
+	const [, baseName, suffix] = match;
+	const field: AuthorValueKey = baseName === 'author-link' ? 'link' : (baseName as Exclude<AuthorValueKey, 'link'>);
+	return {
+		field,
+		index: suffix ? Number.parseInt(suffix, 10) : 1
+	};
+}
+
+/**
+ * Find the best existing identifier or URL to use for Citoid lookup.
+ * @param templateName - Citation template name.
+ * @param rows - Current dialog rows.
+ * @returns Query data for Citoid, or null when no supported source field is filled.
+ */
+export function findAutoFillQuery(templateName: string, rows: InsertCitationRow[]): AutoFillQueryResult | null {
+	for (const sourceParam of AUTO_FILL_SOURCE_PARAMS) {
+		const match = rows.find((row): row is InsertCitationParamRow => {
+			if (row.kind !== 'param') return false;
+			if (!row.field.value.trim()) return false;
+			return normalizeParamNameForTemplate(templateName, row.field.name) === sourceParam;
+		});
+
+		if (match) {
+			return {
+				query: match.field.value.trim(),
+				sourceParam
+			};
+		}
+	}
+
+	return null;
+}
+
+/**
+ * Ensure an author row exists for a specific author index.
+ * @param rows - Current row models.
+ * @param index - 1-based author index.
+ * @returns Existing or newly created author row.
+ */
+function getOrCreateAuthorRow(rows: InsertCitationRow[], index: number): InsertCitationAuthorRow {
+	const existingRow = rows.find((row): row is InsertCitationAuthorRow => row.kind === 'author' && row.index === index);
+	if (existingRow) return existingRow;
+
+	const nextRow = createAuthorRow('split', index);
+	rows.push(nextRow);
+	return nextRow;
+}
+
+/**
+ * Apply mapped Citoid values to a specific author row.
+ * @param row - Author row to update.
+ * @param values - Author field values grouped by index.
+ */
+function applyAuthorValues(row: InsertCitationAuthorRow, values: Partial<Record<AuthorValueKey, string>>): void {
+	if (row.mode === 'single') {
+		const currentNames = splitAuthorName(row.single.author.value);
+		const nextAuthor =
+			values.author ??
+			combineAuthorName(values.first ?? currentNames.first, values.last ?? currentNames.last);
+		if (values.author !== undefined || values.first !== undefined || values.last !== undefined) {
+			row.single.author.value = nextAuthor;
+		}
+		if (values.link !== undefined) {
+			row.single.link.value = values.link;
+		}
+		return;
+	}
+
+	if (values.author !== undefined && values.first === undefined && values.last === undefined) {
+		const parsedName = splitAuthorName(values.author);
+		row.split.first.value = parsedName.first;
+		row.split.last.value = parsedName.last;
+	}
+	if (values.first !== undefined) {
+		row.split.first.value = values.first;
+	}
+	if (values.last !== undefined) {
+		row.split.last.value = values.last;
+	}
+	if (values.link !== undefined) {
+		row.split.link.value = values.link;
+	}
+}
+
+/**
+ * Apply mapped Citoid parameter values to the current dialog rows.
+ * @param templateName - Citation template name.
+ * @param rows - Current dialog rows.
+ * @param mappedParams - Canonical parameter/value pairs from Citoid.
+ * @returns Updated row models.
+ */
+export function applyCitoidMappedParams(templateName: string, rows: InsertCitationRow[], mappedParams: MappedCitoidParams): InsertCitationRow[] {
+	const nextRows = rows.map((row) => cloneRow(row));
+	const authorValues = new Map<number, Partial<Record<AuthorValueKey, string>>>();
+	const genericParams = Object.entries(mappedParams).filter(([paramName, value]) => {
+		const authorField = parseAuthorParamName(paramName);
+		if (!authorField || !value) return Boolean(value);
+
+		const existingValues = authorValues.get(authorField.index) ?? {};
+		existingValues[authorField.field] = value;
+		authorValues.set(authorField.index, existingValues);
+		return false;
+	});
+
+	authorValues.forEach((values, index) => {
+		applyAuthorValues(getOrCreateAuthorRow(nextRows, index), values);
+	});
+
+	genericParams.forEach(([canonicalName, value]) => {
+		if (!value) return;
+
+		const matchingRow = nextRows.find((row): row is InsertCitationParamRow => {
+			if (row.kind !== 'param') return false;
+			return normalizeParamNameForTemplate(templateName, row.field.name) === canonicalName;
+		});
+		if (matchingRow) {
+			matchingRow.field.value = value;
+			return;
+		}
+
+		const blankRow = nextRows.find(
+			(row): row is InsertCitationParamRow =>
+				row.kind === 'param' && !row.field.name.trim() && !row.field.value.trim()
+		);
+		if (blankRow) {
+			blankRow.field.name = canonicalName;
+			blankRow.field.value = value;
+			return;
+		}
+
+		nextRows.push(createParamRow(canonicalName, value));
+	});
+
+	return sortRowsAuthorFirst(nextRows);
 }
 
 /**
@@ -766,6 +1075,7 @@ export async function openInsertCitationDialog(templateName: string, target?: In
 				refName: '',
 				rows: createDefaultRowsForTemplate(templateName),
 				allParamOptions: resolveParamOptions(templateName),
+				autoFilling: false,
 				loadingParams: true,
 				dialogName: DIALOG_NAME,
 				paramDatalistId: `${DIALOG_NAME}-params`,
@@ -784,6 +1094,7 @@ export async function openInsertCitationDialog(templateName: string, target?: In
 				this.refName = '';
 				this.rows = createDefaultRowsForTemplate(nextTemplateName);
 				this.allParamOptions = resolveParamOptions(nextTemplateName);
+				this.autoFilling = false;
 				this.open = true;
 				void this.loadTemplateParams(nextTemplateName);
 			},
@@ -821,6 +1132,59 @@ export async function openInsertCitationDialog(templateName: string, target?: In
 			 */
 			addNameRow(this: InsertCitationVm): void {
 				this.rows = sortRowsAuthorFirst([...this.rows, createAuthorRow('split', getNextAuthorRowIndex(this.rows))]);
+			},
+			/**
+			 * Populate citation fields from Citoid using the current URL or identifier field.
+			 * @returns Promise that resolves after autofill finishes or fails.
+			 */
+			async autoFillFromCitoid(this: InsertCitationVm): Promise<void> {
+				const query = findAutoFillQuery(this.templateName, this.rows);
+				if (!query) {
+					mw.notify?.(t('ui.insertCitation.dialog.autoFillNeedsSource'), {
+						type: 'warn',
+						title: 'Cite Forge'
+					});
+					return;
+				}
+
+				this.autoFilling = true;
+				try {
+					const [citoidData, citoidMap] = await Promise.all([
+						fetchCitoidData(query.query),
+						fetchTemplateDataCitoidMap(this.templateName)
+					]);
+
+					if (!citoidMap) {
+						mw.notify?.(t('ui.insertCitation.dialog.autoFillUnavailable'), {
+							type: 'warn',
+							title: 'Cite Forge'
+						});
+						return;
+					}
+
+					const mappedParams = mapCitoidDataToParams(citoidData, citoidMap);
+					if (Object.keys(mappedParams).length === 0) {
+						mw.notify?.(t('ui.insertCitation.dialog.autoFillUnavailable'), {
+							type: 'warn',
+							title: 'Cite Forge'
+						});
+						return;
+					}
+
+					this.rows = applyCitoidMappedParams(this.templateName, this.rows, mappedParams);
+				} catch (error) {
+					console.warn('[Cite Forge] Failed to auto-fill citation from Citoid', {
+						error: describeError(error),
+						query,
+						templateName: this.templateName
+					});
+					mw.notify?.(t('ui.insertCitation.dialog.autoFillFailed'), {
+						type: 'error',
+						title: 'Cite Forge'
+					});
+				} finally {
+					this.autoFilling = false;
+				}
 			},
 			/**
 			 * Remove a parameter or author row from the form.
