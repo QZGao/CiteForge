@@ -2,11 +2,19 @@ const templateDataOrderCache = new Map<string, string[]>();
 const templateDataAliasCache = new Map<string, Record<string, string>>();
 const templateDataCitoidMapCache = new Map<string, TemplateCitoidMap>();
 const pendingFetches = new Map<string, Promise<void>>();
+const pendingCitoidMapFetches = new Map<string, Promise<void>>();
 const STORAGE_KEY = 'citeforge-template-param-order';
 let cacheLoaded = false;
 const API_ENDPOINT = 'https://zh.wikipedia.org/w/api.php';  // Only used if mw.Api is not available or in tests
+const ENWIKI_API_ENDPOINT = 'https://en.wikipedia.org/w/api.php';
 
 export type TemplateCitoidMap = Record<string, unknown>;
+type TemplateDataPage = {
+	paramorder?: string[];
+	paramOrder?: string[];
+	params?: Record<string, { aliases?: string[] }>;
+	maps?: { citoid?: TemplateCitoidMap };
+};
 
 /**
  * Normalize a template name for consistent caching.
@@ -125,7 +133,7 @@ export async function fetchTemplateDataOrder(templateName: string): Promise<stri
 export async function fetchTemplateDataCitoidMap(templateName: string): Promise<TemplateCitoidMap | null> {
 	const normName = normalizeTemplateName(templateName);
 	console.info('[Cite Forge][TemplateData] Requesting citoid map', { templateName, normName });
-	await fetchAndStoreTemplateData(normName);
+	await fetchAndStoreEnwikiCitoidMap(normName);
 	return getTemplateCitoidMap(normName);
 }
 
@@ -194,16 +202,7 @@ async function fetchAndStoreTemplateData(templateName: string): Promise<void> {
 				return;
 			}
 			console.info('[Cite Forge][TemplateData] API response', data);
-			type TemplateDataPage = {
-				paramorder?: string[];
-				paramOrder?: string[];
-				params?: Record<string, { aliases?: string[] }>;
-				maps?: { citoid?: TemplateCitoidMap };
-			};
-			const pagesObj = (data as {
-				pages?: Record<string, TemplateDataPage>;
-			}).pages;
-			const pages = pagesObj ? Object.values(pagesObj) : [];
+			const pages = getTemplateDataPages(data);
 			const orderFromParamOrder =
 				pages.find((p) => Array.isArray(p.paramorder) && p.paramorder.length)?.paramorder ||
 				pages.find((p) => Array.isArray(p.paramOrder) && p.paramOrder.length)?.paramOrder;
@@ -247,6 +246,65 @@ async function fetchAndStoreTemplateData(templateName: string): Promise<void> {
 }
 
 /**
+ * Fetch the TemplateData Citoid map for a template from English Wikipedia.
+ * This is separate from the general TemplateData cache because many local
+ * wikis do not expose the same Citoid mappings as enwiki.
+ * @param templateName - Normalized template name.
+ */
+async function fetchAndStoreEnwikiCitoidMap(templateName: string): Promise<void> {
+	loadCache();
+	if (templateDataCitoidMapCache.has(templateName)) return;
+	if (pendingCitoidMapFetches.has(templateName)) {
+		await pendingCitoidMapFetches.get(templateName);
+		return;
+	}
+
+	const promise = (async () => {
+		try {
+			if (typeof fetch !== 'function') {
+				console.info('[Cite Forge][TemplateData] No fetch available for enwiki citoid map request', { templateName });
+				return;
+			}
+
+			const title = encodeURIComponent(`Template:${canonicalTemplateTitle(templateName)}`);
+			const url = `${ENWIKI_API_ENDPOINT}?action=templatedata&titles=${title}&redirects=true&formatversion=2&format=json&origin=*`;
+			console.info('[Cite Forge][TemplateData] Fetching citoid map from enwiki', { templateName, url });
+			const resp = await fetch(url);
+			const data = (await resp.json()) as unknown;
+			console.info('[Cite Forge][TemplateData] Enwiki citoid map response', data);
+
+			const pages = getTemplateDataPages(data);
+			const citoidMapPage = pages.find((page) => isTemplateCitoidMap(page.maps?.citoid));
+			const citoidMap = citoidMapPage?.maps?.citoid && isTemplateCitoidMap(citoidMapPage.maps.citoid) ? citoidMapPage.maps.citoid : null;
+
+			if (!citoidMap) {
+				console.info('[Cite Forge][TemplateData] No enwiki citoid map found', { templateName });
+				return;
+			}
+
+			templateDataCitoidMapCache.set(templateName, citoidMap);
+			saveCache();
+			console.info('[Cite Forge][TemplateData] Stored enwiki citoid map', { templateName });
+		} catch (err) {
+			console.warn('[Cite Forge] Failed to fetch TemplateData citoid map from enwiki', err);
+		}
+	})().finally(() => pendingCitoidMapFetches.delete(templateName));
+
+	pendingCitoidMapFetches.set(templateName, promise);
+	await promise;
+}
+
+/**
+ * Extract the TemplateData pages list from an API response.
+ * @param data - Raw TemplateData API response.
+ * @returns Page objects from the response.
+ */
+function getTemplateDataPages(data: unknown): TemplateDataPage[] {
+	const pagesObj = (data as { pages?: Record<string, TemplateDataPage> }).pages;
+	return pagesObj ? Object.values(pagesObj) : [];
+}
+
+/**
  * Load cached template data from localStorage.
  */
 function loadCache(): void {
@@ -286,7 +344,13 @@ function saveCache(): void {
 	try {
 		if (typeof localStorage === 'undefined') return;
 		const obj: Record<string, { order: string[]; aliases: Record<string, string>; citoid?: TemplateCitoidMap }> = {};
-		templateDataOrderCache.forEach((order, name) => {
+		const names = new Set([
+			...templateDataOrderCache.keys(),
+			...templateDataAliasCache.keys(),
+			...templateDataCitoidMapCache.keys()
+		]);
+		names.forEach((name) => {
+			const order = templateDataOrderCache.get(name) ?? [];
 			const citoidMap = templateDataCitoidMapCache.get(name);
 			obj[name] = {
 				order,
