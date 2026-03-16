@@ -639,6 +639,109 @@ export function mapCitoidDataToParams(citoidData: CitoidDataObject, citoidMap: T
 }
 
 /**
+ * Collect the top-level Citoid source keys that TemplateData explicitly maps.
+ * @param citoidMap - TemplateData Citoid map.
+ * @returns Top-level Citoid keys mentioned in the map.
+ */
+function getMappedCitoidSourceKeys(citoidMap: TemplateCitoidMap | null): Set<string> {
+	if (!citoidMap || !isRecord(citoidMap)) return new Set();
+	return new Set(Object.keys(citoidMap));
+}
+
+/**
+ * Collect mapped template parameter names from a nested TemplateData Citoid map value.
+ * @param mapValue - Map value to inspect.
+ * @param output - Ordered list of mapped param names.
+ * @param seen - Set of param names already emitted.
+ */
+function collectMappedTemplateParams(mapValue: unknown, output: string[], seen: Set<string>): void {
+	if (typeof mapValue === 'string') {
+		const normalized = mapValue.trim().toLowerCase();
+		if (!normalized || seen.has(normalized)) return;
+		seen.add(normalized);
+		output.push(normalized);
+		return;
+	}
+
+	if (Array.isArray(mapValue)) {
+		mapValue.forEach((child) => collectMappedTemplateParams(child, output, seen));
+		return;
+	}
+
+	if (!isRecord(mapValue)) return;
+
+	Object.values(mapValue).forEach((child) => {
+		collectMappedTemplateParams(child, output, seen);
+	});
+}
+
+/**
+ * Collect supplemental template params that other TemplateData Citoid maps use
+ * for the same top-level Citoid source key.
+ * @param sourceKey - Top-level Citoid source field name.
+ * @param citoidMaps - TemplateData Citoid maps from other citation templates.
+ * @returns Ordered mapped param names discovered in the provided maps.
+ */
+function getSupplementalTemplateParamsForCitoidKey(
+	sourceKey: string,
+	citoidMaps: Array<TemplateCitoidMap | null>
+): string[] {
+	const output: string[] = [];
+	const seen = new Set<string>();
+
+	citoidMaps.forEach((citoidMap) => {
+		if (!citoidMap || !isRecord(citoidMap)) return;
+		collectMappedTemplateParams(citoidMap[sourceKey], output, seen);
+	});
+
+	return output;
+}
+
+/**
+ * Add direct param fills for top-level Citoid fields that are not explicitly
+ * covered by TemplateData's Citoid map, but whose normalized names are already
+ * supported by the selected template.
+ * @param templateName - Citation template name.
+ * @param citoidData - Raw Citoid response item.
+ * @param mappedParams - Parameters already mapped via TemplateData.
+ * @param citoidMap - TemplateData Citoid map for the selected template.
+ * @param supportedParams - Canonical parameter names supported by the template.
+ * @returns Parameter map including directly fillable unmapped fields.
+ */
+export function applyUnmappedCitoidParams(
+	templateName: string,
+	citoidData: CitoidDataObject,
+	mappedParams: MappedCitoidParams,
+	citoidMap: TemplateCitoidMap | null,
+	supplementalCitoidMaps: Array<TemplateCitoidMap | null>,
+	supportedParams: Iterable<string>
+): MappedCitoidParams {
+	const supported = new Set(Array.from(supportedParams, (param) => param.trim().toLowerCase()).filter(Boolean));
+	const explicitlyMappedKeys = getMappedCitoidSourceKeys(citoidMap);
+	const merged = { ...mappedParams };
+
+	Object.entries(citoidData).forEach(([sourceKey, value]) => {
+		if (explicitlyMappedKeys.has(sourceKey)) return;
+
+		const candidateParams = [
+			normalizeParamNameForTemplate(templateName, sourceKey),
+			...getSupplementalTemplateParamsForCitoidKey(sourceKey, supplementalCitoidMaps).map((paramName) =>
+				normalizeParamNameForTemplate(templateName, paramName)
+			)
+		];
+		const canonicalParam = candidateParams.find((paramName) => supported.has(paramName) && !merged[paramName]);
+		if (!canonicalParam) return;
+
+		const stringValue = stringifyCitoidValue(value);
+		if (!stringValue) return;
+
+		merged[canonicalParam] = stringValue;
+	});
+
+	return merged;
+}
+
+/**
  * Parse an author-related parameter name into its row index and field kind.
  * @param paramName - Canonical parameter name.
  * @returns Parsed author field metadata, or null for non-author params.
@@ -902,6 +1005,19 @@ function resolveParamOptions(templateName: string): string[] {
 	Object.keys(LOCAL_PARAM_ALIASES).forEach((alias) => addOption(options, seen, alias));
 
 	return options;
+}
+
+/**
+ * Resolve the canonical parameter names supported by the selected template.
+ * @param templateName - Citation template name.
+ * @returns Canonical supported parameter names.
+ */
+function getSupportedTemplateParams(templateName: string): Set<string> {
+	const supported = new Set<string>();
+	resolveParamOptions(templateName).forEach((paramName) => {
+		supported.add(normalizeParamNameForTemplate(templateName, paramName));
+	});
+	return supported;
 }
 
 /**
@@ -1174,20 +1290,28 @@ export async function openInsertCitationDialog(templateName: string, target?: In
 
 				this.autoFilling = true;
 				try {
-					const [citoidData, citoidMap] = await Promise.all([
+					const normalizedTemplateName = normalizeTemplateName(this.templateName);
+					const supplementalMapPromises = SUPPORTED_INSERT_CITATION_TEMPLATES
+						.map((templateName) => normalizeTemplateName(templateName))
+						.filter((templateName) => templateName !== normalizedTemplateName)
+						.map((templateName) => fetchTemplateDataCitoidMap(templateName));
+
+					const [citoidData, citoidMap, supplementalCitoidMaps] = await Promise.all([
 						fetchCitoidData(query.query),
-						fetchTemplateDataCitoidMap(this.templateName)
+						fetchTemplateDataCitoidMap(this.templateName),
+						Promise.all([fetchTemplateDataOrder(this.templateName), ...supplementalMapPromises]).then(
+							([, ...maps]) => maps
+						)
 					]);
 
-					if (!citoidMap) {
-						mw.notify?.(t('ui.insertCitation.dialog.autoFillUnavailable'), {
-							type: 'warn',
-							title: 'Cite Forge'
-						});
-						return;
-					}
-
-					const mappedParams = mapCitoidDataToParams(citoidData, citoidMap);
+					const mappedParams = applyUnmappedCitoidParams(
+						this.templateName,
+						citoidData,
+						citoidMap ? mapCitoidDataToParams(citoidData, citoidMap) : {},
+						citoidMap,
+						supplementalCitoidMaps,
+						getSupportedTemplateParams(this.templateName)
+					);
 					if (Object.keys(mappedParams).length === 0) {
 						mw.notify?.(t('ui.insertCitation.dialog.autoFillUnavailable'), {
 							type: 'warn',

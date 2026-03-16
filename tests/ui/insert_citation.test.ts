@@ -2,6 +2,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import {
+	applyUnmappedCitoidParams,
 	applyCitoidMappedParams,
 	buildCitationWikitext,
 	captureInsertionTarget,
@@ -159,6 +160,49 @@ describe('insert citation helpers', () => {
 			last: 'Aspelmeyer',
 			first2: 'Jane',
 			last2: 'Doe'
+		});
+	});
+
+	it('fills unmapped citoid fields from other TemplateData citoid maps when the current template supports the target param', () => {
+		const mapped = applyUnmappedCitoidParams(
+			'cite journal',
+			{
+				title: 'Genshin Impact Fan Creates Arlecchino and Columbina Character Portraits',
+				date: '2023-03-29',
+				url: 'https://gamerant.com/genshin-impact-fan-arlecchino-columbina-character-portraits/',
+				language: 'en',
+				accessDate: '2026-03-16',
+				websiteTitle: 'GameRant',
+				author: [['Hajrudin', 'Krdzic']]
+			},
+			{
+				title: 'Genshin Impact Fan Creates Arlecchino and Columbina Character Portraits',
+				date: '2023-03-29',
+				first: 'Hajrudin',
+				last: 'Krdzic'
+			},
+			{
+				title: 'title',
+				date: 'date',
+				author: [['first', 'last']]
+			},
+			[
+				{
+					websiteTitle: 'website'
+				}
+			],
+			['title', 'date', 'url', 'language', 'access-date', 'website', 'journal', 'first', 'last']
+		);
+
+		expect(mapped).toEqual({
+			title: 'Genshin Impact Fan Creates Arlecchino and Columbina Character Portraits',
+			date: '2023-03-29',
+			first: 'Hajrudin',
+			last: 'Krdzic',
+			url: 'https://gamerant.com/genshin-impact-fan-arlecchino-columbina-character-portraits/',
+			language: 'en',
+			'access-date': '2026-03-16',
+			website: 'GameRant'
 		});
 	});
 
