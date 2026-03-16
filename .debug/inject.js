@@ -1,8 +1,22 @@
 // Inject bundled.js into the page context after page loads
 (function () {
-	const bundleUrl = browser.runtime.getURL('bundled.js');
 	const SCRIPT_ID = 'citeforge-debug-userscript';
+	const BOOTSTRAP_ID = 'citeforge-debug-bootstrap';
 	const DEV_STORAGE_KEY = 'citeforge-dev';
+	const runtime =
+		(typeof browser !== 'undefined' && browser.runtime) ||
+		(typeof chrome !== 'undefined' && chrome.runtime) ||
+		null;
+
+	if (!runtime || typeof runtime.getURL !== 'function') {
+		console.warn('[Cite Forge debug] Extension runtime API unavailable; skipping debug injection');
+		return;
+	}
+
+	const bundleUrl = runtime.getURL('bundled.js');
+	const bootstrapUrl = new URL(runtime.getURL('page_bootstrap.js'));
+	bootstrapUrl.searchParams.set('bundle', bundleUrl);
+	bootstrapUrl.searchParams.set('scriptId', SCRIPT_ID);
 
 	function markDevMode() {
 		if (localStorage.getItem(DEV_STORAGE_KEY) !== '1') {
@@ -13,40 +27,13 @@
 	markDevMode();
 
 	function inject() {
-		// Create inline script that waits for mw.loader then loads our bundle
-		const waitScript = document.createElement('script');
-		waitScript.textContent = `
-			(function() {
-				function loadCiteForge() {
-					// Remove any previously injected copy (prevents double-injection)
-					var old = document.getElementById(${JSON.stringify(SCRIPT_ID)});
-					if (old) old.remove();
+		const old = document.getElementById(BOOTSTRAP_ID);
+		if (old) old.remove();
 
-					var script = document.createElement('script');
-					script.id = ${JSON.stringify(SCRIPT_ID)};
-
-					// Cache-bust so Firefox won’t reuse an old bundled.js
-					script.src = ${JSON.stringify(bundleUrl)} + '?t=' + Date.now();
-
-					document.head.appendChild(script);
-				}
-
-				if (typeof mw !== 'undefined' && mw.loader && typeof mw.loader.using === 'function') {
-					loadCiteForge();
-				} else {
-					// Fallback: wait for mw.loader
-					setTimeout(function retry() {
-						if (typeof mw !== 'undefined' && mw.loader && typeof mw.loader.using === 'function') {
-							loadCiteForge();
-						} else {
-							setTimeout(retry, 50);
-						}
-					}, 50);
-				}
-			})();
-		`;
-		(document.head || document.documentElement).appendChild(waitScript);
-		waitScript.remove();
+		const bootstrap = document.createElement('script');
+		bootstrap.id = BOOTSTRAP_ID;
+		bootstrap.src = `${bootstrapUrl.toString()}&t=${Date.now()}`;
+		(document.head || document.documentElement).appendChild(bootstrap);
 	}
 
 	// Wait for page to finish loading

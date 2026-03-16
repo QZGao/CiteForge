@@ -1,9 +1,12 @@
 const templateDataOrderCache = new Map<string, string[]>();
 const templateDataAliasCache = new Map<string, Record<string, string>>();
+const templateDataCitoidMapCache = new Map<string, TemplateCitoidMap>();
 const pendingFetches = new Map<string, Promise<void>>();
 const STORAGE_KEY = 'citeforge-template-param-order';
 let cacheLoaded = false;
 const API_ENDPOINT = 'https://zh.wikipedia.org/w/api.php';  // Only used if mw.Api is not available or in tests
+
+export type TemplateCitoidMap = Record<string, unknown>;
 
 /**
  * Normalize a template name for consistent caching.
@@ -48,12 +51,18 @@ function normalizeOrder(template: string, order: string[]): string[] {
  * @param name - Template name.
  * @param order - Parameter order array.
  * @param aliases - Parameter alias map.
+ * @param citoidMap - Optional Citoid parameter map.
  */
-function setTemplateData(name: string, order: string[], aliases: Record<string, string>): void {
+function setTemplateData(name: string, order: string[], aliases: Record<string, string>, citoidMap: TemplateCitoidMap | null): void {
 	const norm = normalizeTemplateName(name);
 	const normalized = normalizeOrder(norm, order);
 	templateDataOrderCache.set(norm, normalized);
 	templateDataAliasCache.set(norm, aliases);
+	if (citoidMap) {
+		templateDataCitoidMapCache.set(norm, citoidMap);
+	} else {
+		templateDataCitoidMapCache.delete(norm);
+	}
 	saveCache();
 }
 
@@ -86,6 +95,17 @@ export function getTemplateAliasMap(name: string): Record<string, string> {
 }
 
 /**
+ * Get the cached Citoid-to-template parameter map for a template.
+ * @param name - Template name.
+ * @returns Citoid map or null if unavailable.
+ */
+export function getTemplateCitoidMap(name: string): TemplateCitoidMap | null {
+	loadCache();
+	const key = normalizeTemplateName(name);
+	return templateDataCitoidMapCache.get(key) ?? null;
+}
+
+/**
  * Fetch and return the parameter order for a template, caching the result.
  * @param templateName - Template name.
  * @returns Parameter order array.
@@ -95,6 +115,18 @@ export async function fetchTemplateDataOrder(templateName: string): Promise<stri
 	console.info('[Cite Forge][TemplateData] Requesting param order', { templateName, normName });
 	await fetchAndStoreTemplateData(normName);
 	return getTemplateParamOrder(normName);
+}
+
+/**
+ * Fetch and return the Citoid parameter map for a template, caching the result.
+ * @param templateName - Template name.
+ * @returns Citoid parameter map or null when unavailable.
+ */
+export async function fetchTemplateDataCitoidMap(templateName: string): Promise<TemplateCitoidMap | null> {
+	const normName = normalizeTemplateName(templateName);
+	console.info('[Cite Forge][TemplateData] Requesting citoid map', { templateName, normName });
+	await fetchAndStoreTemplateData(normName);
+	return getTemplateCitoidMap(normName);
 }
 
 /**
@@ -162,26 +194,27 @@ async function fetchAndStoreTemplateData(templateName: string): Promise<void> {
 				return;
 			}
 			console.info('[Cite Forge][TemplateData] API response', data);
+			type TemplateDataPage = {
+				paramorder?: string[];
+				paramOrder?: string[];
+				params?: Record<string, { aliases?: string[] }>;
+				maps?: { citoid?: TemplateCitoidMap };
+			};
 			const pagesObj = (data as {
-				pages?: Record<
-					string,
-					{
-						paramorder?: string[];
-						paramOrder?: string[];
-						params?: Record<string, { aliases?: string[] }>;
-					}
-				>;
+				pages?: Record<string, TemplateDataPage>;
 			}).pages;
 			const pages = pagesObj ? Object.values(pagesObj) : [];
 			const orderFromParamOrder =
 				pages.find((p) => Array.isArray(p.paramorder) && p.paramorder.length)?.paramorder ||
 				pages.find((p) => Array.isArray(p.paramOrder) && p.paramOrder.length)?.paramOrder;
 			const paramsPage = pages.find((p) => p.params && Object.keys(p.params).length);
+			const citoidMapPage = pages.find((p) => isTemplateCitoidMap(p.maps?.citoid));
 			const orderFromParams = paramsPage?.params ? Object.keys(paramsPage.params) : [];
 			let order: string[] = (orderFromParamOrder && orderFromParamOrder.length ? orderFromParamOrder : orderFromParams || []).filter(
 				(p) => p.trim().length > 0
 			);
 			const aliasMap: Record<string, string> = {};
+			const citoidMap = citoidMapPage?.maps?.citoid && isTemplateCitoidMap(citoidMapPage.maps.citoid) ? citoidMapPage.maps.citoid : null;
 			if (paramsPage?.params) {
 				Object.entries(paramsPage.params).forEach(([paramName, info]) => {
 					const aliases = info?.aliases;
@@ -194,15 +227,16 @@ async function fetchAndStoreTemplateData(templateName: string): Promise<void> {
 					}
 				});
 			}
-			if (order.length) {
-				setTemplateData(templateName, order, aliasMap);
+			if (order.length || citoidMap) {
+				setTemplateData(templateName, order, aliasMap, citoidMap);
 				console.info('[Cite Forge][TemplateData] Stored fetched order', {
 					templateName,
 					size: templateDataOrderCache.get(templateName)?.length ?? order.length,
-					order: templateDataOrderCache.get(templateName)
+					order: templateDataOrderCache.get(templateName),
+					hasCitoidMap: Boolean(citoidMap)
 				});
 			} else {
-				console.info('[Cite Forge][TemplateData] No paramorder found after API', { templateName });
+				console.info('[Cite Forge][TemplateData] No paramorder or citoid map found after API', { templateName });
 			}
 		} catch (err) {
 			console.warn('[Cite Forge] Failed to fetch TemplateData order', err);
@@ -222,7 +256,10 @@ function loadCache(): void {
 		if (typeof localStorage === 'undefined') return;
 		const raw = localStorage.getItem(STORAGE_KEY);
 		if (!raw) return;
-		const parsed = JSON.parse(raw) as Record<string, string[] | { order: string[]; aliases?: Record<string, string> }>;
+		const parsed = JSON.parse(raw) as Record<
+			string,
+			string[] | { order: string[]; aliases?: Record<string, string>; citoid?: TemplateCitoidMap }
+		>;
 		Object.entries(parsed).forEach(([name, order]) => {
 			if (Array.isArray(order)) {
 				templateDataOrderCache.set(name, order);
@@ -231,6 +268,9 @@ function loadCache(): void {
 				const norm = normalizeTemplateName(name);
 				templateDataOrderCache.set(norm, order.order);
 				templateDataAliasCache.set(norm, order.aliases ?? {});
+				if (isTemplateCitoidMap(order.citoid)) {
+					templateDataCitoidMapCache.set(norm, order.citoid);
+				}
 			}
 		});
 		console.info('[Cite Forge][TemplateData] Loaded cache from storage', { size: templateDataOrderCache.size });
@@ -245,12 +285,26 @@ function loadCache(): void {
 function saveCache(): void {
 	try {
 		if (typeof localStorage === 'undefined') return;
-		const obj: Record<string, { order: string[]; aliases: Record<string, string> }> = {};
+		const obj: Record<string, { order: string[]; aliases: Record<string, string>; citoid?: TemplateCitoidMap }> = {};
 		templateDataOrderCache.forEach((order, name) => {
-			obj[name] = { order, aliases: templateDataAliasCache.get(name) ?? {} };
+			const citoidMap = templateDataCitoidMapCache.get(name);
+			obj[name] = {
+				order,
+				aliases: templateDataAliasCache.get(name) ?? {},
+				...(citoidMap ? { citoid: citoidMap } : {})
+			};
 		});
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
 	} catch (err) {
 		console.warn('[Cite Forge][TemplateData] Failed to save cache', err);
 	}
+}
+
+/**
+ * Check whether a value looks like a TemplateData Citoid map object.
+ * @param value - Candidate map value.
+ * @returns True when the value is a plain object.
+ */
+function isTemplateCitoidMap(value: unknown): value is TemplateCitoidMap {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

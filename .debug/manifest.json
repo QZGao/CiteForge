@@ -1,5 +1,5 @@
 {
-	"manifest_version": 2,
+	"manifest_version": 3,
 	"name": "Cite Forge Dev",
 	"version": "1.0",
 	"description": "Development loader for Cite Forge",
@@ -15,9 +15,17 @@
 		}
 	],
 	"web_accessible_resources": [
-		"bundled.js"
+		{
+			"resources": [
+				"bundled.js",
+				"page_bootstrap.js"
+			],
+			"matches": [
+				"*://*.wikipedia.org/*"
+			]
+		}
 	],
-	"permissions": [
+	"host_permissions": [
 		"*://*.wikipedia.org/*"
 	]
 }
