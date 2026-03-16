@@ -14,7 +14,8 @@
 				</div>
 				<div class="citeforge-insert-dialog__toolbar-actions">
 					<span v-if="loadingParams || autoFilling" class="citeforge-insert-dialog__status">{{
-						t(autoFilling ? 'ui.insertCitation.dialog.autoFilling' : 'ui.insertCitation.dialog.loadingParams')
+						t(autoFilling ? 'ui.insertCitation.dialog.autoFilling' :
+							'ui.insertCitation.dialog.loadingParams')
 					}}</span>
 					<cdx-button weight="quiet" @click.prevent="addNameRow">
 						{{ t('ui.insertCitation.dialog.addNames') }}
@@ -39,6 +40,7 @@
 								:aria-label="t('ui.insertCitation.dialog.paramNameLabel')" />
 							<input v-model="row.field.value"
 								class="citeforge-insert-input citeforge-insert-input--value"
+								:placeholder="t('ui.insertCitation.dialog.paramValuePlaceholder')"
 								:aria-label="t('ui.insertCitation.dialog.paramValueLabel')" />
 						</div>
 						<button class="citeforge-insert-remove" type="button"
