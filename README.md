@@ -22,7 +22,7 @@ Pick multiple naming parts (author/title/work/domain/year/full date/etc.), choos
 
 ### Citation insertion dropdown
 
-Adds an `Insert citation` dropdown to WikiEditor's `cites` toolbar group for `{{cite web}}`, `{{cite news}}`, `{{cite book}}}`, `{{cite journal}}`, `{{cite AV media}}`, and `{{cite video game}}`.
+Adds an `Insert citation` dropdown to WikiEditor's `cites` toolbar group for `{{cite web}}`, `{{cite news}}`, `{{cite book}}`, `{{cite journal}}`, `{{cite AV media}}`, and `{{cite video game}}`.
 
 Each entry opens a compact dialog with editable parameter rows, add-more controls for names and parameters, optional `<ref name="...">`, and [Citoid](https://www.mediawiki.org/wiki/Citoid)-powered auto-fill from supported source fields. The generated result is inserted directly into the active editor as a single-line `<ref>{{cite ...}}</ref>`.
 
