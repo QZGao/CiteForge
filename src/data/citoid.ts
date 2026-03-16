@@ -1,25 +1,13 @@
 export type CitoidPrimitive = boolean | number | string;
 export type CitoidDataValue = CitoidDataObject | CitoidDataValue[] | CitoidPrimitive;
 export type CitoidDataObject = { [key: string]: CitoidDataValue };
-type CitoidRequestSource = 'restbase' | 'service' | 'origin' | 'fallback';
-
-type CitoidConfig = {
-	citoidServiceUrl?: string;
-	fullRestbaseUrl?: string;
-	wbFullRestbaseUrl?: string;
-};
-
-type VisualEditorConfig = {
-	fullRestbaseUrl?: string;
-};
+type CitoidRequestSource = 'enwiki';
+const ENWIKI_CITOID_ENDPOINT = 'https://en.wikipedia.org/api/rest_v1/data/citation/mediawiki/';
 
 type CitoidRequestDetails = {
 	query: string;
 	requestUrl: string;
 	requestSource: CitoidRequestSource;
-	restBaseUrl?: string;
-	citoidServiceUrl?: string;
-	origin?: string;
 };
 
 export type CitoidRequestError = Error &
@@ -50,96 +38,17 @@ function isCitoidDataObject(value: unknown): value is CitoidDataObject {
 }
 
 /**
- * Ensure a URL base ends with a slash for path concatenation.
- * @param value - URL base.
- * @returns Normalized URL base.
- */
-function withTrailingSlash(value: string): string {
-	return value.endsWith('/') ? value : `${value}/`;
-}
-
-/**
- * Build the mediawiki-style citation endpoint from a RESTBase base URL.
- * @param baseUrl - RESTBase base URL from wiki config.
- * @param encodedQuery - Encoded Citoid query.
- * @returns Full Citoid request URL.
- */
-function buildRestBaseCitoidUrl(baseUrl: string, encodedQuery: string): string {
-	if (baseUrl.endsWith('_')) {
-		return `${baseUrl}v1/data/citation/mediawiki/${encodedQuery}`;
-	}
-
-	if (/(?:^|[_/])v1\/?$/i.test(baseUrl)) {
-		return `${withTrailingSlash(baseUrl)}data/citation/mediawiki/${encodedQuery}`;
-	}
-
-	return `${withTrailingSlash(baseUrl)}v1/data/citation/mediawiki/${encodedQuery}`;
-}
-
-/**
- * Normalize a configured citoid service URL for REST-style requests.
- * MediaWiki 1.44+ accepts service URLs like `http://localhost:1970/api` and
- * treats the trailing `/api` as legacy noise.
- * @param serviceUrl - Configured citoid service URL.
- * @returns Normalized base URL for REST-style citoid requests.
- */
-function normalizeCitoidServiceUrl(serviceUrl: string): string {
-	const trimmed = serviceUrl.replace(/\/+$/, '');
-	return trimmed.replace(/\/api$/i, '');
-}
-
-/**
- * Build the REST-style citation endpoint from a citoid service URL.
- * @param serviceUrl - Configured citoid service URL.
- * @param encodedQuery - Encoded Citoid query.
- * @returns Full REST-style request URL.
- */
-function buildServiceCitoidUrl(serviceUrl: string, encodedQuery: string): string {
-	return `${withTrailingSlash(normalizeCitoidServiceUrl(serviceUrl))}mediawiki/${encodedQuery}`;
-}
-
-/**
  * Resolve the Citoid endpoint for the current wiki configuration.
  * @param query - URL or identifier to send to Citoid.
  * @returns Resolved request metadata.
  */
 function resolveCitoidRequest(query: string): CitoidRequestDetails {
-	const citoidConfig = mw.config.get('wgCitoidConfig') as CitoidConfig | undefined;
-	const visualEditorConfig = mw.config.get('wgVisualEditorConfig') as VisualEditorConfig | undefined;
-	const restBaseUrl = citoidConfig?.fullRestbaseUrl ?? citoidConfig?.wbFullRestbaseUrl ?? visualEditorConfig?.fullRestbaseUrl;
 	const encodedQuery = encodeURIComponent(query);
-
-	if (restBaseUrl) {
-		return {
-			query,
-			requestUrl: buildRestBaseCitoidUrl(restBaseUrl, encodedQuery),
-			requestSource: 'restbase',
-			restBaseUrl
-		};
-	}
-
-	if (citoidConfig?.citoidServiceUrl) {
-		return {
-			query,
-			requestUrl: buildServiceCitoidUrl(citoidConfig.citoidServiceUrl, encodedQuery),
-			requestSource: 'service',
-			citoidServiceUrl: citoidConfig.citoidServiceUrl
-		};
-	}
-
-	if (typeof window !== 'undefined' && window.location.origin) {
-		return {
-			query,
-			requestUrl: `${withTrailingSlash(window.location.origin)}api/rest_v1/data/citation/mediawiki/${encodedQuery}`,
-			requestSource: 'origin',
-			origin: window.location.origin
-		};
-	}
 
 	return {
 		query,
-		requestUrl: `https://en.wikipedia.org/api/rest_v1/data/citation/mediawiki/${encodedQuery}`,
-		requestSource: 'fallback'
+		requestUrl: `${ENWIKI_CITOID_ENDPOINT}${encodedQuery}`,
+		requestSource: 'enwiki'
 	};
 }
 
