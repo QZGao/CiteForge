@@ -18,7 +18,13 @@ Inline ref renaming (including nameless refs) with conflict detection and batch-
 
 Optional wikitext transforms: rename, dedupe, normalize ref markup, prefer `{{r}}` or `<ref>`, move refs inline↔LDR (all-inline, all-LDR, or threshold), sort reflist entries, keep copies vs dedupe, and rename nameless refs. Template support covers `<ref>`, self-closing `<ref />`, `{{r}}` (including chains), and reflist `refs=` blocks.
 
-Pick multiple naming parts (author/title/work/domain/year/full date/etc.), choose collision suffix styles, and control punctuation/diacritic handling. Generated renames feed back into the inspector’s pending changes for diff preview. Inspired by [RefRenamer](https://en.wikipedia.org/wiki/User:Nardog/RefRenamer).
+Pick multiple naming parts (author/title/work/domain/year/full date/etc.), choose collision suffix styles, and control punctuation/diacritic handling. Generated renames feed back into the inspector's pending changes for diff preview. Inspired by [RefRenamer](https://en.wikipedia.org/wiki/User:Nardog/RefRenamer).
+
+### Citation insertion dropdown
+
+Adds an `Insert citation` dropdown to WikiEditor's `cites` toolbar group for `{{cite web}}`, `{{cite news}}`, `{{cite book}}}`, `{{cite journal}}`, `{{cite AV media}}`, and `{{cite video game}}`.
+
+Each entry opens a compact dialog with editable parameter rows, add-more controls for names and parameters, optional `<ref name="...">`, and [Citoid](https://www.mediawiki.org/wiki/Citoid)-powered auto-fill from supported source fields. The generated result is inserted directly into the active editor as a single-line `<ref>{{cite ...}}</ref>`.
 
 ### Harv checks
 
@@ -69,21 +75,30 @@ You can test Cite Forge by pasting the bundle directly into a wiki tab:
 
 ### VS Code debugging
 
-The repository ships with a ready-to-run Firefox debugging workflow for VS Code. The `.debug/manifest.json` web extension installs a content script (`inject.js`) that injects the freshly built `.debug/bundled.js` bundle into any `*.wikipedia.org` page, letting you test Cite Forge like a normal gadget while still using VS Code breakpoints and sourcemaps.
+The repository ships with ready-to-run Firefox and Chrome debugging workflows for VS Code. The `.debug/manifest.json` web extension installs a content script (`inject.js`) that injects the freshly built `.debug/bundled.js` bundle into any `*.wikipedia.org` page, letting you test Cite Forge like a normal gadget while still using VS Code breakpoints and sourcemaps.
+
+#### Firefox
 
 1. Install the **Debugger for Firefox** extension in VS Code (it provides the `"firefox"` debug type).
-2. Open the *Run and Debug* panel and select **Debug Cite Forge on Wikipedia**.
+2. Open the *Run and Debug* panel and select **Debug Cite Forge on Firefox**.
 3. Press ▶️. The pre-launch task defined in `.vscode/tasks.json` runs `npm run watch:debug`, which keeps rebuilding `.debug/bundled.js` with inline sourcemaps.
-4. VS Code launches Firefox to the URL from `launch.json` (default: `https://en.wikipedia.org/wiki/Terraria`) and sideloads the `.debug` extension. The debugger auto-reloads the page whenever `bundled.js`, `inject.js`, or `manifest.json` change, so edits + saves immediately refresh the gadget.
+4. VS Code launches Firefox to the URL from `launch.json` and sideloads the `.debug` extension. The debugger auto-reloads the page whenever `bundled.js`, `inject.js`, or `manifest.json` change, so edits + saves immediately refresh the gadget.
 5. Set breakpoints anywhere in the TypeScript source; Firefox hits them against the rebuilt bundle thanks to the sourcemaps produced by the debug build.
 
-Tip: Update `url` in `.vscode/launch.json` if you want the debug session to start on another article or wiki. Stop the debug session to terminate the `watch:debug` background task.
+#### Chrome
+
+1. Open the *Run and Debug* panel and select **Debug Cite Forge on Chrome**. The built-in VS Code JavaScript debugger handles the `"chrome"` debug type.
+2. Press ▶️. The `prepare-debug-chrome` pre-launch task installs a workspace-local Chrome for Testing build if needed, then starts `npm run watch:debug`.
+3. VS Code launches Chrome to the URL from `launch.json` and loads `.debug` as an unpacked extension with a dedicated profile at `.debug/chrome-profile`.
+4. Set breakpoints anywhere in the TypeScript source; Chrome hits them against the rebuilt bundle thanks to the sourcemaps produced by the debug build.
+
+Tip: Update `url` in `.vscode/launch.json` if you want either debug session to start on another article or wiki. Stop the debug session to terminate the background watch task.
 
 **Persisting cookies between sessions.** The Firefox debugger spins up a temporary profile every time, so your wiki login cookies disappear at the end of each run. To keep them, point the `.vscode/launch.json` at a reusable profile directory and tell the debugger to save changes:
 
 ```jsonc
 {
- "name": "Debug Cite Forge on Wikipedia",
+ "name": "Debug Cite Forge on Firefox",
  // …
  "profileDir": "${workspaceFolder}/.debug/firefox-profile",
  "keepProfileChanges": true
@@ -91,6 +106,8 @@ Tip: Update `url` in `.vscode/launch.json` if you want the debug session to star
 ```
 
 The first launch will create the profile folder if it does not exist; afterwards your cookies, localStorage, and other profile data persist automatically. Delete `.debug/firefox-profile` whenever you want a clean slate.
+
+Chrome debugging already uses the reusable profile directory `.debug/chrome-profile`, so cookies and localStorage persist there automatically between runs. Delete that folder whenever you want a clean slate.
 
 **Disable the Meta-hosted loader while debugging.** If your user `common.js` (or `global.js`) loads the Meta-hosted script, add a guard to skip it when you are running the local debug extension:
 
