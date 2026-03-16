@@ -68,7 +68,7 @@
 	"ui.extract.dialog.outputLabel": "Extracted wikitext",
 	"ui.extract.dialog.extractButton": "Extract",
 	"ui.insertCitation.toolbar.toolLabel": "Insert citation",
-	"ui.insertCitation.dialog.title": "Insert $1",
+	"ui.insertCitation.dialog.title": "Insert \"$1\"",
 	"ui.insertCitation.dialog.loadingParams": "Loading template params...",
 	"ui.insertCitation.dialog.refNameLabel": "Reference name",
 	"ui.insertCitation.dialog.refNamePlaceholder": "Ref name",

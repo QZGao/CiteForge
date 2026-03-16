@@ -74,7 +74,7 @@
 	"ui.extract.dialog.outputLabel": "擷取的 wikitext",
 	"ui.extract.dialog.extractButton": "擷取",
 	"ui.insertCitation.toolbar.toolLabel": "插入引用",
-	"ui.insertCitation.dialog.title": "插入 $1",
+	"ui.insertCitation.dialog.title": "插入「$1」",
 	"ui.insertCitation.dialog.loadingParams": "正在載入模板參數...",
 	"ui.insertCitation.dialog.refNameLabel": "引用名稱",
 	"ui.insertCitation.dialog.refNamePlaceholder": "引用名",
