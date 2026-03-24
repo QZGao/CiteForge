@@ -132,6 +132,7 @@ location.reload();
 - Icons and assets from:
   - [Codex](https://doc.wikimedia.org/codex/latest/) (MIT and CC BY 4.0) by Wikimedia Foundation
   - [Codicons](https://github.com/microsoft/vscode-codicons) (MIT and CC BY 4.0) by Microsoft
+  - [Tabler Icons](https://github.com/tabler/tabler-icons) (MIT) by Paweł Kuna
 - Inspired by the following works:
   - [QuickEditExt-Citations](https://github.com/QZGao/QuickEditExt-Citations) (MIT) by SuperGrey
   - [refOrganizer](https://github.com/QZGao/refOrganizer) and its upstream [refCon](https://github.com/Cumbril/refcon) (GNU GPL 3.0) by Kaniivel, SuperGrey, et al.
@@ -141,3 +142,6 @@ location.reload();
   - [HarvErrors](https://en.wikipedia.org/wiki/User:Ucucha/HarvErrors) (CC BY-SA 4.0) by Ucucha
   - [reviewsourcecheck](https://en.wikipedia.org/wiki/User:Lingzhi2/reviewsourcecheck) (CC BY-SA 4.0) by Lingzhi & Ucucha
   - [MOSNUM dates](https://zh.wikipedia.org/wiki/User:Vozhuo/Tool/MOSNUM_dates) (CC BY-SA 4.0) by Ohconfucius & Vozhuo
+- Used the following APIs:
+  - [MediaWiki Action API](https://www.mediawiki.org/wiki/API:Action_API) (GPL 2.0 or later) by Wikimedia Foundation
+  - [Citoid](https://www.mediawiki.org/wiki/Citoid) (MIT) by Wikimedia Foundation

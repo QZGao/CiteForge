@@ -58,11 +58,22 @@
 										? t('ui.insertCitation.dialog.expandAuthorFields')
 										: t('ui.insertCitation.dialog.collapseAuthorFields')"
 								@click.prevent="setAuthorMode(row, row.mode !== 'single')">
-								<svg v-if="row.mode === 'single'" viewBox="0 0 20 20" aria-hidden="true">
-									<path d="m17.5 4.75-7.5 7.5-7.5-7.5L1 6.25l9 9 9-9z" />
+								<svg v-if="row.mode === 'single'" viewBox="0 0 24 24" stroke-width="2.25"
+									stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"
+									aria-hidden="true">
+									<path d="M17 13l4 -4l-4 -4" />
+									<path d="M7 13l-4 -4l4 -4" />
+									<path d="M12 14a5 5 0 0 1 5 -5h4" />
+									<path d="M12 19v-5a5 5 0 0 0 -5 -5h-4" />
 								</svg>
-								<svg v-else viewBox="0 0 20 20" aria-hidden="true">
-									<path d="m2.5 15.25 7.5-7.5 7.5 7.5 1.5-1.5-9-9-9 9z" />
+								<svg v-else viewBox="0 0 24 24" stroke-width="2.25" stroke="currentColor" fill="none"
+									stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+									<path d="M11 16h10" />
+									<path d="M11 16l4 4" />
+									<path d="M11 16l4 -4" />
+									<path d="M13 8h-10" />
+									<path d="M13 8l-4 4" />
+									<path d="M13 8l-4 -4" />
 								</svg>
 							</button>
 
