@@ -142,3 +142,6 @@ location.reload();
   - [HarvErrors](https://en.wikipedia.org/wiki/User:Ucucha/HarvErrors) (CC BY-SA 4.0) by Ucucha
   - [reviewsourcecheck](https://en.wikipedia.org/wiki/User:Lingzhi2/reviewsourcecheck) (CC BY-SA 4.0) by Lingzhi & Ucucha
   - [MOSNUM dates](https://zh.wikipedia.org/wiki/User:Vozhuo/Tool/MOSNUM_dates) (CC BY-SA 4.0) by Ohconfucius & Vozhuo
+- Used the following APIs:
+  - [MediaWiki Action API](https://www.mediawiki.org/wiki/API:Action_API) (GPL 2.0 or later) by Wikimedia Foundation
+  - [Citoid](https://www.mediawiki.org/wiki/Citoid) (MIT) by Wikimedia Foundation
