@@ -196,20 +196,31 @@ function buildLdrEntries(
 	dateFormat: DateFormat = 'iso'
 ): Array<{ name: string; group: string | null; content: string }> {
 	const list: Array<{ name: string; group: string | null; content: string }> = [];
+	const seenNames = new Set<string>(); // Track names to prevent duplicates
 	refIterator(refs).forEach((ref) => {
 		const canonical = ref.canonical ?? ref;
+
 		if (canonical !== ref) return;
 		if (canonical.targetLocation !== 'ldr') return;
 		if (!canonical.name) return;
+
+		// Prevent duplicate reference names in reflist
+		// If this name already exists, skip it to avoid collisions
+		const nameKey = `${canonical.name}|${normalizeGroupValue(canonical.group)}`;
+		if (seenNames.has(nameKey)) return;
+		seenNames.add(nameKey);
+
 		const override = contentOverrideLookup?.(canonical);
 		const content = override !== undefined ? override : firstContent(canonical);
 		if (!content) return;
+
 		list.push({
 			name: canonical.name,
 			group: canonical.group,
 			content: normalize ? normalizeRefBody(content, dateFormat) : normalizeContentBlock(content)
 		});
 	});
+
 	return list;
 }
 
@@ -451,6 +462,7 @@ function findTemplateEnd(text: string, start: number): number {
 			if (depth === 0) {
 				return i + 1;
 			}
+			continue;
 		}
 	}
 	return -1;
@@ -1949,9 +1961,22 @@ function applyDedupe(refs: Map<RefKey, RefRecord>): Array<{ from: string; to: st
 		const templateInfo = buildTemplateFingerprint(content);
 		if (templateInfo) {
 			const urlKey = getUrlKey(templateInfo) ?? '';
+
 			const bucket = bucketsByUrl.get(urlKey);
 			if (bucket) {
-				const match = bucket.find((entry) => templatesCompatible(entry.fingerprint, templateInfo));
+				const match = bucket.find((entry) => {
+					// Only merge refs without URL if they have overlapping parameters. This prevents false positives like merging magazine cites which have no URL and no matching parameters.
+					if (urlKey === '') {
+						// No URL - require parameter overlap to consider as potential duplicate
+						const hasParamOverlap = Array.from(templateInfo.params.entries()).some(([key]) => {
+							return entry.fingerprint.params.has(key);
+						});
+						if (!hasParamOverlap) {
+							return false;
+						}
+					}
+					return templatesCompatible(entry.fingerprint, templateInfo);
+				});
 				if (match && match.canonical.name) {
 					ref.canonical = match.canonical;
 					inheritDefinitionContent(match.canonical, ref);
