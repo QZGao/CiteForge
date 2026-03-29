@@ -22,7 +22,17 @@ type TemplateDataPage = {
  * @returns Normalized template name.
  */
 function normalizeTemplateName(name: string): string {
-	return name.trim().toLowerCase();
+	return name.trim().replace(/[_\s]+/g, ' ').toLowerCase();
+}
+
+/**
+ * Normalize a TemplateData parameter key for cache storage and lookup.
+ * TemplateData can differ between wikis on whether it uses underscores or hyphens.
+ * @param name - Raw TemplateData parameter key.
+ * @returns Normalized key.
+ */
+function normalizeTemplateParamKey(name: string): string {
+	return name.trim().toLowerCase().replace(/[_-]+/g, '-');
 }
 
 /**
@@ -45,12 +55,28 @@ function normalizeOrder(template: string, order: string[]): string[] {
 	const seen = new Set<string>();
 	const normalized: string[] = [];
 	order.forEach((item) => {
-		const key = item.trim().toLowerCase();
+		const key = normalizeTemplateParamKey(item);
 		if (!key || seen.has(key)) return;
 		seen.add(key);
 		normalized.push(key);
 	});
 	console.info('[Cite Forge][TemplateData] Normalized order', { template, size: normalized.length });
+	return normalized;
+}
+
+/**
+ * Normalize a TemplateData alias map for cache storage and lookup.
+ * @param aliases - Raw alias map.
+ * @returns Normalized alias map.
+ */
+function normalizeAliasMap(aliases: Record<string, string>): Record<string, string> {
+	const normalized: Record<string, string> = {};
+	Object.entries(aliases).forEach(([alias, canonical]) => {
+		const normAlias = normalizeTemplateParamKey(alias);
+		const normCanonical = normalizeTemplateParamKey(canonical);
+		if (!normAlias || !normCanonical) return;
+		normalized[normAlias] = normCanonical;
+	});
 	return normalized;
 }
 
@@ -65,7 +91,7 @@ function setTemplateData(name: string, order: string[], aliases: Record<string, 
 	const norm = normalizeTemplateName(name);
 	const normalized = normalizeOrder(norm, order);
 	templateDataOrderCache.set(norm, normalized);
-	templateDataAliasCache.set(norm, aliases);
+	templateDataAliasCache.set(norm, normalizeAliasMap(aliases));
 	if (citoidMap) {
 		templateDataCitoidMapCache.set(norm, citoidMap);
 	} else {
@@ -150,11 +176,11 @@ export async function ensureTemplateOrders(names: string[]): Promise<void> {
  * wikitext so that downstream synchronous normalization can use cached data.
  */
 export async function prefetchTemplateDataForWikitext(wikitext: string): Promise<void> {
-	const citeRegex = /\{\{\s*([Cc]ite\s+[^\|\}\n\r]+)\s*\|/g;
+	const citeRegex = /\{\{\s*([Cc]ite(?:[\s_]+)[^\|\}\n\r]+)\s*\|/g;
 	const names = new Set<string>();
 	let m: RegExpExecArray | null;
 	while ((m = citeRegex.exec(wikitext)) !== null) {
-		const name = m[1].trim().toLowerCase();
+		const name = normalizeTemplateName(m[1]);
 		if (name) names.add(name);
 	}
 	if (names.size === 0) return;
@@ -216,12 +242,14 @@ async function fetchAndStoreTemplateData(templateName: string): Promise<void> {
 			const citoidMap = citoidMapPage?.maps?.citoid && isTemplateCitoidMap(citoidMapPage.maps.citoid) ? citoidMapPage.maps.citoid : null;
 			if (paramsPage?.params) {
 				Object.entries(paramsPage.params).forEach(([paramName, info]) => {
+					const canonicalName = normalizeTemplateParamKey(paramName);
+					if (!canonicalName) return;
 					const aliases = info?.aliases;
 					if (Array.isArray(aliases)) {
 						aliases.forEach((alias) => {
-							const normAlias = alias.trim().toLowerCase();
+							const normAlias = normalizeTemplateParamKey(alias);
 							if (!normAlias) return;
-							aliasMap[normAlias] = paramName.trim().toLowerCase();
+							aliasMap[normAlias] = canonicalName;
 						});
 					}
 				});
@@ -319,13 +347,13 @@ function loadCache(): void {
 			string[] | { order: string[]; aliases?: Record<string, string>; citoid?: TemplateCitoidMap }
 		>;
 		Object.entries(parsed).forEach(([name, order]) => {
+			const norm = normalizeTemplateName(name);
 			if (Array.isArray(order)) {
-				templateDataOrderCache.set(name, order);
-				templateDataAliasCache.set(name, {});
+				templateDataOrderCache.set(norm, normalizeOrder(norm, order));
+				templateDataAliasCache.set(norm, {});
 			} else if (order && Array.isArray(order.order)) {
-				const norm = normalizeTemplateName(name);
-				templateDataOrderCache.set(norm, order.order);
-				templateDataAliasCache.set(norm, order.aliases ?? {});
+				templateDataOrderCache.set(norm, normalizeOrder(norm, order.order));
+				templateDataAliasCache.set(norm, normalizeAliasMap(order.aliases ?? {}));
 				if (isTemplateCitoidMap(order.citoid)) {
 					templateDataCitoidMapCache.set(norm, order.citoid);
 				}

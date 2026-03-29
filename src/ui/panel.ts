@@ -96,6 +96,33 @@ function resolveRefByTargetId(refs: Reference[], targetId: string): Reference | 
 }
 
 /**
+ * Summarize the first textual difference between two strings for debugging.
+ * @param before - Original text.
+ * @param after - Updated text.
+ * @returns Diff summary, or null when texts are identical.
+ */
+function getFirstDiffSummary(before: string, after: string): {
+	index: number;
+	beforeSnippet: string;
+	afterSnippet: string
+} | null {
+	if (before === after) return null;
+	const max = Math.min(before.length, after.length);
+	let index = 0;
+	while (index < max && before[index] === after[index]) {
+		index++;
+	}
+	const start = Math.max(0, index - 60);
+	const endBefore = Math.min(before.length, index + 120);
+	const endAfter = Math.min(after.length, index + 120);
+	return {
+		index,
+		beforeSnippet: before.slice(start, endBefore),
+		afterSnippet: after.slice(start, endAfter)
+	};
+}
+
+/**
  * Inject panel styles into the document once.
  */
 function injectPanelStyles(): void {
@@ -992,12 +1019,32 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					});
 
 					const transformOpts = settingsToTransformOptions(this.settings, renameMap, renameNameless, contentOverrides);
+					console.info('[Cite Forge][Save] Transform options', {
+						pendingChanges: this.pendingChanges.length,
+						allowCosmetic,
+						normalizeAll: transformOpts.normalizeAll,
+						dedupe: transformOpts.dedupe,
+						locationMode: transformOpts.locationMode,
+						dateFormat: transformOpts.dateFormat
+					});
 
 					if (transformOpts.normalizeAll || transformOpts.dedupe) {
 						await prefetchTemplateDataForWikitext(base);
 					}
 
 					const result = transformWikitext(base, transformOpts);
+					console.info('[Cite Forge][Save] Transform result', {
+						changed: result.wikitext !== base,
+						baseLength: base.length,
+						resultLength: result.wikitext.length,
+						renamed: result.changes.renamed.length,
+						deduped: result.changes.deduped.length,
+						movedToInline: result.changes.movedToInline.length,
+						movedToLdr: result.changes.movedToLdr.length
+					});
+					if (result.wikitext !== base) {
+						console.info('[Cite Forge][Save] First diff', getFirstDiffSummary(base, result.wikitext));
+					}
 
 					if (result.wikitext === base) {
 						mw.notify?.(t('ui.panel.noChangesGenerated'), { type: 'info' });

@@ -129,7 +129,7 @@ function buildReplacementPlan(ctx: {
 
 	// Rebuild reflist templates
 	if (!opts.locationModeKeep) {
-		const ldrEntries = buildLdrEntries(ctx.refs, opts.contentOverrideLookup);
+		const ldrEntries = buildLdrEntries(ctx.refs, opts.contentOverrideLookup, opts.normalizeAll, opts.dateFormat);
 		const entriesByGroup = groupEntriesByGroup(ldrEntries);
 		const getEntries = (group: string | null): Array<{ name: string; group: string | null; content: string }> =>
 			entriesByGroup.get(normalizeGroupValue(group)) ?? [];
@@ -191,7 +191,9 @@ function buildReplacementPlan(ctx: {
  */
 function buildLdrEntries(
 	refs: Map<RefKey, RefRecord>,
-	contentOverrideLookup?: (ref: RefRecord) => string | undefined
+	contentOverrideLookup?: (ref: RefRecord) => string | undefined,
+	normalize = false,
+	dateFormat: DateFormat = 'iso'
 ): Array<{ name: string; group: string | null; content: string }> {
 	const list: Array<{ name: string; group: string | null; content: string }> = [];
 	refIterator(refs).forEach((ref) => {
@@ -202,7 +204,11 @@ function buildLdrEntries(
 		const override = contentOverrideLookup?.(canonical);
 		const content = override !== undefined ? override : firstContent(canonical);
 		if (!content) return;
-		list.push({ name: canonical.name, group: canonical.group, content });
+		list.push({
+			name: canonical.name,
+			group: canonical.group,
+			content: normalize ? normalizeRefBody(content, dateFormat) : normalizeContentBlock(content)
+		});
 	});
 	return list;
 }
@@ -425,6 +431,82 @@ function normalizeDateParamValue(name: string, value: string, dateFormat: DateFo
 }
 
 /**
+ * Find the end offset of a balanced template starting at the given index.
+ * @param text - Source text.
+ * @param start - Index where `{{` begins.
+ * @returns Exclusive end offset, or -1 if unbalanced.
+ */
+function findTemplateEnd(text: string, start: number): number {
+	let depth = 0;
+	for (let i = start; i < text.length - 1; i++) {
+		const pair = text[i] + text[i + 1];
+		if (pair === '{{') {
+			depth++;
+			i++;
+			continue;
+		}
+		if (pair === '}}') {
+			depth--;
+			i++;
+			if (depth === 0) {
+				return i + 1;
+			}
+		}
+	}
+	return -1;
+}
+
+/**
+ * Replace cite templates in a text block using balanced template parsing.
+ * @param text - Source text.
+ * @param replacer - Replacement callback.
+ * @returns Updated text.
+ */
+function replaceCitationTemplates(
+	text: string,
+	replacer: (templateText: string, templateName: string) => string
+): string {
+	let output = '';
+	let cursor = 0;
+
+	while (cursor < text.length) {
+		const start = text.indexOf('{{', cursor);
+		if (start === -1) {
+			output += text.slice(cursor);
+			break;
+		}
+
+		output += text.slice(cursor, start);
+		const head = text.slice(start);
+		const nameMatch = head.match(/^\{\{\s*([^{|}]+?)(?=\s*\||\s*}})/);
+		if (!nameMatch) {
+			output += '{{';
+			cursor = start + 2;
+			continue;
+		}
+
+		const templateName = nameMatch[1].trim();
+		if (!/^[Cc]ite(?:[\s_]+)/.test(templateName)) {
+			output += '{{';
+			cursor = start + 2;
+			continue;
+		}
+
+		const end = findTemplateEnd(text, start);
+		if (end === -1) {
+			output += text.slice(start);
+			break;
+		}
+
+		const templateText = text.slice(start, end);
+		output += replacer(templateText, templateName);
+		cursor = end;
+	}
+
+	return output;
+}
+
+/**
  * Normalize the body of a reference, reordering citation template parameters.
  * @param content - Raw content of the reference.
  * @param dateFormat - Desired date format for normalization.
@@ -432,52 +514,60 @@ function normalizeDateParamValue(name: string, value: string, dateFormat: DateFo
  */
 function normalizeRefBody(content: string, dateFormat: DateFormat): string {
 	let text = normalizeContentBlock(content);
-	const citeRegex = /\{\{\s*([Cc]ite\s+[^\|\}]+)\s*\|([\s\S]*?)\}\}/g;
-	text = text.replace(citeRegex, (match, name: string, paramText: string) => {
-		const params = parseTemplateParams('|' + paramText);
-		if (!params.length) return match;
+	text = replaceCitationTemplates(text, (match, name: string) => {
+		try {
+			const params = parseTemplateParams(match);
+			if (!params.length) return match;
 
-		const ordered: TemplateParam[] = [];
-		const used = new Set<number>();
-		const templateOrder = getTemplateParamOrder(name);
-		const aliasMap = getTemplateAliasMap(name);
+			const ordered: TemplateParam[] = [];
+			const used = new Set<number>();
+			const templateOrder = getTemplateParamOrder(name);
+			const aliasMap = getTemplateAliasMap(name);
 
-		const canonicalParam = (paramName?: string | null): string | null => {
-			if (!paramName) return null;
-			const norm = paramName.trim().toLowerCase();
-			return aliasMap[norm] ?? norm;
-		};
+			const canonicalParam = (paramName?: string | null): string | null => {
+				const norm = normalizeTemplateDataParamKey(paramName);
+				if (!norm) return null;
+				return aliasMap[norm] ?? norm;
+			};
 
-		templateOrder.forEach((key) => {
-			const target = canonicalParam(key);
-			if (!target) return;
-			const idx = params.findIndex((p, paramIdx) => {
-				if (used.has(paramIdx)) return false;
-				return canonicalParam(p.name) === target;
+			templateOrder.forEach((key) => {
+				const target = canonicalParam(key);
+				if (!target) return;
+				const idx = params.findIndex((p, paramIdx) => {
+					if (used.has(paramIdx)) return false;
+					return canonicalParam(p.name) === target;
+				});
+				if (idx >= 0 && !used.has(idx)) {
+					ordered.push(params[idx]);
+					used.add(idx);
+				}
 			});
-			if (idx >= 0 && !used.has(idx)) {
-				ordered.push(params[idx]);
-				used.add(idx);
-			}
-		});
 
-		params.forEach((p, idx) => {
-			if (!used.has(idx)) {
-				ordered.push(p);
-				used.add(idx);
-			}
-		});
+			params.forEach((p, idx) => {
+				if (!used.has(idx)) {
+					ordered.push(p);
+					used.add(idx);
+				}
+			});
 
-		const parts = ordered.map((p) => {
-			const val = String(p.value).trim();
-			const name = p.name?.trim();
-			if (name) {
-				const normalizedValue = normalizeDateParamValue(name, val, dateFormat);
-				return `${name}=${normalizedValue}`;
-			}
-			return val;
-		});
-		return `{{${name.trim()}${parts.length ? ' |' + parts.join(' |') : ''}}}`;
+			const parts = ordered.map((p) => {
+				const val = String(p.value).trim();
+				const name = p.name?.trim();
+				if (name) {
+					const normalizedValue = normalizeDateParamValue(name, val, dateFormat);
+					return `${name}=${normalizedValue}`;
+				}
+				return val;
+			});
+			return `{{${name.trim()}${parts.length ? ' |' + parts.join(' |') : ''}}}`;
+		} catch (err) {
+			console.warn('[Cite Forge][Normalize] Failed to normalize citation template body', {
+				templateName: name.trim(),
+				snippet: match.slice(0, 240),
+				error: err
+			});
+			return match;
+		}
 	});
 
 	return text;
@@ -1202,19 +1292,38 @@ export function transformWikitext(wikitext: string, options: TransformOptions = 
 
 	applyRenames(ctx.refs, renameMap, renameNameless);
 	ctx.refs = normalizeRefKeys(ctx.refs);
-	const deduped = dedupe ? applyDedupe(ctx.refs) : [];
+	let deduped: Array<{ from: string; to: string }> = [];
+	try {
+		deduped = dedupe ? applyDedupe(ctx.refs) : [];
+	} catch (err) {
+		console.error('[Cite Forge][Transform] Failed during dedupe', err);
+		throw err;
+	}
 	assignLocations(ctx.refs, targetMode);
 
-	const plan = buildReplacementPlan(ctx, {
-		preferTemplateR,
-		preferTemplateReflist,
-		sortRefs,
-		normalizeAll,
-		dateFormat,
-		locationModeKeep: targetMode === 'keep',
-		renameLookup: (name: string) => renameMap[name],
-		contentOverrideLookup
-	});
+	let plan: ReturnType<typeof buildReplacementPlan>;
+	try {
+		plan = buildReplacementPlan(ctx, {
+			preferTemplateR,
+			preferTemplateReflist,
+			sortRefs,
+			normalizeAll,
+			dateFormat,
+			locationModeKeep: targetMode === 'keep',
+			renameLookup: (name: string) => renameMap[name],
+			contentOverrideLookup
+		});
+	} catch (err) {
+		console.error('[Cite Forge][Transform] Failed during replacement planning', {
+			normalizeAll,
+			dateFormat,
+			preferTemplateR,
+			preferTemplateReflist,
+			refCount: ctx.refs.size,
+			error: err
+		});
+		throw err;
+	}
 
 	const replaced = applyReplacements(wikitext, plan.replacements);
 	const finalText = preferTemplateR ? collapseRefsAndRp(replaced, true) : replaced;
@@ -1452,6 +1561,19 @@ function normalizeTemplateName(name: string): string {
 }
 
 /**
+ * Normalize a TemplateData parameter key while keeping it distinct from
+ * Cite Forge's local semantic alias groups.
+ * @param name - Raw TemplateData parameter key.
+ * @returns Normalized key or null if empty.
+ */
+function normalizeTemplateDataParamKey(name?: string | null): string | null {
+	if (name === undefined || name === null) return null;
+	const trimmed = name.trim().toLowerCase();
+	if (!trimmed) return null;
+	return trimmed.replace(/[_-]+/g, '-');
+}
+
+/**
  * Normalize a template parameter key.
  * @param name - Parameter name to normalize.
  * @returns Normalized parameter key or null if invalid.
@@ -1473,8 +1595,7 @@ function normalizeParamKey(name?: string | null): string | null {
  * @returns Normalized parameter key or null if invalid.
  */
 function normalizeParamKeyWithAlias(name: string | null | undefined, aliasMap: Record<string, string>): string | null {
-	if (name === undefined || name === null) return null;
-	const trimmed = name.trim().toLowerCase();
+	const trimmed = normalizeTemplateDataParamKey(name);
 	if (!trimmed) return null;
 	if (/^\d+$/.test(trimmed)) return trimmed;
 

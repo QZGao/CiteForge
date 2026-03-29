@@ -54,4 +54,31 @@ describe('TemplateData citoid map fetch', () => {
 			url: 'url'
 		});
 	});
+
+	it('normalizes underscore and hyphen variants in fetched TemplateData keys', async () => {
+		const fetchMock = vi.fn().mockResolvedValue({
+			json: async () => ({
+				pages: {
+					'cite video game': {
+						title: 'Template:Cite video game',
+						paramorder: ['title', 'trans_title', 'script-title'],
+						params: {
+							title: { aliases: [] },
+							trans_title: { aliases: ['trans-title'] },
+							'script-title': { aliases: [] }
+						}
+					}
+				}
+			})
+		});
+		globalThis.fetch = fetchMock as typeof fetch;
+
+		const { fetchTemplateDataOrder, getTemplateAliasMap } = await import('../../src/data/templatedata_fetch');
+		const order = await fetchTemplateDataOrder('cite video game');
+
+		expect(order).toEqual(['title', 'trans-title', 'script-title']);
+		expect(getTemplateAliasMap('cite video game')).toEqual({
+			'trans-title': 'trans-title'
+		});
+	});
 });

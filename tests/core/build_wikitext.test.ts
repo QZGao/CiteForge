@@ -627,6 +627,21 @@ Lead <ref name="a">Alpha</ref> tail <ref name="b">Beta</ref>
 		expect(result.wikitext).toContain('publication-date=21 May 2021');
 	});
 
+	it('normalizes cite templates that contain nested templates in parameter values', async () => {
+		const source = '<ref name="nested">{{cite web|last=Smith|title={{lang|ja|テスト}}|url=https://example.com|access-date=2021年5月2日}}</ref>';
+		await prefetchTemplateDataForWikitext(source);
+		const result = transformWikitext(source, { normalizeAll: true });
+		expect(result.wikitext).toBe('<ref name="nested">{{cite web |title={{lang|ja|テスト}} |url=https://example.com |last=Smith |access-date=2021-05-02}}</ref>');
+	});
+
+	it('preserves normalization when rebuilding refs into list-defined references', async () => {
+		const source = 'Lead <ref name="date-test">{{cite web|last=Smith|title=Foo|url=https://example.com|access-date=2021年5月2日}}</ref>\n\n<references />';
+		await prefetchTemplateDataForWikitext(source);
+		const result = transformWikitext(source, { normalizeAll: true, locationMode: 'all_ldr' });
+		expect(result.wikitext).toContain('<ref name="date-test" />');
+		expect(result.wikitext).toContain('<ref name="date-test">{{cite web |title=Foo |url=https://example.com |last=Smith |access-date=2021-05-02}}</ref>');
+	});
+
 	it('normalizes ref content, test 3', async () => {
 		const source = `<ref name="OXMUK_20130510">{{Cite magazine |title=''Terraria'' – Can Re-Logic’s tile-based sandbox dig its way out of Minecraft’s shadow? |last=Borthwick |first=Ben |magazine=[[Official Xbox Magazine|Xbox 360: The Official Xbox Magazine (UK)]] |date=2013-05-10 |issue=99 (June 2013) |publisher=[[Future Publishing]] |pages=84–85 |language=en-GB |issn=1534-7850}}</ref>`;
 		await prefetchTemplateDataForWikitext(source);
