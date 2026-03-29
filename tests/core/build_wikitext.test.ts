@@ -689,10 +689,10 @@ Lead <ref name="a">Alpha</ref> tail <ref name="b">Beta</ref>
 		// Regression test for findTemplateEnd when handling nested templates
 		// e.g., {{Cite web|website={{tsl|en|Earth}}}} has }}}} at the end (closing inner template then outer template)
 		const source = '<ref name="earth">{{Cite web|website={{tsl|en|Earth}}}}</ref>';
-		const result = transformWikitext(source, { locationMode: 'all_inline' });
+		const result = transformWikitext(source, { locationMode: 'all_inline', normalizeAll: true });
 
 		// Template should be parsed correctly without truncation
-		expect(result.wikitext).toContain('<ref name="earth">{{Cite web|website={{tsl|en|Earth}}}}</ref>');
+		expect(result.wikitext).toContain('<ref name="earth">{{Cite web |website={{tsl|en|Earth}}}}</ref>');
 		expect(result.warnings).toHaveLength(0);
 		expect(result.changes.renamed).toHaveLength(0);
 	});
