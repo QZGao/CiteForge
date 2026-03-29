@@ -763,7 +763,6 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			 * Toggle the checks feature on or off.
 			 */
 			toggleChecks(this: InspectorCtx): void {
-				// console.info('[Cite Forge][Checks] Toggle requested', { current: this.checksOn, refs: this.refs.length });
 				if (isChecksActive() || this.checksOn) {
 					disableChecks();
 					this.checksOn = false;
