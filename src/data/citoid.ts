@@ -94,7 +94,7 @@ function extractCitoidItem(payload: unknown): CitoidDataObject | null {
  */
 export async function fetchCitoidData(query: string): Promise<CitoidDataObject> {
 	const requestDetails = resolveCitoidRequest(query);
-	console.info('[Cite Forge][Citoid] Requesting citation data', requestDetails);
+	// console.info('[Cite Forge][Citoid] Requesting citation data', requestDetails);
 
 	const requestHeaders = {
 		accept: 'application/json'

@@ -763,7 +763,6 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 			 * Toggle the checks feature on or off.
 			 */
 			toggleChecks(this: InspectorCtx): void {
-				console.info('[Cite Forge][Checks] Toggle requested', { current: this.checksOn, refs: this.refs.length });
 				if (isChecksActive() || this.checksOn) {
 					disableChecks();
 					this.checksOn = false;
@@ -992,12 +991,29 @@ export async function openInspectorDialog(refs: Reference[], refreshFn?: () => P
 					});
 
 					const transformOpts = settingsToTransformOptions(this.settings, renameMap, renameNameless, contentOverrides);
+					// console.info('[Cite Forge][Save] Transform options', {
+					// 	pendingChanges: this.pendingChanges.length,
+					// 	allowCosmetic,
+					// 	normalizeAll: transformOpts.normalizeAll,
+					// 	dedupe: transformOpts.dedupe,
+					// 	locationMode: transformOpts.locationMode,
+					// 	dateFormat: transformOpts.dateFormat
+					// });
 
 					if (transformOpts.normalizeAll || transformOpts.dedupe) {
 						await prefetchTemplateDataForWikitext(base);
 					}
 
 					const result = transformWikitext(base, transformOpts);
+					// console.info('[Cite Forge][Save] Transform result', {
+					// 	changed: result.wikitext !== base,
+					// 	baseLength: base.length,
+					// 	resultLength: result.wikitext.length,
+					// 	renamed: result.changes.renamed.length,
+					// 	deduped: result.changes.deduped.length,
+					// 	movedToInline: result.changes.movedToInline.length,
+					// 	movedToLdr: result.changes.movedToLdr.length
+					// });
 
 					if (result.wikitext === base) {
 						mw.notify?.(t('ui.panel.noChangesGenerated'), { type: 'info' });

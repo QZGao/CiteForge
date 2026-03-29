@@ -627,6 +627,21 @@ Lead <ref name="a">Alpha</ref> tail <ref name="b">Beta</ref>
 		expect(result.wikitext).toContain('publication-date=21 May 2021');
 	});
 
+	it('normalizes cite templates that contain nested templates in parameter values', async () => {
+		const source = '<ref name="nested">{{cite web|last=Smith|title={{lang|ja|テスト}}|url=https://example.com|access-date=2021年5月2日}}</ref>';
+		await prefetchTemplateDataForWikitext(source);
+		const result = transformWikitext(source, { normalizeAll: true });
+		expect(result.wikitext).toBe('<ref name="nested">{{cite web |title={{lang|ja|テスト}} |url=https://example.com |last=Smith |access-date=2021-05-02}}</ref>');
+	});
+
+	it('preserves normalization when rebuilding refs into list-defined references', async () => {
+		const source = 'Lead <ref name="date-test">{{cite web|last=Smith|title=Foo|url=https://example.com|access-date=2021年5月2日}}</ref>\n\n<references />';
+		await prefetchTemplateDataForWikitext(source);
+		const result = transformWikitext(source, { normalizeAll: true, locationMode: 'all_ldr' });
+		expect(result.wikitext).toContain('<ref name="date-test" />');
+		expect(result.wikitext).toContain('<ref name="date-test">{{cite web |title=Foo |url=https://example.com |last=Smith |access-date=2021-05-02}}</ref>');
+	});
+
 	it('normalizes ref content, test 3', async () => {
 		const source = `<ref name="OXMUK_20130510">{{Cite magazine |title=''Terraria'' – Can Re-Logic’s tile-based sandbox dig its way out of Minecraft’s shadow? |last=Borthwick |first=Ben |magazine=[[Official Xbox Magazine|Xbox 360: The Official Xbox Magazine (UK)]] |date=2013-05-10 |issue=99 (June 2013) |publisher=[[Future Publishing]] |pages=84–85 |language=en-GB |issn=1534-7850}}</ref>`;
 		await prefetchTemplateDataForWikitext(source);
@@ -668,5 +683,75 @@ Lead <ref name="a">Alpha</ref> tail <ref name="b">Beta</ref>
 		expect(result.wikitext).toContain(`<references>
 <ref name="a_ref">This is a reference.</ref>
 </references>`);
+	});
+
+	it('parses templates with nested templates having consecutive closing braces (}}}})', () => {
+		// Regression test for findTemplateEnd when handling nested templates
+		// e.g., {{Cite web|website={{tsl|en|Earth}}}} has }}}} at the end (closing inner template then outer template)
+		const source = '<ref name="earth">{{Cite web|website={{tsl|en|Earth}}}}</ref>';
+		const result = transformWikitext(source, { locationMode: 'all_inline', normalizeAll: true });
+
+		// Template should be parsed correctly without truncation
+		expect(result.wikitext).toContain('<ref name="earth">{{Cite web |website={{tsl|en|Earth}}}}</ref>');
+		expect(result.warnings).toHaveLength(0);
+		expect(result.changes.renamed).toHaveLength(0);
+	});
+
+	it('parses multiple cite templates with nested templates', async () => {
+		const source = `<ref name="ref1">{{Cite web|title=Example|website={{tsl|fr|Example}}}}</ref> and <ref name="ref2">{{Cite web|title=Test|url=https://example.com|work={{tsl|de|Werk}}}}</ref>`;
+		await prefetchTemplateDataForWikitext(source);
+		const result = transformWikitext(source, { normalizeAll: true });
+
+		// Both refs should be parsed and preserved
+		expect(result.wikitext).toContain('{{tsl|fr|Example}}');
+		expect(result.wikitext).toContain('{{tsl|de|Werk}}');
+		expect(result.wikitext).toContain('name="ref1"');
+		expect(result.wikitext).toContain('name="ref2"');
+	});
+
+	it('parses Multiref templates with deeply nested citations', async () => {
+		// Complex real-world example with Multiref containing multiple Cite templates
+		const source = `<ref name="animage-2025年1月号">{{Multiref|{{Cite magazine |last=アニメージュ編集部 |magazine=[[Animage|アニメージュ]] |date=2024-12-10 |issue=559 (2025年1月号) |language=ja |script-title=ja:マスカレードが始まる |asin=B00PG3CDE2 |asin-tld=co.jp |pp=40–43}}|{{Cite news |url=https://animageplus.jp/news/detail/96 |script-title=ja:アニメージュ2025年1月号に関するお詫び |author=アニメージュ編集部 |work=[[Animage|アニメージュ]] |date=2024-12-20 |accessdate=2025-03-14 |language=ja |archive-date=2025-02-15 |archive-url=https://web.archive.org/web/20250215042453/https://animageplus.jp/news/detail/96 |dead-url=no}}}}</ref>`;
+		await prefetchTemplateDataForWikitext(source);
+		const result = transformWikitext(source, { locationMode: 'all_inline', normalizeAll: true });
+
+		// Template should be parsed completely without truncation
+		expect(result.wikitext).toContain('{{Multiref|');
+		expect(result.wikitext).toContain('{{Cite magazine');
+		expect(result.wikitext).toContain('{{Cite news');
+		expect(result.wikitext).toContain('name="animage-2025年1月号"');
+		// Verify it wasn't truncated (the full name with closing quotes should be present)
+		expect(result.wikitext).toContain('name="animage-2025年1月号">{{Multiref');
+	});
+
+	it('parses two consecutive Multiref definitions correctly without name confusion', async () => {
+		// Regression test for issue where animage-2025年1月号 gets confused with yomiuri-popstyle-960
+		// This matches the real-world pattern from temp.wikitext where both refs are used multiple times
+		const source = `導演表示... {{r|animage-2025年1月号}}。柿本廣大表示，祥子決定的契機...{{r|animage-2025年1月号}}。
+特別選擇在相同的音樂領域...{{r|animage-2025年1月号}}。
+柿本廣大在訪談中提到...{{r|animage-2025年1月号}}。
+現實樂團演出中，高尾奏音亦擔任鍵盤演奏{{r|yomiuri-popstyle-960}}。
+
+{{reflist|refs=
+<ref name="animage-2025年1月号">{{Multiref|{{Cite magazine |last=アニメージュ編集部 |magazine=[[Animage|アニメージュ]] |date=2024-12-10 |issue=559 (2025年1月号) |language=ja |script-title=ja:マスカレードが始まる |asin=B00PG3CDE2 |asin-tld=co.jp |pp=40–43}}|{{Cite news |url=https://animageplus.jp/news/detail/96 |script-title=ja:アニメージュ2025年1月号に関するお詫び |author=アニメージュ編集部 |work=[[Animage|アニメージュ]] |date=2024-12-20 |accessdate=2025-03-14 |language=ja |archive-date=2025-02-15 |archive-url=https://web.archive.org/web/20250215042453/https://animageplus.jp/news/detail/96 |dead-url=no}}}}</ref>
+<ref name="yomiuri-popstyle-960">{{Multiref|{{cite magazine |script-title=ja:ALL ABOUT ようこそ Ave Mujicaの世界へ |date=2025-08-20 |issue=960 |language=ja }}|{{cite web |url=https://example.com |title=Example |date=2025-09-08 |accessdate=2026-03-08 |language=ja }}}}</ref>
+}}`;
+		await prefetchTemplateDataForWikitext(source);
+		const result = transformWikitext(source, { locationMode: 'all_ldr', preferTemplateR: true });
+
+		// Both references should be parsed correctly with their own names preserved
+		expect(result.wikitext).toContain('name="animage-2025年1月号"');
+		expect(result.wikitext).toContain('name="yomiuri-popstyle-960"');
+		// Both should have proper uses (self-closing refs or {{r|...}} templates)
+		expect(result.wikitext).toContain('{{r|animage-2025年1月号}}');
+		expect(result.wikitext).toContain('{{r|yomiuri-popstyle-960}}');
+		// Both Multiref definitions in the reflist should be preserved
+		expect(result.wikitext.match(/{{Multiref\|/g)).toHaveLength(2);
+		// Verify that animage-2025年1月号 has exactly 4 uses (not merged with yomiuri)
+		const anImageMatches = result.wikitext.match(/{{r\|animage-2025年1月号}}/g) || [];
+		const yomiuriMatches = result.wikitext.match(/{{r\|yomiuri-popstyle-960}}/g) || [];
+		expect(anImageMatches.length).toBeGreaterThan(1); // Should have multiple uses
+		expect(yomiuriMatches.length).toBeGreaterThan(0);  // Should have at least one use
+		expect(anImageMatches.length).not.toEqual(yomiuriMatches.length); // Should be different counts
 	});
 });

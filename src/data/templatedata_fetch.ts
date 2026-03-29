@@ -22,7 +22,17 @@ type TemplateDataPage = {
  * @returns Normalized template name.
  */
 function normalizeTemplateName(name: string): string {
-	return name.trim().toLowerCase();
+	return name.trim().replace(/[_\s]+/g, ' ').toLowerCase();
+}
+
+/**
+ * Normalize a TemplateData parameter key for cache storage and lookup.
+ * TemplateData can differ between wikis on whether it uses underscores or hyphens.
+ * @param name - Raw TemplateData parameter key.
+ * @returns Normalized key.
+ */
+function normalizeTemplateParamKey(name: string): string {
+	return name.trim().toLowerCase().replace(/[_-]+/g, '-');
 }
 
 /**
@@ -45,12 +55,28 @@ function normalizeOrder(template: string, order: string[]): string[] {
 	const seen = new Set<string>();
 	const normalized: string[] = [];
 	order.forEach((item) => {
-		const key = item.trim().toLowerCase();
+		const key = normalizeTemplateParamKey(item);
 		if (!key || seen.has(key)) return;
 		seen.add(key);
 		normalized.push(key);
 	});
-	console.info('[Cite Forge][TemplateData] Normalized order', { template, size: normalized.length });
+	// console.info('[Cite Forge][TemplateData] Normalized order', { template, size: normalized.length });
+	return normalized;
+}
+
+/**
+ * Normalize a TemplateData alias map for cache storage and lookup.
+ * @param aliases - Raw alias map.
+ * @returns Normalized alias map.
+ */
+function normalizeAliasMap(aliases: Record<string, string>): Record<string, string> {
+	const normalized: Record<string, string> = {};
+	Object.entries(aliases).forEach(([alias, canonical]) => {
+		const normAlias = normalizeTemplateParamKey(alias);
+		const normCanonical = normalizeTemplateParamKey(canonical);
+		if (!normAlias || !normCanonical) return;
+		normalized[normAlias] = normCanonical;
+	});
 	return normalized;
 }
 
@@ -65,7 +91,7 @@ function setTemplateData(name: string, order: string[], aliases: Record<string, 
 	const norm = normalizeTemplateName(name);
 	const normalized = normalizeOrder(norm, order);
 	templateDataOrderCache.set(norm, normalized);
-	templateDataAliasCache.set(norm, aliases);
+	templateDataAliasCache.set(norm, normalizeAliasMap(aliases));
 	if (citoidMap) {
 		templateDataCitoidMapCache.set(norm, citoidMap);
 	} else {
@@ -84,10 +110,10 @@ export function getTemplateParamOrder(name: string): string[] {
 	const key = normalizeTemplateName(name);
 	const cached = templateDataOrderCache.get(key);
 	if (cached) {
-		console.info('[Cite Forge][TemplateData] Cache hit', { name: key, size: cached.length });
+		// console.info('[Cite Forge][TemplateData] Cache hit', { name: key, size: cached.length });
 		return cached;
 	}
-	console.info('[Cite Forge][TemplateData] No order found', { name: key });
+	// console.info('[Cite Forge][TemplateData] No order found', { name: key });
 	return [];
 }
 
@@ -120,7 +146,7 @@ export function getTemplateCitoidMap(name: string): TemplateCitoidMap | null {
  */
 export async function fetchTemplateDataOrder(templateName: string): Promise<string[]> {
 	const normName = normalizeTemplateName(templateName);
-	console.info('[Cite Forge][TemplateData] Requesting param order', { templateName, normName });
+	// console.info('[Cite Forge][TemplateData] Requesting param order', { templateName, normName });
 	await fetchAndStoreTemplateData(normName);
 	return getTemplateParamOrder(normName);
 }
@@ -132,7 +158,7 @@ export async function fetchTemplateDataOrder(templateName: string): Promise<stri
  */
 export async function fetchTemplateDataCitoidMap(templateName: string): Promise<TemplateCitoidMap | null> {
 	const normName = normalizeTemplateName(templateName);
-	console.info('[Cite Forge][TemplateData] Requesting citoid map', { templateName, normName });
+	// console.info('[Cite Forge][TemplateData] Requesting citoid map', { templateName, normName });
 	await fetchAndStoreEnwikiCitoidMap(normName);
 	return getTemplateCitoidMap(normName);
 }
@@ -150,11 +176,11 @@ export async function ensureTemplateOrders(names: string[]): Promise<void> {
  * wikitext so that downstream synchronous normalization can use cached data.
  */
 export async function prefetchTemplateDataForWikitext(wikitext: string): Promise<void> {
-	const citeRegex = /\{\{\s*([Cc]ite\s+[^\|\}\n\r]+)\s*\|/g;
+	const citeRegex = /\{\{\s*([Cc]ite(?:[\s_]+)[^\|\}\n\r]+)\s*\|/g;
 	const names = new Set<string>();
 	let m: RegExpExecArray | null;
 	while ((m = citeRegex.exec(wikitext)) !== null) {
-		const name = m[1].trim().toLowerCase();
+		const name = normalizeTemplateName(m[1]);
 		if (name) names.add(name);
 	}
 	if (names.size === 0) return;
@@ -176,7 +202,7 @@ async function fetchAndStoreTemplateData(templateName: string): Promise<void> {
 			// Skip if already cached
 			const existing = templateDataOrderCache.get(templateName);
 			if (existing) {
-				console.info('[Cite Forge][TemplateData] Using cached param order', { templateName, size: existing.length });
+				// console.info('[Cite Forge][TemplateData] Using cached param order', { templateName, size: existing.length });
 				return;
 			}
 			const mwApiCtor = (globalThis as unknown as { mw?: typeof mw }).mw?.Api;
@@ -184,7 +210,7 @@ async function fetchAndStoreTemplateData(templateName: string): Promise<void> {
 			if (mwApiCtor) {
 				const api = new mwApiCtor();
 				const title = `Template:${canonicalTemplateTitle(templateName).replace(/\s+/g, '_')}`;
-				console.info('[Cite Forge][TemplateData] Fetching via mw.Api', { title });
+				// console.info('[Cite Forge][TemplateData] Fetching via mw.Api', { title });
 				data = await api.get({
 					action: 'templatedata',
 					titles: title,
@@ -194,14 +220,14 @@ async function fetchAndStoreTemplateData(templateName: string): Promise<void> {
 			} else if (typeof fetch === 'function') {
 				const title = encodeURIComponent(`Template:${canonicalTemplateTitle(templateName)}`);
 				const url = `${API_ENDPOINT}?action=templatedata&titles=${title}&redirects=true&formatversion=2&format=json&origin=*`;
-				console.info('[Cite Forge][TemplateData] Fetching via http fetch', { url });
+				// console.info('[Cite Forge][TemplateData] Fetching via http fetch', { url });
 				const resp = await fetch(url);
 				data = await resp.json();
 			} else {
-				console.info('[Cite Forge][TemplateData] No mw.Api or fetch available; skipping fetch', { templateName });
+				// console.info('[Cite Forge][TemplateData] No mw.Api or fetch available; skipping fetch', { templateName });
 				return;
 			}
-			console.info('[Cite Forge][TemplateData] API response', data);
+			// console.info('[Cite Forge][TemplateData] API response', data);
 			const pages = getTemplateDataPages(data);
 			const orderFromParamOrder =
 				pages.find((p) => Array.isArray(p.paramorder) && p.paramorder.length)?.paramorder ||
@@ -216,26 +242,28 @@ async function fetchAndStoreTemplateData(templateName: string): Promise<void> {
 			const citoidMap = citoidMapPage?.maps?.citoid && isTemplateCitoidMap(citoidMapPage.maps.citoid) ? citoidMapPage.maps.citoid : null;
 			if (paramsPage?.params) {
 				Object.entries(paramsPage.params).forEach(([paramName, info]) => {
+					const canonicalName = normalizeTemplateParamKey(paramName);
+					if (!canonicalName) return;
 					const aliases = info?.aliases;
 					if (Array.isArray(aliases)) {
 						aliases.forEach((alias) => {
-							const normAlias = alias.trim().toLowerCase();
+							const normAlias = normalizeTemplateParamKey(alias);
 							if (!normAlias) return;
-							aliasMap[normAlias] = paramName.trim().toLowerCase();
+							aliasMap[normAlias] = canonicalName;
 						});
 					}
 				});
 			}
 			if (order.length || citoidMap) {
 				setTemplateData(templateName, order, aliasMap, citoidMap);
-				console.info('[Cite Forge][TemplateData] Stored fetched order', {
-					templateName,
-					size: templateDataOrderCache.get(templateName)?.length ?? order.length,
-					order: templateDataOrderCache.get(templateName),
-					hasCitoidMap: Boolean(citoidMap)
-				});
+				// console.info('[Cite Forge][TemplateData] Stored fetched order', {
+				// 	templateName,
+				// 	size: templateDataOrderCache.get(templateName)?.length ?? order.length,
+				// 	order: templateDataOrderCache.get(templateName),
+				// 	hasCitoidMap: Boolean(citoidMap)
+				// });
 			} else {
-				console.info('[Cite Forge][TemplateData] No paramorder or citoid map found after API', { templateName });
+				// console.info('[Cite Forge][TemplateData] No paramorder or citoid map found after API', { templateName });
 			}
 		} catch (err) {
 			console.warn('[Cite Forge] Failed to fetch TemplateData order', err);
@@ -262,29 +290,29 @@ async function fetchAndStoreEnwikiCitoidMap(templateName: string): Promise<void>
 	const promise = (async () => {
 		try {
 			if (typeof fetch !== 'function') {
-				console.info('[Cite Forge][TemplateData] No fetch available for enwiki citoid map request', { templateName });
+				// console.info('[Cite Forge][TemplateData] No fetch available for enwiki citoid map request', { templateName });
 				return;
 			}
 
 			const title = encodeURIComponent(`Template:${canonicalTemplateTitle(templateName)}`);
 			const url = `${ENWIKI_API_ENDPOINT}?action=templatedata&titles=${title}&redirects=true&formatversion=2&format=json&origin=*`;
-			console.info('[Cite Forge][TemplateData] Fetching citoid map from enwiki', { templateName, url });
+			// console.info('[Cite Forge][TemplateData] Fetching citoid map from enwiki', { templateName, url });
 			const resp = await fetch(url);
 			const data = (await resp.json()) as unknown;
-			console.info('[Cite Forge][TemplateData] Enwiki citoid map response', data);
+			// console.info('[Cite Forge][TemplateData] Enwiki citoid map response', data);
 
 			const pages = getTemplateDataPages(data);
 			const citoidMapPage = pages.find((page) => isTemplateCitoidMap(page.maps?.citoid));
 			const citoidMap = citoidMapPage?.maps?.citoid && isTemplateCitoidMap(citoidMapPage.maps.citoid) ? citoidMapPage.maps.citoid : null;
 
 			if (!citoidMap) {
-				console.info('[Cite Forge][TemplateData] No enwiki citoid map found', { templateName });
+				// console.info('[Cite Forge][TemplateData] No enwiki citoid map found', { templateName });
 				return;
 			}
 
 			templateDataCitoidMapCache.set(templateName, citoidMap);
 			saveCache();
-			console.info('[Cite Forge][TemplateData] Stored enwiki citoid map', { templateName });
+			// console.info('[Cite Forge][TemplateData] Stored enwiki citoid map', { templateName });
 		} catch (err) {
 			console.warn('[Cite Forge] Failed to fetch TemplateData citoid map from enwiki', err);
 		}
@@ -319,19 +347,19 @@ function loadCache(): void {
 			string[] | { order: string[]; aliases?: Record<string, string>; citoid?: TemplateCitoidMap }
 		>;
 		Object.entries(parsed).forEach(([name, order]) => {
+			const norm = normalizeTemplateName(name);
 			if (Array.isArray(order)) {
-				templateDataOrderCache.set(name, order);
-				templateDataAliasCache.set(name, {});
+				templateDataOrderCache.set(norm, normalizeOrder(norm, order));
+				templateDataAliasCache.set(norm, {});
 			} else if (order && Array.isArray(order.order)) {
-				const norm = normalizeTemplateName(name);
-				templateDataOrderCache.set(norm, order.order);
-				templateDataAliasCache.set(norm, order.aliases ?? {});
+				templateDataOrderCache.set(norm, normalizeOrder(norm, order.order));
+				templateDataAliasCache.set(norm, normalizeAliasMap(order.aliases ?? {}));
 				if (isTemplateCitoidMap(order.citoid)) {
 					templateDataCitoidMapCache.set(norm, order.citoid);
 				}
 			}
 		});
-		console.info('[Cite Forge][TemplateData] Loaded cache from storage', { size: templateDataOrderCache.size });
+		// console.info('[Cite Forge][TemplateData] Loaded cache from storage', { size: templateDataOrderCache.size });
 	} catch (err) {
 		console.warn('[Cite Forge][TemplateData] Failed to load cache', err);
 	}
